@@ -1,0 +1,40 @@
+Meeting 04/11/2016
+
+- Document and event clustering:
+    - Try to use some clustering algorithms without explicit number of clusters defined.
+    - Project the events into a 2D space and plot them graphically (either just the centroids or whole document sets).
+    - Use the Gensim implementation of LSI, since it has a good efficiency/quality ratio and allows batch updating.
+
+- In the future, event headlines may be retrieved from the event clusters:
+    - Perhaps the headline of the document closest to centroid?
+    - May not work correctly for periodic events though, as there are several bursts over the observed time period (football matches with different winners each time, extracting the correct title may prove difficult).
+
+- Keep working with the preprocessed documents:
+    - Use the full document set for extracting headlines, possibly also for setting a DPS boundary for stopwords detection.
+    - If there is some time left, play around with Doc2Vec?
+
+- Next steps:
+    - Merge the event clustering to the main project.
+    - I really should write something about the algorithm we have so far.
+
+
+Meeting 07/10/2016
+
+- Periodic events are mostly correct, though sometimes the cost function does not permit more word to be added together. This causes some real events to be scattered among several detected events.
+- Aperiodic events could be better -- they mostly contain very few words.
+
+- Periodicity classification problems:
+    - Some word features are incorrectly classified as periodic due to having several mild bursts apart from the main one.
+    - Signal processing methods may be employed to deal with this issue. Try to use some sort of filter to suppress mild bursts and propagate strong ones?
+
+- Discussed usage of Gensim:
+    - One idea is to modify the cost function to use some sort of semantic similarity between documents when grouping word features into events (possibly using Doc2Vec). This may not even be used, it just seemed like a cool idea for a while.
+    - Another idea is to use document similarity queries to collect the detected events into groups by their document set semantics. That way, events with similar meaning (e.g. "sport", "finance", "elections", etc.) will be grouped together. This sounds more promising.
+    - Both ideas are usable in online detection, and at least LDA and LSI models even support gradual "forgetting" of older documents.
+    - An initial model can be precomputed and stored in a file, and later updated with new documents as they come. This will require minimum additional computation in online detection.
+
+- Next steps:
+    - Try some signal cleaning methods to even out mild bursts causing aperiodic events to be incorrectly classified as periodic.
+    - Write a document describing how the algorithm currently works as a basis for future writings.
+    - Create a Jupyter notebook comparing various methods offered by Gensim to be used in semantic event grouping.
+    - Obtain full document set to allow dynamic stopwords detection and use of Word2Vec and Doc2Vec models. Will have to deal with lemmatization (not in stopword detection, stopwords can be processed as they are).
