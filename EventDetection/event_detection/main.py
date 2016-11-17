@@ -208,7 +208,7 @@ def precompute_divergences(feature_trajectories, dominant_periods):
     We keep only the points of the trajectory greater than cutoff, which are then modeled by Normal distribution
     (aperiodic features) or a mixture of Cauchy distributions (periodic features).
 
-    Depending on whether dominant_periods[0] > ceil(len(stream) / 2), aperiodic or periodic features, respectively,
+    Depending on whether dominant_periods[0] > floor(len(stream) / 2), aperiodic or periodic features, respectively,
     are assumed.
     :param feature_trajectories: matrix of feature trajectories as row vectors
     :param dominant_periods: dominant periods of all features matching feature_trajectories order
@@ -280,7 +280,7 @@ def precompute_divergences(feature_trajectories, dominant_periods):
 
     n_features, n_days = feature_trajectories.shape
 
-    if dominant_periods[0] > math.ceil(n_days / 2):
+    if dominant_periods[0] > math.floor(n_days / 2):
         distributions = np.apply_along_axis(estimate_distribution_aperiodic, axis=1, arr=feature_trajectories)
     else:
         indices = np.arange(len(feature_trajectories)).reshape(-1, 1)
@@ -403,9 +403,9 @@ def detect_events(bow_matrix, feature_trajectories, dps, dp, aperiodic):
     _, n_days = feature_trajectories.shape
 
     if aperiodic:
-        feature_indices = np.where((dps > DPS_BOUNDARY) & (dp > math.ceil(n_days / 2)))[0]
+        feature_indices = np.where((dps > DPS_BOUNDARY) & (dp > math.floor(n_days / 2)))[0]
     else:
-        feature_indices = np.where((dps > DPS_BOUNDARY) & (dp <= math.ceil(n_days / 2)))[0]
+        feature_indices = np.where((dps > DPS_BOUNDARY) & (dp <= math.floor(n_days / 2)))[0]
 
     bow_slice = bow_matrix[:, feature_indices]
     features = feature_trajectories[feature_indices, :]

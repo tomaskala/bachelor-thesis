@@ -56,7 +56,7 @@ def plot_aperiodic_features(feature_trajectories, dps, dp, dps_boundary, stream_
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    aperiodic_features_indices = np.where((dps > dps_boundary) & (dp > np.ceil(stream_length / 2)))[0]
+    aperiodic_features_indices = np.where((dps > dps_boundary) & (dp > np.floor(stream_length / 2)))[0]
     print('Plotting %d aperiodic features.' % len(aperiodic_features_indices))
 
     for i in aperiodic_features_indices:
@@ -79,7 +79,7 @@ def plot_periodic_features(feature_trajectories, dps, dp, dps_boundary, stream_l
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    periodic_features_indices = np.where((dps > dps_boundary) & (dp <= np.ceil(stream_length / 2)))[0]
+    periodic_features_indices = np.where((dps > dps_boundary) & (dp <= np.floor(stream_length / 2)))[0]
     print('Plotting %d periodic features.' % len(periodic_features_indices))
 
     for i in periodic_features_indices:
