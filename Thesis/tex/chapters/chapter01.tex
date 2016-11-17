@@ -1,6 +1,3 @@
-% \parencite[see][]{einstein}
-%\cite{latexcompanion}
-
 %\begin{figure}[h]
 %    \centering
 %	\includegraphics[scale=0.5]{graph}
@@ -8,15 +5,15 @@
 %	\label{fig:x sine graph}
 %\end{figure}
 
-The core of this algorithm is take from \cite{event-detection}.
+The core of this algorithm is taken from \cite{event-detection}.
 
 \section{Document fetching}
-We assume a collection of documents $\{d_{1}, d_{2}, \dots, d_{D}\}$ where for each document $d_{i}$, we know its publication day $t_{i}$. Then, the documents can be understood as a stream $\{(d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{D}, t_{D})\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $T$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 0$ and $t_{D} = T - 1$.
+We assume a collection of documents $\big\{d_{1}, d_{2}, \dots, d_{D}\big\}$ where for each document $d_{i}$, we know its publication day $t_{i}$. Then, the documents can be understood as a stream $\big\{(d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{D}, t_{D})\big\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $T$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{D} = T$.
 
 
 \section{Bag of words model}
 % TODO: blah blah we use the well known (binary) bag of words model, which drops the word order
-To vectorize the documents, we define a matrix $\mathbf{B} \in \{0, 1\}^{D \times V}$ where V is the total vocabulary size. The document collection can then be understood as a set of $D$ observations, each consisting of $V$ binary features. The matrix $\mathbf{B}$ is defined as
+To vectorize the documents, we define a matrix $\mathbf{B} \in \{0, 1\}^{D \times V}$ where V is the total vocabulary size. The document collection can then be interpreted as a set of $D$ observations, each consisting of $V$ binary features. The matrix $\mathbf{B}$ is defined as
 
 \begin{equation}
 	\mathbf{B}_{ij} = \begin{cases}
@@ -25,43 +22,46 @@ To vectorize the documents, we define a matrix $\mathbf{B} \in \{0, 1\}^{D \time
 	\end{cases}
 \end{equation}
 
-To limit the feature space, we trim the words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information.
+To limit the feature space, we trim the words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\mathbf{B}$ reasonably sized.
 
 From now on, we focus our analysis on the individual word features rather than whole documents.
 
 \section{Computing feature trajectories}
 The previous section represented word features in the document domain. This section focuses on representing these features in the time domain.
 
-A time trajectory of a feature $f$ is a vector $\mathbf{y}_f = \big(y_{f}(1), y_{f}(2), \dots, y_{f}(T)\big)$. Each element $y_{f}(t)$ represents the relative frequency of the feature $f$ at time $t$. This frequency is defined using the DFIDF score:
+A time trajectory of a feature $f$ is a vector $\mathbf{y}_f = \big[y_{f}(1), y_{f}(2), \dots, y_{f}(T)\big]$. Each element $y_{f}(t)$ represents the relative frequency of the feature $f$ at time $t$. This frequency is defined using the DFIDF score:
 
 \begin{equation}
 	y_{f}(t) \coloneqq \frac{\text{DF}_{f}(t)}{\text{D}(t)} \times \log{\frac{\text{D}}{\text{DF}_{f}}},
 \end{equation}
 
-where $\text{DF}_{f}(t)$ is the number of documents published on day $t$ which contain the feature $f$ (time-local document frequency), $\text{D}(t)$ is the number of documents published on day $t$ and $\text{DF}_{f}$ is the number of documents containing the feature $f$ (global document frequency).
+where $\text{DF}_{f}(t)$ is the number of documents published on day $t$ containing the feature $f$ (time-local document frequency), $\text{D}(t)$ is the number of documents published on day $t$ and $\text{DF}_{f}$ is the number of documents containing the feature $f$ (global document frequency).
 
-These feature trajectories are stored in a matrix $\mathbf{T} \in \R^{V \times T}$, with $\mathbf{y}_f$ being the $f$-th row of $\mathbf{T}$.
+These feature trajectories are stored in a matrix $\mathbf{T} \in \R^{V \times T}$, with $\mathbf{y}_f$ being the $f$-th row of $\mathbf{T}$. Here we utilize the normalization of the publication days, since they can now be used as column indices of $\mathbf{T}$.
 
 
 \section{Spectral analysis}
-The next step is to employ spectral analysis techniques borrowed from signal processing to discover periodicities in the features. Results from this section are used in the next section to categorize word features.
+The next step is to employ spectral analysis techniques borrowed from signal processing to discover periodicities in the features. Results from this section are further used to categorize the word features.
 
-The well known discrete Fourier transform is applied to each feature trajectory, yielding $\mathcal{F} \mathbf{y}_y = \big(X_{1}, X_{2}, \dots, X_{T}\big)$ such that
+The well known discrete Fourier transform is applied to each feature trajectory, yielding $\mathcal{F} \mathbf{y}_{f} = \big[X_{1}, X_{2}, \dots, X_{T}\big]$ such that
 
 \begin{equation}
 	X_{k} = \sum_{t = 1}^{T}{y_{f}(t) \me^{- \frac{2 \pi \mi}{T} (k - 1) t}}, ~ k \in \{1, 2, \dots, T\}.
 \end{equation}
 
-The periodogram estimator is then used to estimate the power spectral density from the Fourier coefficients $X_{k}$.
-% TODO: Write about periodogram.
-
-We define the dominant power spectrum of the feature $f$ as
+To estimate the power spectral density, we use the periodogram estimator:
 
 \begin{equation}
-	\text{DPS}_{f} \coloneqq \max_{k \leq \ceil{T/2}}{\|X_{k}\|^{2}},
+	P = \big[\|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{T / 2}}\|^{2}\big].
 \end{equation}
 
-and the dominant period as
+We define the dominant power spectrum of the feature $f$ as the maximum element of the periodogram, that is
+
+\begin{equation}
+	\text{DPS}_{f} \coloneqq \max_{k \leq \ceil{T/2}}{\|X_{k}\|^{2}}.
+\end{equation}
+
+Furthermore, we define the dominant period as the inverse of the frequency corresponding to the dominant power spectrum:
 
 \begin{equation}
 	\text{DP}_{f} \coloneqq \frac{1}{\mathit{freq}}.
@@ -69,27 +69,54 @@ and the dominant period as
 
 where \textit{freq} is the frequency corresponding to $\text{DPS}_{f}$.
 
+When applied to the matrix $\mathbf{T}$, this method yields two vectors, $\mathbf{DPS} \in \R^{V}$ and $\mathbf{DP} \in \N^{V}$, containing the dominant power spectra and dominant periods, respectively.
+
 
 \section{Feature categorization}
-Based on the dominant power spectra and dominant periods, we divide the features into two categories \footnote{\cite{event-detection} actually define \textit{five} such categories; however, our method uses only two of them.}:
+Based on the dominant power spectra and dominant periods, we divide the features into \underline{H}igh power-\underline{H}igh period and \underline{H}igh power-\underline{L}ow period categories \footnote{\cite{event-detection} actually define \textit{five} such categories; however, our method works only with the two sets of the most prominent features.}:
 
 \begin{equation}
-	\mathit{HH} \coloneqq \{f \mid DPS(f) > \textit{dps-bound}, ~ DP(f) > \ceil{T / 2}\},
+\begin{split}
+	\mathit{HH} \coloneqq \big\{f \mid DPS_{f} > \textit{dps-bound}, DP_{f} > \ceil{T / 2}\big\}, \\
+	\mathit{HL} \coloneqq \big\{f \mid DPS_{f} > \textit{dps-bound}, DP_{f} \leq \ceil{T / 2}\big\}.
+\end{split}
 \end{equation}
-
-\begin{equation}
-	\mathit{HL} \coloneqq \{f \mid DPS(f) > \textit{dps-bound}, ~ DP(f) \leq \ceil{T / 2}\},
-\end{equation}
-
-The \textit{HH} category corresponds to High power-High period features. Similarly, the \textit{HL} category corresponds to High power-Low period features.
-
-% TODO: Create a pretty figure.
 
 
 \section{Event detection}
 
+During the event detection phase, the aim is to find sets of features highly correlated both in the time domain and in the document domain. The assumption is that features appearing in similar documents during the same time periods concern the same real-world events. Each such feature set then represents a single event.
+
+By inspecting only the sets of high power features, we uncover only the features best describing the individual events. This also helps to reduce computation time, since there are generally much fewer high power features than the low power ones.
+
+We detect aperiodic and periodic features separately. First, because different techniques must be employed for time correlation analysis. Second, because we assume no connection between aperiodic events and the periodic ones. However, apart from the time correlation analysis, the algorithm is the same for both sets.
+
 \subsection{Measuring trajectory similarity}
+To measure how similar two trajectories are, we interpret them as probability distributions and compute their information divergences. However, due to the general noisiness of the trajectories, the divergences are not computed directly. Most features would then seem very far apart due to mild bursts malforming the distributions, while not really contributing to the underlying event.
+
+To counter this, we first filter out the mild bursts.
+
+Then, the trajectories are smoothened.
+
+Finally, we compute the information divergence between two trajectories...
+
+... and among a set of features.
 
 \subsection{Measuring document overlap}
+The document overlap is first defined for two features, and then generalized to a whole feature set.
+
+Let $M_{i}$ be the set of all documents containing a feature $f_{i}$, and $M_{j}$ the set of all documents containing a feature $f_{j}$. Then, the document overlap of the features $f_{i}$ and $f_{j}$ is defined as
+
+\begin{equation}
+	d(f_{i}, f_{j}) \coloneqq \frac{\left\vert{M_{i} \cap M{j}}\right\vert}{\min({\left\vert{M_{i}}\right\vert, \left\vert{M_{j}}\right\vert})}.
+\end{equation}
+
+Using this definition, the document overlap of a set of features $M$ can be defined as
+
+\begin{equation}
+	d(M) \coloneqq \min{\big\{d(f_{i}, f_{j}) \mid f_{i}, f_{j} \in M\big\}}.
+\end{equation}
+
+Since we aim to maximize the document overlap among a set of features, it makes sense to define it using minimum, as it takes care of the worst possible case.
 
 \subsection{Event detection}
