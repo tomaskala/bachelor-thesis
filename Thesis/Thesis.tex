@@ -21,10 +21,64 @@
 \usepackage{mathtools}
 
 
+%% Definitions %%
+
+
 \newcommand{\R}{\mathbb{R}}  % Pretty set of real numbers.
 \newcommand{\me}{\mathrm{e}}  % Pretty Euler number.
 \newcommand{\mi}{\mathrm{i}}  % Pretty imaginary unit.
 \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}  % The ceiling function.
 
 
-\input{tex/main}
+%% Document %%
+
+
+\begin{document}
+
+
+% Title page
+\input{tex/titlepage}
+
+
+% Abstract
+\input{tex/abstract}
+
+
+% Declaration
+\chapter*{Declaration}
+This is my declaration.
+
+
+% Acknowledgements
+\chapter*{Acknowledgements}
+These are my acknowledgements.
+
+
+% Table of contents
+\tableofcontents
+\listoffigures
+
+
+% Chapters
+\chapter*{Introduction}
+\addcontentsline{toc}{chapter}{Introduction}
+\input{tex/chapters/introduction}
+
+\chapter{Event detection algorithm}
+\input{tex/chapters/chapter01}
+
+\chapter*{Conclusion}
+\addcontentsline{toc}{chapter}{Conclusion}
+\input{tex/chapters/conclusion}
+
+
+% Appendices
+\appendix
+\chapter{Appendix Title}
+\input{tex/chapters/appendix}
+
+
+% Bibliography
+\printbibliography
+
+\end{document}
