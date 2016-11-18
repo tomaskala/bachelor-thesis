@@ -187,8 +187,8 @@ def moving_average(vector, window):
 
 def jensen_shannon_divergence(p, q):
     """
-    Compute the square root of Jensen-Shannon divergence between the two probability distributions. Jensen-Shannon
-    divergence is symmetric (in contrast to Kullback-Leibler divergence) and its square root is a proper metric.
+    Compute the Jensen-Shannon divergence between the two probability distributions. Jensen-Shannon divergence is
+    symmetric (in contrast to Kullback-Leibler divergence) and its square root is a proper metric.
     :param p: the true probability distribution
     :param q: the theoretical probability distribution
     :return: Jensen-Shannon divergence between the two probability distributions
