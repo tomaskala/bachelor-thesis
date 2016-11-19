@@ -5,60 +5,100 @@
 %	\label{fig:x sine graph}
 %\end{figure}
 
+
+\newcommand{\doccount}{N}
+\newcommand{\featcount}{V}
+\newcommand{\streamlen}{T}
+\newcommand{\traj}{y}
+\newcommand{\df}{DF}
+\newcommand{\featset}{\text{M}}
+
+\newcommand{\docoverlap}{d}
+
+\newcommand{\bowmat}{\mat{B}}
+\newcommand{\dtdmat}{\mat{D}}
+\newcommand{\trajmat}{\mat{T}}
+
+
 The core of this algorithm is taken from \cite{event-detection}.
 
 \section{Document fetching}
-We assume a collection of documents $\big\{d_{1}, d_{2}, \dots, d_{D}\big\}$ where for each document $d_{i}$, we know its publication day $t_{i}$. Then, the documents can be understood as a stream $\big\{(d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{D}, t_{D})\big\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $T$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{D} = T$.
+We assume a collection of documents $\left\{ d_{1}, d_{2}, \dots, d_{\doccount} \right\}$ where for each document $d_{i}$, we know its publication day $t_{i}$. Then, the documents can be understood as a stream $\left\{ (d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{\doccount}, t_{\doccount}) \right\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $\streamlen$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{\doccount} = \streamlen$.
 
 
 \section{Bag of words model}
 % TODO: blah blah we use the well known (binary) bag of words model, which drops the word order
-To vectorize the documents, we define a matrix $\mathbf{B} \in \{0, 1\}^{D \times V}$ where V is the total vocabulary size. The document collection can then be interpreted as a set of $D$ observations, each consisting of $V$ binary features. The matrix $\mathbf{B}$ is defined as
+To vectorize the documents, we define a matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \times \featcount}$, where $\featcount$ is the total vocabulary size. The document collection can then be interpreted as a set of $\doccount$ observations, each consisting of $\featcount$ binary features. The matrix $\bowmat$ is defined as
 
-\begin{equation}
-	\mathbf{B}_{ij} = \begin{cases}
+\begin{equation} \label{eq:bow-matrix}
+	\bowmat_{ij} \coloneqq
+	\begin{cases}
 		1, & \text{document}~i~\text{contains the feature}~j \text{;} \\
 		0, & \text{otherwise.}
 	\end{cases}
 \end{equation}
 
-To limit the feature space, we trim the words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\mathbf{B}$ reasonably sized.
+To limit the feature space, we trim the words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\bowmat$ reasonably sized.
 
 From now on, we focus our analysis on the individual word features rather than whole documents.
+
 
 \section{Computing feature trajectories}
 The previous section represented word features in the document domain. This section focuses on representing these features in the time domain.
 
-A time trajectory of a feature $f$ is a vector $\mathbf{y}_f = \big[y_{f}(1), y_{f}(2), \dots, y_{f}(T)\big]$. Each element $y_{f}(t)$ represents the relative frequency of the feature $f$ at time $t$. This frequency is defined using the DFIDF score:
+A time trajectory of a feature $f$ is a vector $\vect{\traj}_f = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$. Each element $\traj_{f}(t)$ represents the relative frequency of the feature $f$ at time $t$. This frequency is defined using the DFIDF score:
 
 \begin{equation}
-	y_{f}(t) \coloneqq \frac{\text{DF}_{f}(t)}{\text{D}(t)} \times \log{\frac{\text{D}}{\text{DF}_{f}}},
+	\traj_{f}(t) \coloneqq \underbrace{\frac{\text{\df}_{f}(t)}{\text{\doccount}(t)}}_{\text{DF}} \times \underbrace{\log{\frac{\doccount}{\text{\df}_{f}}}}_{\text{IDF}},
 \end{equation}
 
-where $\text{DF}_{f}(t)$ is the number of documents published on day $t$ containing the feature $f$ (time-local document frequency), $\text{D}(t)$ is the number of documents published on day $t$ and $\text{DF}_{f}$ is the number of documents containing the feature $f$ (global document frequency).
+where $\text{\df}_{f}(t)$ is the number of documents published on day $t$ containing the feature $f$ (time-local document frequency), $\text{\doccount}(t)$ is the number of documents published on day $t$ and $\text{\df}_{f}$ is the number of documents containing the feature $f$ (global document frequency).
 
-These feature trajectories are stored in a matrix $\mathbf{T} \in \R^{V \times T}$, with $\mathbf{y}_f$ being the $f$-th row of $\mathbf{T}$. Here we utilize the normalization of the publication days, since they can now be used as column indices of $\mathbf{T}$.
+These feature trajectories are stored in a matrix $\trajmat \in \R^{\featcount \times \streamlen}$, with $\vect{\traj}_f$ being the $f$-th row of $\trajmat$. Here we take advantage of the normalization of the publication days, since they can now be used as column indices of $\trajmat$.
+
+To make the computation efficient, we vectorize most of the operations. Along with the matrix $\bowmat$ defined in \ref{eq:bow-matrix}, we define a matrix $\dtdmat \in \left\{ 0, 1 \right\}^{\doccount \times \streamlen}$ mapping the documents to their publication days:
+
+\begin{equation}
+	\dtdmat_{ij} \coloneqq
+	\begin{cases}
+		1, & \text{document}~i~\text{was published on day}~j \text{;} \\
+		0, & \text{otherwise}.
+	\end{cases}
+\end{equation}
+
+Next, we sum the rows of $\bowmat$ together to obtain $\vect{\df} = \left[ \text{\df}_{1}, \text{\df}_{2}, \dots, \text{\df}_{\featcount} \right]$, and similarly the rows of $\dtdmat$ to obtain $\vect{\doccount}_{t} = \left[ \text{\doccount}(1), \text{\doccount}(2), \dots, \text{\doccount}(\streamlen) \right]$.
+
+Using these matrices and vectors, we can compute $\trajmat$ as follows:
+
+\begin{equation}
+	\trajmat \coloneqq
+		\underbrace{\text{diag} \left( \log{\frac{\doccount}{\vect{\df}}} \right)}_{\text{IDF}}
+		\times
+		\underbrace{\bowmat^{\T}
+		\times \dtdmat
+		\times \text{diag} \left( \frac{1}{\vect{\doccount}_{t}} \right)}_{\text{DF}}
+\end{equation}
 
 
 \section{Spectral analysis}
 The next step is to employ spectral analysis techniques borrowed from signal processing to discover periodicities in the features. Results from this section are further used to categorize the word features.
 
-The well known discrete Fourier transform is applied to each feature trajectory, yielding $\mathcal{F} \mathbf{y}_{f} = \big[X_{1}, X_{2}, \dots, X_{T}\big]$ such that
+We apply the discrete Fourier transform to each feature trajectory, yielding $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
 
-\begin{equation}
-	X_{k} = \sum_{t = 1}^{T}{y_{f}(t) \me^{- \frac{2 \pi \mi}{T} (k - 1) t}}, ~ k \in \{1, 2, \dots, T\}.
-\end{equation}
+\begin{equation*}
+	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \me^{- \frac{2 \pi \mi}{\streamlen} (k - 1) t}}, ~ k \in \{1, 2, \dots, \streamlen\}.
+\end{equation*}
 
-To estimate the power spectral density, we use the periodogram estimator:
+That way, we move from the time-domain of publication days to the frequency domain, where we can analyze how powerful each feature is. For this, we need to estimate the power spectral density, which we do using the periodigram estimator:
 
-\begin{equation}
-	P = \big[\|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{T / 2}}\|^{2}\big].
-\end{equation}
+\begin{equation*}
+	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
+\end{equation*}
 
 We define the dominant power spectrum of the feature $f$ as the maximum element of the periodogram, that is
 
 \begin{equation}
-	\text{DPS}_{f} \coloneqq \max_{k \leq \ceil{T/2}}{\|X_{k}\|^{2}}.
+	\text{DPS}_{f} \coloneqq \max_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
 Furthermore, we define the dominant period as the inverse of the frequency corresponding to the dominant power spectrum:
@@ -69,7 +109,7 @@ Furthermore, we define the dominant period as the inverse of the frequency corre
 
 where \textit{freq} is the frequency corresponding to $\text{DPS}_{f}$.
 
-When applied to the matrix $\mathbf{T}$, this method yields two vectors, $\mathbf{DPS} \in \R^{V}$ and $\mathbf{DP} \in \N^{V}$, containing the dominant power spectra and dominant periods, respectively.
+When applied to rows of the matrix $\trajmat$, this method yields two vectors, $\vect{DPS} \in \R^{\featcount}$ and $\vect{DP} \in \N^{\featcount}$, containing the dominant power spectra and dominant periods, respectively.
 
 
 \section{Feature categorization}
@@ -77,8 +117,8 @@ Based on the dominant power spectra and dominant periods, we divide the features
 
 \begin{equation}
 \begin{split}
-	\mathit{HH} \coloneqq \big\{f \mid DPS_{f} > \textit{dps-bound}, DP_{f} > \ceil{T / 2}\big\}, \\
-	\mathit{HL} \coloneqq \big\{f \mid DPS_{f} > \textit{dps-bound}, DP_{f} \leq \ceil{T / 2}\big\}.
+	\mathit{HH} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound}, \text{DP}_{f} > \ceil{\streamlen / 2} \right\}, \\
+	\mathit{HL} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound}, \text{DP}_{f} \leq \ceil{\streamlen / 2} \right\}.
 \end{split}
 \end{equation}
 
@@ -94,7 +134,9 @@ We detect aperiodic and periodic features separately. First, because different t
 \subsection{Measuring trajectory similarity}
 To measure how similar two trajectories are, we interpret them as probability distributions and compute their information divergences. However, due to the general noisiness of the trajectories, the divergences are not computed directly. Most features would then seem very far apart due to mild bursts malforming the distributions, while not really contributing to the underlying event.
 
-To counter this, we first filter out the mild bursts.
+First, we normalize the trajectories to have a unit sum.
+
+Next, to counter the noisiness, we first filter out the mild bursts.
 
 Then, the trajectories are smoothened.
 
@@ -105,16 +147,16 @@ Finally, we compute the information divergence between two trajectories...
 \subsection{Measuring document overlap}
 The document overlap is first defined for two features, and then generalized to a whole feature set.
 
-Let $M_{i}$ be the set of all documents containing a feature $f_{i}$, and $M_{j}$ the set of all documents containing a feature $f_{j}$. Then, the document overlap of the features $f_{i}$ and $f_{j}$ is defined as
+Let $\featset_{i}$ be the set of all documents containing a feature $f_{i}$, and $\featset_{j}$ the set of all documents containing a feature $f_{j}$. Then, the document overlap of the features $f_{i}$ and $f_{j}$ is defined as
 
 \begin{equation}
-	d(f_{i}, f_{j}) \coloneqq \frac{\left\vert{M_{i} \cap M{j}}\right\vert}{\min({\left\vert{M_{i}}\right\vert, \left\vert{M_{j}}\right\vert})}.
+	\docoverlap(f_{i}, f_{j}) \coloneqq \frac{\left\vert{\featset_{i} \cap \featset{j}}\right\vert}{\min \left( {\left\vert{\featset_{i}}\right\vert, \left\vert{\featset_{j}}\right\vert} \right)}.
 \end{equation}
 
-Using this definition, the document overlap of a set of features $M$ can be defined as
+Using this definition, the document overlap of a set of features $\featset$ can be defined as
 
 \begin{equation}
-	d(M) \coloneqq \min{\big\{d(f_{i}, f_{j}) \mid f_{i}, f_{j} \in M\big\}}.
+	\docoverlap(\featset) \coloneqq \min{\left\{ \docoverlap \left( f_{i}, f_{j} \right) \mid f_{i}, f_{j} \in \featset \right\}}.
 \end{equation}
 
 Since we aim to maximize the document overlap among a set of features, it makes sense to define it using minimum, as it takes care of the worst possible case.
