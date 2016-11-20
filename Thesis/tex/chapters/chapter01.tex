@@ -13,7 +13,8 @@
 \newcommand{\df}{DF}
 \newcommand{\featset}{\text{M}}
 
-\newcommand{\docoverlap}{d}
+\newcommand{\docoverlap}{\text{d}}
+\newcommand{\featsim}{\text{JSD}}
 
 \newcommand{\bowmat}{\mat{B}}
 \newcommand{\dtdmat}{\mat{D}}
@@ -101,7 +102,7 @@ We define the dominant power spectrum of the feature $f$ as the maximum element 
 	\text{DPS}_{f} \coloneqq \max_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
-Furthermore, we define the dominant period as the inverse of the frequency corresponding to the dominant power spectrum:
+and the dominant period as the inverse of the frequency corresponding to the dominant power spectrum:
 
 \begin{equation}
 	\text{DP}_{f} \coloneqq \frac{1}{\mathit{freq}}.
@@ -123,24 +124,44 @@ Based on the dominant power spectra and dominant periods, we divide the features
 \end{equation}
 
 
+\section{Trajectory preprocessing}
+During the event detection itself, we will need to measure the similarity of two trajectories. However, due to the general noisiness of the trajectories, the similarities are not computed directly. Most features would then seem far apart due to mild bursts malforming the trajectories, while not really contributing to the underlying events. Thus, the trajectories are first preprocessed.
+
+\subsection{Computing cutoff}
+
+\subsection{Normalization}
+From now on, we assume the individual trajectories have been normalized to have unit sums. This can be computed efficiently by vectorizing the operation and dividing every row of $\trajmat$ by its sum.
+
+\subsection{Smoothing}
+
+\begin{enumerate}
+
+\item \textbf{Aperiodic features}
+
+\item \textbf{Periodic features}
+
+\end{enumerate}
+
+
 \section{Event detection}
 
-During the event detection phase, the aim is to find sets of features highly correlated both in the time domain and in the document domain. The assumption is that features appearing in similar documents during the same time periods concern the same real-world events. Each such feature set then represents a single event.
+During the event detection phase, the aim is to find sets of features highly correlated both in time domain and in document domain. The assumption is that features appearing in similar documents during the same time periods concern the same real-world events. Each such feature set then represents a single event.
 
 By inspecting only the sets of high power features, we uncover only the features best describing the individual events. This also helps to reduce computation time, since there are generally much fewer high power features than the low power ones.
 
-We detect aperiodic and periodic features separately. First, because different techniques must be employed for time correlation analysis. Second, because we assume no connection between aperiodic events and the periodic ones. However, apart from the time correlation analysis, the algorithm is the same for both sets.
+We detect aperiodic and periodic features separately. First, because different techniques must be employed for time correlation analysis. Second, because we assume no connection between aperiodic events and the periodic ones.
+
 
 \subsection{Measuring trajectory similarity}
-To measure how similar two trajectories are, we interpret them as probability distributions and compute their information divergences. However, due to the general noisiness of the trajectories, the divergences are not computed directly. Most features would then seem very far apart due to mild bursts malforming the distributions, while not really contributing to the underlying event.
+Similarity between two feature trajectories is defined in terms of their information divergence. Unlike \cite{event-detection}, we use the \textit{Jensen-Shannon divergence}:
 
-First, we normalize the trajectories to have a unit sum.
+\begin{equation*}
+	\featsim \left( \vect{p} \| \vect{q} \right) = \frac{1}{2} \text{D} \left( \vect{p} \| \vect{m} \right) + \frac{1}{2} \text{D} \left( \vect{q} \| \vect{m} \right),
+\end{equation*}
 
-Next, to counter the noisiness, we first filter out the mild bursts.
+where $\vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$ and D denotes the \textit{Kullback-Leibler divergence}.
 
-Then, the trajectories are smoothened.
-
-Finally, we compute the information divergence between two trajectories...
+Our reason for choosing the JS-divergence instead of KL-divergence is that the JS-divergence is symmetric while not using the $\max$ function used by \cite{event-detection}, so it is computed more easily. {\color{red}Unlike the KL-divergence, it is also simple to generalize it to more distributions.}
 
 ... and among a set of features.
 
@@ -150,7 +171,7 @@ The document overlap is first defined for two features, and then generalized to 
 Let $\featset_{i}$ be the set of all documents containing a feature $f_{i}$, and $\featset_{j}$ the set of all documents containing a feature $f_{j}$. Then, the document overlap of the features $f_{i}$ and $f_{j}$ is defined as
 
 \begin{equation}
-	\docoverlap(f_{i}, f_{j}) \coloneqq \frac{\left\vert{\featset_{i} \cap \featset{j}}\right\vert}{\min \left( {\left\vert{\featset_{i}}\right\vert, \left\vert{\featset_{j}}\right\vert} \right)}.
+	\docoverlap(f_{i}, f_{j}) \coloneqq \frac{\left\vert{\featset_{i} \cap \featset_{j}}\right\vert}{\min \left( {\left\vert{\featset_{i}}\right\vert, \left\vert{\featset_{j}}\right\vert} \right)}.
 \end{equation}
 
 Using this definition, the document overlap of a set of features $\featset$ can be defined as
