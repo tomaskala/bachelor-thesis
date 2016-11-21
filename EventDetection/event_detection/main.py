@@ -90,7 +90,7 @@ def construct_feature_trajectories(bow, doc_days):
 
     t = time()
     df_t = bow.T @ dtd  # Number of documents containing each feature in individual days.
-    df_t = sp.csc_matrix(df_t, dtype=np.float64, copy=True)
+    df_t = sp.csc_matrix(df_t, dtype=float, copy=True)
 
     logging.info('Multiplied BOW and DTD matrices in %fs.', time() - t)
     logging.info('DF(t): %s, %s', str(df_t.shape), str(df_t.dtype))
@@ -453,8 +453,8 @@ def main():
     # documents, relative_days, weekdays = data_fetchers.fetch_de_news()
     # documents, relative_days, weekdays = data_fetchers.fetch_reuters()
     # documents, relative_days, weekdays = data_fetchers.fetch_crawl_data(num_docs=100000)
-    # documents, relative_days = data_fetchers.fetch_czech_corpus_dec_jan()
-    documents, relative_days = data_fetchers.fetch_czech_corpus(num_docs=10000000)
+    documents, relative_days = data_fetchers.fetch_czech_corpus_dec_jan()
+    # documents, relative_days = data_fetchers.fetch_czech_corpus(num_docs=10000000)
 
     stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
     logging.info('Read input in %fs.', time() - t)
@@ -465,7 +465,7 @@ def main():
     bow_matrix = vectorizer.fit_transform(documents)
     id2word = {v: k for k, v in vectorizer.vocabulary_.items()}
     logging.info('Created bag of words in %fs.', time() - t)
-    logging.info('BOW: %s', str(bow_matrix.shape))
+    logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype), bow_matrix.getnnz())
 
     trajectories = construct_feature_trajectories(bow_matrix, relative_days)
     dps, dp = spectral_analysis(trajectories)
