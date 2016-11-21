@@ -24,7 +24,7 @@
 The core of this algorithm is taken from \cite{event-detection}.
 
 \section{Document fetching}
-We assume a collection of documents $\left\{ d_{1}, d_{2}, \dots, d_{\doccount} \right\}$ where for each document $d_{i}$, we know its publication day $t_{i}$. Then, the documents can be understood as a stream $\left\{ (d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{\doccount}, t_{\doccount}) \right\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $\streamlen$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{\doccount} = \streamlen$.
+We assume a collection of $N$ documents $\left\{ d_{1}, d_{2}, \dots, d_{\doccount} \right\}$ where for each document $d_{i}$, we know its publication day $t_{i}$. Then, the documents can be understood as a stream $\left\{ (d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{\doccount}, t_{\doccount}) \right\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $\streamlen$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{\doccount} = \streamlen$.
 
 
 \section{Bag of words model}
@@ -47,7 +47,7 @@ From now on, we focus our analysis on the individual word features rather than w
 \section{Computing feature trajectories}
 The previous section represented word features in the document domain. This section focuses on representing these features in the time domain.
 
-A time trajectory of a feature $f$ is a vector $\vect{\traj}_f = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$. Each element $\traj_{f}(t)$ represents the relative frequency of the feature $f$ at time $t$. This frequency is defined using the DFIDF score:
+The time trajectory of a feature $f$ is a vector $\vect{\traj}_f = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$. Each element $\traj_{f}(t)$ represents the relative frequency of the feature $f$ at time $t$. This frequency is defined using the DFIDF score:
 
 \begin{equation}
 	\traj_{f}(t) \coloneqq \underbrace{\frac{\text{\df}_{f}(t)}{\text{\doccount}(t)}}_{\text{DF}} \times \underbrace{\log{\frac{\doccount}{\text{\df}_{f}}}}_{\text{IDF}},
@@ -90,7 +90,7 @@ We apply the discrete Fourier transform to each feature trajectory, yielding $\m
 	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \me^{- \frac{2 \pi \mi}{\streamlen} (k - 1) t}}, ~ k \in \{1, 2, \dots, \streamlen\}.
 \end{equation*}
 
-That way, we move from the time-domain of publication days to the frequency domain, where we can analyze how powerful each feature is. For this, we need to estimate the power spectral density, which we do using the periodigram estimator:
+That way, we move from the time-domain of publication days to the frequency domain, where we can analyze how powerful each feature is. To do this, we need to estimate the power spectral density, which we do using the periodigram
 
 \begin{equation*}
 	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
@@ -114,7 +114,7 @@ When applied to rows of the matrix $\trajmat$, this method yields two vectors, $
 
 
 \section{Feature categorization}
-Based on the dominant power spectra and dominant periods, we divide the features into \underline{H}igh power-\underline{H}igh period and \underline{H}igh power-\underline{L}ow period categories \footnote{\cite{event-detection} actually define \textit{five} such categories; however, our method works only with the two sets of the most prominent features.}:
+Based on the dominant power spectra and dominant periods, we divide the features into \underline{H}igh power-\underline{H}igh period and \underline{H}igh power-\underline{L}ow period categories \footnote{\cite{event-detection} actually define \textit{five} such categories; however, our method uses only the two sets of the most powerful features.}:
 
 \begin{equation}
 \begin{split}
@@ -123,14 +123,37 @@ Based on the dominant power spectra and dominant periods, we divide the features
 \end{split}
 \end{equation}
 
+{\color{red}TODO: Define dps-bound!}
+
 
 \section{Trajectory preprocessing}
 During the event detection itself, we will need to measure the similarity of two trajectories. However, due to the general noisiness of the trajectories, the similarities are not computed directly. Most features would then seem far apart due to mild bursts malforming the trajectories, while not really contributing to the underlying events. Thus, the trajectories are first preprocessed.
 
-\subsection{Computing cutoff}
+\subsection{Burst filtering}
+As we are only interested in the dominant bursts around the main events, we filter out the mild ones. We do this by computing a cutoff value for each feature trajectory and discarding all trajectory elements falling under this cutoff. This procedure is adopted from \cite{online-search-queries}. The algorithm is as follows:
+
+\begin{algorithm}[H]
+\begin{algorithmic}[1]
+\caption{Burst filtering}
+\Input $\text{window-length} ~ w$
+
+\ForEach {$\vect{\traj}_{f} \in \{ \vect{\traj}_{1}, \vect{\traj}_{2}, \dots, \vect{\traj}_{\featcount}\}$}
+	\State $\vect{MA}_{w} \gets \text{Moving Average of length} ~ w ~ \text{for} ~ \vect{\traj}_{f} = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$
+
+	\State $\mathit{cutoff} \gets \text{mean} \left( \vect{MA}_{w} \right) + \text{std} \left( \vect{MA}_{w} \right)$
+
+	\State $\vect{bursts}_{f} \gets \left[ \traj_{f}(t) \mid \traj_{f}(t) > \mathit{cutoff}, \traj_{f}(t) \in \vect{y}_{f} \right]$
+\EndFor
+
+\Output $\{ \vect{bursts}_{1}, \vect{bursts}_{2}, \dots, \vect{bursts}_{\featcount} \}$
+
+\end{algorithmic}
+\end{algorithm}
+
+{\color{red} TODO: In the paper, they use $\vect{MA}(t)_{w} > \mathit{cutoff}$, try that. Also, why did I miss that? :(}
 
 \subsection{Normalization}
-From now on, we assume the individual trajectories have been normalized to have unit sums. This can be computed efficiently by vectorizing the operation and dividing every row of $\trajmat$ by its sum.
+From now on, we assume the individual trajectories have been normalized to have unit sums. This can be computed efficiently by vectorizing the operation and dividing every row of $\trajmat$ by its sum. Thanks to this normalization, the individual trajectories can be interpreted as probability distributions over the stream days.
 
 \subsection{Smoothing}
 
@@ -138,34 +161,47 @@ From now on, we assume the individual trajectories have been normalized to have 
 
 \item \textbf{Aperiodic features}
 
+\textbf{TODO}
+
 \item \textbf{Periodic features}
+
+\textbf{TODO}
 
 \end{enumerate}
 
 
 \section{Event detection}
 
-During the event detection phase, the aim is to find sets of features highly correlated both in time domain and in document domain. The assumption is that features appearing in similar documents during the same time periods concern the same real-world events. Each such feature set then represents a single event.
+During the event detection phase, the aim is to find sets of features highly correlated both in the time domain and in the document domain. The assumption is that features appearing in similar documents during the same time periods concern the same real-world events. Each such feature set then represents a single event.
 
 By inspecting only the sets of high power features, we uncover only the features best describing the individual events. This also helps to reduce computation time, since there are generally much fewer high power features than the low power ones.
 
-We detect aperiodic and periodic features separately. First, because different techniques must be employed for time correlation analysis. Second, because we assume no connection between aperiodic events and the periodic ones.
+The aperiodic and periodic features are detected separately, since we assume no connection between aperiodic events and the periodic ones.
 
 
 \subsection{Measuring trajectory similarity}
-Similarity between two feature trajectories is defined in terms of their information divergence. Unlike \cite{event-detection}, we use the \textit{Jensen-Shannon divergence}:
+
+Similarity between two feature trajectories is defined in terms of their information divergence. Unlike \cite{event-detection}, we use the \textit{Jensen-Shannon} divergence:
 
 \begin{equation*}
 	\featsim \left( \vect{p} \| \vect{q} \right) = \frac{1}{2} \text{D} \left( \vect{p} \| \vect{m} \right) + \frac{1}{2} \text{D} \left( \vect{q} \| \vect{m} \right),
 \end{equation*}
 
-where $\vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$ and D denotes the \textit{Kullback-Leibler divergence}.
+where $\vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$ and D denotes the \textit{Kullback-Leibler} divergence.
 
-Our reason for choosing the JS-divergence instead of KL-divergence is that the JS-divergence is symmetric while not using the $\max$ function used by \cite{event-detection}, so it is computed more easily. {\color{red}Unlike the KL-divergence, it is also simple to generalize it to more distributions.}
+The JS-divergence is symmetric, and its square root is a proper metric. It can also be computed without using the \textit{max} function, unlike the approach chosen by \cite{event-detection}, which makes the computation somewhat faster.
 
-... and among a set of features.
+This similarity is then generalized to a set of features $\featset$ as
+
+\begin{equation}
+	\featsim \left( \featset \right) = \max{ \{ \featsim ( \vect{y}_{f_{i}} \| \vect{y}_{f_{j}} ) \mid f_{i}, f_{j} \in \featset \} }
+\end{equation}
+
+{\color{red}TODO: Use the JSD formula for multiple distributions?}
+
 
 \subsection{Measuring document overlap}
+
 The document overlap is first defined for two features, and then generalized to a whole feature set.
 
 Let $\featset_{i}$ be the set of all documents containing a feature $f_{i}$, and $\featset_{j}$ the set of all documents containing a feature $f_{j}$. Then, the document overlap of the features $f_{i}$ and $f_{j}$ is defined as
@@ -177,9 +213,12 @@ Let $\featset_{i}$ be the set of all documents containing a feature $f_{i}$, and
 Using this definition, the document overlap of a set of features $\featset$ can be defined as
 
 \begin{equation}
-	\docoverlap(\featset) \coloneqq \min{\left\{ \docoverlap \left( f_{i}, f_{j} \right) \mid f_{i}, f_{j} \in \featset \right\}}.
+	\docoverlap \left( \featset \right) \coloneqq \min{\{ \docoverlap \left( f_{i}, f_{j} \right) \mid f_{i}, f_{j} \in \featset \}}.
 \end{equation}
 
 Since we aim to maximize the document overlap among a set of features, it makes sense to define it using minimum, as it takes care of the worst possible case.
 
+
 \subsection{Event detection}
+
+\textbf{TODO}
