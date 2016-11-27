@@ -443,8 +443,6 @@ WINDOW = 7  # Length of the window to use in computing the moving average.
 # TODO: When extracting event headlines for periodic events, extract one for each burst and return them in a list.
 def main():
     from event_detection import data_fetchers, plotting
-    # TODO: For online detection, see
-    # TODO: http://scikit-learn.org/stable/auto_examples/applications/plot_out_of_core_classification.html
     total_time = time()
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
