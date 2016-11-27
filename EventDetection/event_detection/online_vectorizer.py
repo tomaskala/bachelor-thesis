@@ -1,5 +1,6 @@
-import collections
-import numbers
+from collections import Counter, defaultdict
+from numbers import Integral
+from operator import itemgetter
 
 import numpy as np
 import scipy.sparse as sp
@@ -31,7 +32,7 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         self.max_features = max_features
 
         if max_features is not None:
-            if not isinstance(max_features, numbers.Integral) or max_features <= 0:
+            if not isinstance(max_features, Integral) or max_features <= 0:
                 raise ValueError("max_features=%r, neither a positive integer nor None" % max_features)
 
         self.ngram_range = ngram_range
@@ -39,10 +40,15 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         self.dtype = dtype
         self.bow_matrix = None
 
-        self.vocabulary_ = collections.defaultdict()
+        self.vocabulary_ = defaultdict()
         self.vocabulary_.default_factory = self.vocabulary_.__len__
 
     def _append_matrix(self, batch_matrix):
+        """
+        Append the given term-document matrix from a document batch to the BOW matrix in place.
+        :param batch_matrix: sparse matrix of term frequencies from the currently processed document batch
+        :return: self.bow_matrix after appending it with batch_matrix
+        """
         if self.bow_matrix is None:
             self.bow_matrix = batch_matrix
             return self.bow_matrix
@@ -56,6 +62,11 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         return self.bow_matrix
 
     def _count_vocab(self, raw_documents):
+        """
+        Count term frequencies of the given document batch and return them in a sparse CSR matrix format.
+        :param raw_documents: list of documents as strings
+        :return: CSR sparse matrix of shape (len(raw_documents), len(self.vocabulary_))
+        """
         analyzer = self.build_analyzer()
         vocabulary = self.vocabulary_
 
@@ -64,38 +75,32 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         indptr = [0]
 
         for doc in raw_documents:
-            token_counter = collections.Counter(vocabulary[token] for token in analyzer(doc))
+            token_counter = Counter(vocabulary[token] for token in analyzer(doc))
             j_indices.extend(token_counter.keys())
             values.extend(token_counter.values())
             indptr.append(len(j_indices))
-
-        n_tokens = max(j_indices) + 1
-
-        if n_tokens < 0:
-            raise ValueError('No tokens found in the document batch.')
-
-        if self.bow_matrix is not None and n_tokens < self.bow_matrix.shape[1]:
-            n_tokens = self.bow_matrix.shape[1]
 
         values = np.asarray(values, dtype=np.intc)
         j_indices = np.asarray(j_indices, dtype=np.intc)
         indptr = np.asarray(indptr, dtype=np.intc)
 
-        X = sp.csr_matrix((values, j_indices, indptr), shape=(len(indptr) - 1, n_tokens), dtype=self.dtype)
+        X = sp.csr_matrix((values, j_indices, indptr), shape=(len(indptr) - 1, len(self.vocabulary_)), dtype=self.dtype)
         X.sort_indices()
 
         return X
 
     def _sort_features(self, X):
-        """Sort features by name
-
-        Returns a reordered matrix and modifies the vocabulary in place
         """
-        sorted_features = sorted(self.vocabulary_.items())
+        Sort features by name and modify the vocabulary in place.
+        :param X:
+        :return: a reordered matrix X
+        """
+        vocabulary = self.vocabulary_
+        sorted_features = sorted(vocabulary.items())
         map_index = np.empty(len(sorted_features), dtype=np.int32)
 
         for new_val, (term, old_val) in enumerate(sorted_features):
-            self.vocabulary_[term] = new_val
+            vocabulary[term] = new_val
             map_index[old_val] = new_val
 
         X.indices = map_index.take(X.indices, mode='clip')
@@ -114,7 +119,8 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         if self.binary:
             X.data.fill(1)
 
-        return self._sort_features(self._append_matrix(X))
+        self.bow_matrix = self._sort_features(self._append_matrix(X))
+        return self.bow_matrix
 
     def partial_fit(self, raw_documents, y=None):
         self.fit_transform(raw_documents, y)
@@ -127,24 +133,29 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         pass
 
     def get_feature_names(self):
-        pass
+        """
+        Array mapping from feature integer indices to feature name.
+        """
+        return [t for t, _ in sorted(self.vocabulary_.items(), key=itemgetter(1))]
 
 
 if __name__ == '__main__':
-    from sklearn.feature_extraction.text import CountVectorizer
     from event_detection import data_fetchers
     from time import time
 
-    docs, _ = data_fetchers.fetch_czech_corpus(num_docs=10000000)
+    # docs, _ = data_fetchers.fetch_czech_corpus(num_docs=10000000)
+    docs, _ = data_fetchers.fetch_czech_corpus_dec_jan()
     subset = docs
 
-    count_vectorizer = CountVectorizer(binary=True)
+    step_size = 25000
+    j = step_size
     online_vectorizer = OnlineVectorizer(binary=True)
 
-    # t0 = time()
-    # count_vectorizer.fit_transform(subset)
-    # print('Count vectorizer done in %fs.' % (time() - t0))
-
     t0 = time()
-    online_vectorizer.fit_transform(subset)
-    print('Online vectorizer done in %fs.' % (time() - t0))
+
+    for i in range(0, len(subset), step_size):
+        online_vectorizer.fit_transform(subset[i:j])
+        print(online_vectorizer.bow_matrix.shape)
+        j += step_size
+
+    print('Done in %fs' % (time() - t0))

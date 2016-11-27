@@ -14,6 +14,9 @@ SMALL_SET_4 = ['Turtles are pretty', 'Why so serious', 'Let us have one more sen
 LARGER = ['Such words much wow']
 SMALLER = ['Such much']
 
+OLD_WORDS = ['This document contains some words']
+NEW_WORDS = ['None of these was seen before']
+
 
 class TestOnlineVectorizer(unittest.TestCase):
     def setUp(self):
@@ -24,14 +27,24 @@ class TestOnlineVectorizer(unittest.TestCase):
     def setUpClass(cls):
         cls.docs, _ = data_fetchers.fetch_czech_corpus_dec_jan()
 
+    def assert_sparse_csr_equal(self, x, y, err_msg):
+        x = x.sorted_indices()
+        y = y.sorted_indices()
+        self.assertEqual(x.shape, y.shape, err_msg + ', shape')
+        self.assertEqual(x.dtype, y.dtype, err_msg + ', dtype')
+        self.assertEqual(x.getnnz(), y.getnnz(), err_msg + ', nnz')
+        npt.assert_array_equal(x.data, y.data, err_msg + ', data')
+        npt.assert_array_equal(x.indices, y.indices, err_msg + ', indices')
+        npt.assert_array_equal(x.indptr, y.indptr, err_msg + ', indptr')
+
     def test_one_docset(self):
         online_bow = self.online_vectorizer.fit_transform(SMALL_SET_1)
 
         reference_bow = self.reference_vectorizer.fit_transform(SMALL_SET_1)
 
-        npt.assert_array_equal(online_bow.toarray(), reference_bow.toarray(), 'Offline fit, bow')
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Offline fit, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
-                             'Offline fit, dicts')
+                             'Offline fit, dict')
 
     def test_two_docsets_online(self):
         self.online_vectorizer.fit_transform(SMALL_SET_1)
@@ -39,9 +52,9 @@ class TestOnlineVectorizer(unittest.TestCase):
 
         reference_bow = self.reference_vectorizer.fit_transform(SMALL_SET_1 + SMALL_SET_2)
 
-        npt.assert_array_equal(online_bow.toarray(), reference_bow.toarray(), 'Online fit, two docsets, bow')
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, two docsets, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
-                             'Online fit, two docsets, dicts')
+                             'Online fit, two docsets, dict')
 
     def test_two_fits_single_docset(self):
         self.online_vectorizer.fit_transform(SMALL_SET_1)
@@ -49,9 +62,9 @@ class TestOnlineVectorizer(unittest.TestCase):
 
         reference_bow = self.reference_vectorizer.fit_transform(SMALL_SET_1 + SMALL_SET_1)
 
-        npt.assert_array_equal(online_bow.toarray(), reference_bow.toarray(), 'Fit same docset twice, dict')
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Fit same docset twice, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
-                             'Fit same docset twice, bow')
+                             'Fit same docset twice, dict')
 
     def test_more_partial_fits(self):
         self.online_vectorizer.fit_transform(SMALL_SET_1)
@@ -61,11 +74,11 @@ class TestOnlineVectorizer(unittest.TestCase):
 
         reference_bow = self.reference_vectorizer.fit_transform(SMALL_SET_1 + SMALL_SET_2 + SMALL_SET_3 + SMALL_SET_4)
 
-        npt.assert_array_equal(online_bow.toarray(), reference_bow.toarray(), 'Online fit, four docsets, dict')
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, four docsets, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
-                             'Online fit, four docsets, bow')
+                             'Online fit, four docsets, dict')
 
-    def test_large_dataset_offline(self):
+    def test_large_docset_offline(self):
         subset = self.docs[:1000]
 
         self.online_vectorizer.fit_transform(subset[:200])
@@ -76,9 +89,9 @@ class TestOnlineVectorizer(unittest.TestCase):
 
         reference_bow = self.reference_vectorizer.fit_transform(subset)
 
-        npt.assert_array_equal(online_bow.toarray(), reference_bow.toarray(), 'Online fit, large docset, dict')
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, large docset, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
-                             'Online fit, large docset, bow')
+                             'Online fit, large docset, dict')
 
     def test_fill_from_left_in_batch(self):
         # The first fit creates the BOW matrix. If the second batch contains only words from the first, say, half
@@ -97,9 +110,9 @@ class TestOnlineVectorizer(unittest.TestCase):
 
         reference_bow = self.reference_vectorizer.fit_transform(LARGER + SMALLER)
 
-        npt.assert_array_equal(online_bow.toarray(), reference_bow.toarray(), 'Online fit, fill from left, dict')
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, fill from left, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
-                             'Online fit, fill from left, bow')
+                             'Online fit, fill from left, dict')
 
     def test_two_documents(self):
         docs = [SMALL_SET_1[0], SMALL_SET_1[1]]
@@ -109,11 +122,11 @@ class TestOnlineVectorizer(unittest.TestCase):
 
         reference_bow = self.reference_vectorizer.fit_transform(docs)
 
-        npt.assert_array_equal(online_bow.toarray(), reference_bow.toarray(), 'Online fit, two documents, bow')
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, two documents, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
                              'Online fit, two documents, dict')
 
-    def test_large_dataset_small_batches(self):
+    def test_large_docset_small_batches(self):
         subset = self.docs[:1000]
 
         for doc in subset[:-1]:
@@ -123,10 +136,42 @@ class TestOnlineVectorizer(unittest.TestCase):
 
         reference_bow = self.reference_vectorizer.fit_transform(subset)
 
-        npt.assert_array_equal(online_bow.toarray(), reference_bow.toarray(),
-                               'Online fit, large docset with small strides, dict')
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, large docset with small batches, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
-                             'Online fit, large docset with small strides, bow')
+                             'Online fit, large docset with small batches, dict')
+
+    def test_large_docset_large_batches(self):
+        subset = self.docs[:10000]
+
+        self.online_vectorizer.fit_transform(subset[:5000])
+        online_bow = self.online_vectorizer.fit_transform(subset[5000:])
+
+        reference_bow = self.reference_vectorizer.fit_transform(subset)
+
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, large docset with large batches, bow')
+        self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
+                             'Online fit, large docset with large batches, dict')
+
+    def test_new_words_only(self):
+        self.online_vectorizer.fit_transform(OLD_WORDS)
+        online_bow = self.online_vectorizer.fit_transform(NEW_WORDS)
+
+        reference_bow = self.reference_vectorizer.fit_transform(OLD_WORDS + NEW_WORDS)
+
+        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, new words only, bow')
+        self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
+                             'Online fit, new words only, dict')
+
+    def test_commutativity(self):
+        self.online_vectorizer.fit_transform(OLD_WORDS)
+        online_bow1 = self.online_vectorizer.fit_transform(NEW_WORDS)
+
+        online_vectorizer2 = OnlineVectorizer(binary=True)
+        online_vectorizer2.fit_transform(NEW_WORDS)
+        online_bow2 = online_vectorizer2.fit_transform(OLD_WORDS)
+
+        self.assert_sparse_csr_equal(online_bow1, online_bow2[::-1], 'Commutativity, bow')
+        self.assertDictEqual(self.online_vectorizer.vocabulary_, online_vectorizer2.vocabulary_, 'Commutativity, dict')
 
 
 if __name__ == '__main__':
