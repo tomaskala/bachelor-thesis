@@ -441,6 +441,9 @@ WINDOW = 7  # Length of the window to use in computing the moving average.
 # TODO: Try at least a subset of the full documents, possibly using n-gram models.
 # TODO: Output explained variance from LSI (see the document clustering example on sklearn webpage).
 # TODO: When extracting event headlines for periodic events, extract one for each burst and return them in a list.
+
+# TODO: Try other document similarity models: Sorensen-Dice coefficient or do TfIdf and compare the terms using
+# TODO: cosine similarity.
 def main():
     from event_detection import data_fetchers, plotting
     total_time = time()
