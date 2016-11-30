@@ -157,15 +157,33 @@ From now on, we assume the individual trajectories have been normalized to have 
 
 \subsection{Smoothing}
 
+We smoothen each trajectory by fitting a probability distribution to it. The similarity measures will be applied on this model rather than the trajectory itself to get rid of the interfering noise.
+
+In this section, we interpret the trajectories as two-dimensional observations $\traj_{f} = \{ \left( 1, \traj \left(1 \right) \right), \left( 2, \traj \left(2 \right) \right), \dots, \left( \streamlen, \traj \left(\streamlen \right) \right) \}$.
+
 \begin{enumerate}
 
 \item \textbf{Aperiodic features}
 
-\textbf{TODO}
+An aperiodic feature trajectory $\traj_{f}$ is modeled by Gaussian distribution. We fit the Gaussian function
+
+\begin{equation*}
+	f(x) = \frac{1}{\sigma \sqrt{2 \pi}} \me^{-\frac{\left( x - \mu \right)^{2}}{2 \sigma^{2}}}
+\end{equation*}
+
+to the trajectory $y_{f}$. The parameters $\mu$ and $\sigma$ are estimated using non-linear Least squares method. Unlike \cite{event-detection} who use the EM algorithm, Least squares proved to be less prone to outliers, yielding a shape more resembling the actual trajectory.
 
 \item \textbf{Periodic features}
 
-\textbf{TODO}
+A periodic feature trajectory $\traj_{f}$ is modeled using a mixture of $K = \floor{\streamlen / \text{DP}_{f}}$ Cauchy distributions:
+
+\begin{equation*}
+	f(x) = \sum_{k = 1}^{K}{\alpha_{k} \frac{1}{\pi \gamma_{k} \left( 1 + \left( \frac{x - \mu_{k}}{\gamma_{k}} \right)^2 \right)}}
+\end{equation*}
+
+The mixing parameters $\alpha_{k}, \sum_{k = 1}^{K}{\alpha_{k}} = 1$, location parameters $\mu_{k}$ and scale parameters $\gamma_{k}$ are estimated by applying the EM algorithm to $y_{f}$.
+
+The Cauchy distribution has a narrower peak and thicker tails than Gaussian distribution, which models the periodic burst more closely. The individual bursts of a periodic feature tend to be quite short, but even between bursts, the trajectory does not usually drop to zero, which makes the Cauchy distribution somewhat better choice.
 
 \end{enumerate}
 
