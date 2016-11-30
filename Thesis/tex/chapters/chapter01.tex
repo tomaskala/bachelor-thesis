@@ -12,6 +12,7 @@
 \newcommand{\traj}{y}
 \newcommand{\df}{DF}
 \newcommand{\featset}{\text{M}}
+\newcommand{\cost}{\text{C}}
 
 \newcommand{\docoverlap}{\text{d}}
 \newcommand{\featsim}{\text{JSD}}
@@ -118,8 +119,8 @@ Based on the dominant power spectra and dominant periods, we divide the features
 
 \begin{equation}
 \begin{split}
-	\mathit{HH} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound}, \text{DP}_{f} > \ceil{\streamlen / 2} \right\}, \\
-	\mathit{HL} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound}, \text{DP}_{f} \leq \ceil{\streamlen / 2} \right\}.
+	\text{HH} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound}, \text{DP}_{f} > \ceil{\streamlen / 2} \right\}, \\
+	\text{HL} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound}, \text{DP}_{f} \leq \ceil{\streamlen / 2} \right\}.
 \end{split}
 \end{equation}
 
@@ -138,15 +139,14 @@ As we are only interested in the dominant bursts around the main events, we filt
 \Input $\text{window-length} ~ w$
 
 \ForEach {$\vect{\traj}_{f} \in \{ \vect{\traj}_{1}, \vect{\traj}_{2}, \dots, \vect{\traj}_{\featcount}\}$}
-	\State $\vect{MA}_{w} \gets \text{Moving Average of length} ~ w ~ \text{for} ~ \vect{\traj}_{f} = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$
+	\State $\vect{MA}_{w} = \text{Moving Average of length} ~ w ~ \text{for} ~ \vect{\traj}_{f} = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$
 
-	\State $\mathit{cutoff} \gets \text{mean} \left( \vect{MA}_{w} \right) + \text{std} \left( \vect{MA}_{w} \right)$
+	\State $\mathit{cutoff} = \text{mean} \left( \vect{MA}_{w} \right) + \text{std} \left( \vect{MA}_{w} \right)$
 
-	\State $\vect{bursts}_{f} \gets \left[ \traj_{f}(t) \mid \traj_{f}(t) > \mathit{cutoff}, \traj_{f}(t) \in \vect{y}_{f} \right]$
+	\State $\vect{bursts}_{f} = \left[ \traj_{f}(t) \mid \traj_{f}(t) > \mathit{cutoff}, \traj_{f}(t) \in \vect{y}_{f} \right]$
 \EndFor
 
 \Output $\{ \vect{bursts}_{1}, \vect{bursts}_{2}, \dots, \vect{bursts}_{\featcount} \}$
-
 \end{algorithmic}
 \end{algorithm}
 
@@ -207,15 +207,13 @@ Similarity between two feature trajectories is defined in terms of their informa
 
 where $\vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$ and D denotes the \textit{Kullback-Leibler} divergence.
 
-The JS-divergence is symmetric, and its square root is a proper metric. It can also be computed without using the \textit{max} function, unlike the approach chosen by \cite{event-detection}, which makes the computation somewhat faster.
+The JS-divergence is symmetric, and its square root is a proper metric. It can also be computed without using the \textit{max} function, as opposed to the original approach, which makes the computation somewhat faster.
 
 This similarity is then generalized to a set of features $\featset$ as
 
 \begin{equation}
 	\featsim \left( \featset \right) = \max{ \{ \featsim ( \vect{y}_{f_{i}} \| \vect{y}_{f_{j}} ) \mid f_{i}, f_{j} \in \featset \} }
 \end{equation}
-
-{\color{red}TODO: Use the JSD formula for multiple distributions?}
 
 
 \subsection{Measuring document overlap}
@@ -239,4 +237,47 @@ Since we aim to maximize the document overlap among a set of features, it makes 
 
 \subsection{Event detection}
 
-\textbf{TODO}
+We can now measure the similarity of a feature set both in the time domain (using Jensen-Shannon divergence) and in the document domain (using document overlap). These two measures are combined into a cost function $\cost$, which we aim to minimize.
+
+\begin{equation} \label{eq:cost-function}
+	\cost \left( \featset \right) \coloneqq \frac{\featsim \left( \featset \right)}{\docoverlap \left( \featset \right) \sum_{f \in \featset}{\text{DPS}_{f}}}
+\end{equation}
+
+Intuitively, a set $\featset$ which minimizes this function will have low inter-feature divergence, high document overlap and will be comprised of relevant features with high DPS.
+
+To perform the event detection itself, we mostly adapt the \textit{Unsupervised greedy event detection} algorithm from \cite{event-detection}.
+
+\begin{algorithm}[H]
+\begin{algorithmic}[1]
+\caption{Unsupervised greedy event detection}
+\Input $\text{Feature set} ~ \featset \coloneqq \text{HH or HL}$
+
+\State $\text{Sort the features in ascending DPS order: } DPS_{f_{1}} \leq DPS_{f_{2}} \leq \dots \leq DPS_{f_{\left\vert M \right\vert}}$
+
+\State $k = 0$
+
+\ForEach{$f \in \featset$}
+	\State $k = k + 1$	
+	\State $e_{k} = \{ f \}$
+	\State $\cost \left(e_{k} \right) = \frac{1}{DPS_{f}}$
+	\State $\featset = \featset \setminus f$
+	
+	\While{$M \neq \emptyset$}
+		\State $m = \argmin\limits_{m}{\cost \left( e_{k} \cup f_{m} \right)}$
+
+		\If{$\cost \left( e_{k} \cup f_{m} \right) < \cost \left( e_{k} \right)$}
+			\State $e_{k} = e_{k} \cup f_{m}$
+			\State $\featset = \featset \setminus f_{m}$
+		\Else
+			\Break
+		\EndIf
+	\EndWhile
+\EndFor
+
+\Output $\{ e_{1}, e_{2}, \dots, e_{k} \}$
+\end{algorithmic}
+\end{algorithm}
+
+We do make two changes, however. First, we sort the features in \textit{ascending} rather than descending order. This ensures that words with lower DPS value will get selected first and that the function \ref{eq:cost-function} will not be minimalized as quickly. As a result, the events will contain more representing features and will not be broken into several events concerning the same real-world event. This effectively relaxes the DPS part of the function \ref{eq:cost-function} while keeping emphasis on the trajectory similarity and document overlap.
+
+Second, we output the events as sets of word features rather than event trajectories. This is simply because we will need to access the individual features, and later, documents, of each event.
