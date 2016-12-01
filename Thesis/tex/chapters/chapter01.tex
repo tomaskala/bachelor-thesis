@@ -25,10 +25,10 @@
 The core of this algorithm is taken from \cite{event-detection}.
 
 \section{Document fetching}
-We assume a collection of $N$ documents $\left\{ d_{1}, d_{2}, \dots, d_{\doccount} \right\}$ where for each document $d_{i}$, we know its publication day $t_{i}$. Then, the documents can be understood as a stream $\left\{ (d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{\doccount}, t_{\doccount}) \right\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $\streamlen$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{\doccount} = \streamlen$.
+We assume a collection of $N$ documents $\left\{ d_{1}, d_{2}, \dots, d_{\doccount} \right\}$ where for each document $d_{i}$, its publication day $t_{i}$ is known. Then, the documents can be understood as a stream $\left\{ (d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{\doccount}, t_{\doccount}) \right\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $\streamlen$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{\doccount} = \streamlen$.
 
 
-\section{Bag of words model}
+\section{Binary bag of words model}
 % TODO: blah blah we use the well known (binary) bag of words model, which drops the word order
 To vectorize the documents, we define a matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \times \featcount}$, where $\featcount$ is the total vocabulary size. The document collection can then be interpreted as a set of $\doccount$ observations, each consisting of $\featcount$ binary features. The matrix $\bowmat$ is defined as
 
@@ -100,7 +100,7 @@ That way, we move from the time-domain of publication days to the frequency doma
 We define the dominant power spectrum of the feature $f$ as the maximum element of the periodogram, that is
 
 \begin{equation}
-	\text{DPS}_{f} \coloneqq \max_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
+	\text{DPS}_{f} \coloneqq \max_{k = 1}^{\ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
 and the dominant period as the inverse of the frequency corresponding to the dominant power spectrum:
@@ -111,7 +111,7 @@ and the dominant period as the inverse of the frequency corresponding to the dom
 
 where \textit{freq} is the frequency corresponding to $\text{DPS}_{f}$.
 
-When applied to rows of the matrix $\trajmat$, this method yields two vectors, $\vect{DPS} \in \R^{\featcount}$ and $\vect{DP} \in \N^{\featcount}$, containing the dominant power spectra and dominant periods, respectively.
+When applied to rows of the matrix $\trajmat$, this method yields two vectors, $\vect{DPS} \in \R^{\featcount}$ and $\vect{DP} \in \R^{\featcount}$, containing the dominant power spectra and dominant periods, respectively.
 
 
 \section{Feature categorization}
@@ -128,7 +128,7 @@ Based on the dominant power spectra and dominant periods, we divide the features
 
 
 \section{Trajectory preprocessing}
-During the event detection itself, we will need to measure the similarity of two trajectories. However, due to the general noisiness of the trajectories, the similarities are not computed directly. Most features would then seem far apart due to mild bursts malforming the trajectories, while not really contributing to the underlying events. Thus, the trajectories are first preprocessed.
+During the event detection itself, we will need to measure the similarity of two trajectories. However, due to the general noisiness of the data, the similarities are not computed directly. Most features would then seem distant due to mild bursts malforming the trajectories, while not really contributing to the underlying events. Thus, the trajectories are first preprocessed.
 
 \subsection{Burst filtering}
 As we are only interested in the dominant bursts around the main events, we filter out the mild ones. We do this by computing a cutoff value for each feature trajectory and discarding all trajectory elements falling under this cutoff. This procedure is adopted from \cite{online-search-queries}. The algorithm is as follows:
@@ -157,7 +157,7 @@ From now on, we assume the individual trajectories have been normalized to have 
 
 \subsection{Smoothing}
 
-We smoothen each trajectory by fitting a probability distribution to it. The similarity measures will be applied on this model rather than the trajectory itself to get rid of the interfering noise.
+We smoothen each trajectory by fitting a probability density function to it. The similarity measures will be applied on this model rather than the trajectory itself to get rid of the interfering noise. By keeping the probability model of the trajectories, we are able to employ statistical distance measures later.
 
 In this section, we interpret the trajectories as two-dimensional observations $\traj_{f} = \{ \left( 1, \traj \left(1 \right) \right), \left( 2, \traj \left(2 \right) \right), \dots, \left( \streamlen, \traj \left(\streamlen \right) \right) \}$.
 
