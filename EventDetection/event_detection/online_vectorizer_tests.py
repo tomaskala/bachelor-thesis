@@ -25,7 +25,7 @@ class TestOnlineVectorizer(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.docs, _ = data_fetchers.fetch_czech_corpus_dec_jan()
+        cls.docs, _ = data_fetchers.fetch_czech_corpus(num_docs=1000)
 
     def assert_sparse_csr_equal(self, x, y, err_msg):
         x = x.sorted_indices()
@@ -79,7 +79,7 @@ class TestOnlineVectorizer(unittest.TestCase):
                              'Online fit, four docsets, dict')
 
     def test_large_docset_offline(self):
-        subset = self.docs[:1000]
+        subset = self.docs
 
         self.online_vectorizer.fit_transform(subset[:200])
         self.online_vectorizer.fit_transform(subset[200:400])
@@ -127,7 +127,7 @@ class TestOnlineVectorizer(unittest.TestCase):
                              'Online fit, two documents, dict')
 
     def test_large_docset_small_batches(self):
-        subset = self.docs[:1000]
+        subset = self.docs
 
         for doc in subset[:-1]:
             self.online_vectorizer.fit_transform([doc])
@@ -139,18 +139,6 @@ class TestOnlineVectorizer(unittest.TestCase):
         self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, large docset with small batches, bow')
         self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
                              'Online fit, large docset with small batches, dict')
-
-    def test_large_docset_large_batches(self):
-        subset = self.docs[:10000]
-
-        self.online_vectorizer.fit_transform(subset[:5000])
-        online_bow = self.online_vectorizer.fit_transform(subset[5000:])
-
-        reference_bow = self.reference_vectorizer.fit_transform(subset)
-
-        self.assert_sparse_csr_equal(online_bow, reference_bow, 'Online fit, large docset with large batches, bow')
-        self.assertDictEqual(self.online_vectorizer.vocabulary_, self.reference_vectorizer.vocabulary_,
-                             'Online fit, large docset with large batches, dict')
 
     def test_new_words_only(self):
         self.online_vectorizer.fit_transform(OLD_WORDS)
