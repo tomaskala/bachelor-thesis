@@ -83,33 +83,35 @@ Using these matrices and vectors, we can compute $\trajmat$ as follows:
 
 
 \section{Spectral analysis}
-The next step is to employ spectral analysis techniques borrowed from signal processing to discover periodicities in the features. Results from this section are further used to categorize the word features.
+The next step is to employ spectral analysis techniques to discover periodicities in the features. Results from this section are further used to categorize the word features by their periodicity and signal power.
 
-We apply the discrete Fourier transform to each feature trajectory, yielding $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
+We apply the discrete Fourier transform to each feature trajectory, which represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
 
 \begin{equation*}
-	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \me^{- \frac{2 \pi \mi}{\streamlen} (k - 1) t}}, ~ k \in \{1, 2, \dots, \streamlen\}.
+	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \me^{- \frac{2 \pi \mi}{\streamlen} (k - 1) t}}, ~ k = 1, 2, \dots, \streamlen.
 \end{equation*}
 
-That way, we move from the time-domain of publication days to the frequency domain, where we can analyze how powerful each feature is. To do this, we need to estimate the power spectral density, which we do using the periodigram
+The absolute value of the Fourier coefficient $X_{k}$ denotes the amplitude of the complex sinusoid at frequency $\frac{k}{\streamlen}$.
+
+Having moved from the time domain to the frequency domain, we can now analyze the signal power and dominant periodicity of each feature.
+
+We observe peaks in the power spectrum of the transformed data and obtain the signal power and periodicity from those. The power spectrum is estimated using the periodogram estimator
 
 \begin{equation*}
 	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
 \end{equation*}
 
-We define the dominant power spectrum of the feature $f$ as the maximum element of the periodogram, that is
+To measure the overall signal power, we define the dominant power spectrum of the feature $f$ as the value of the highest peak in the power spectrum, that is
 
 \begin{equation}
-	\text{DPS}_{f} \coloneqq \max_{k = 1}^{\ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
+	\text{DPS}_{f} \coloneqq \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
-and the dominant period as the inverse of the frequency corresponding to the dominant power spectrum:
+The dominant period is then defined as the inverse of the frequency corresponding to the highest peak:
 
 \begin{equation}
-	\text{DP}_{f} \coloneqq \frac{1}{\mathit{freq}}.
+	\text{DP}_{f} \coloneqq \frac{\streamlen}{\argmax\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}},
 \end{equation}
-
-where \textit{freq} is the frequency corresponding to $\text{DPS}_{f}$.
 
 When applied to rows of the matrix $\trajmat$, this method yields two vectors, $\vect{DPS} \in \R^{\featcount}$ and $\vect{DP} \in \R^{\featcount}$, containing the dominant power spectra and dominant periods, respectively.
 
@@ -157,7 +159,7 @@ From now on, we assume the individual trajectories have been normalized to have 
 
 \subsection{Smoothing}
 
-We smoothen each trajectory by fitting a probability density function to it. The similarity measures will be applied on this model rather than the trajectory itself to get rid of the interfering noise. By keeping the probability model of the trajectories, we are able to employ statistical distance measures later.
+We smoothen each trajectory by fitting a probability density function to it. Preserving the probability interpretation allows us to measure trajectory distance using information divergence later. Different techniques must be employed when smoothing aperiodic and periodic feature trajectories, since we aim mainly to fit all non-trivial bursts.
 
 In this section, we interpret the trajectories as two-dimensional observations $\traj_{f} = \{ \left( 1, \traj \left(1 \right) \right), \left( 2, \traj \left(2 \right) \right), \dots, \left( \streamlen, \traj \left(\streamlen \right) \right) \}$.
 
@@ -165,7 +167,7 @@ In this section, we interpret the trajectories as two-dimensional observations $
 
 \item \textbf{Aperiodic features}
 
-An aperiodic feature trajectory $\traj_{f}$ is modeled by Gaussian distribution. We fit the Gaussian function
+An aperiodic feature trajectory $\traj_{f}$ is modeled by a Gaussian distribution. We fit the Gaussian function
 
 \begin{equation*}
 	f(x) = \frac{1}{\sigma \sqrt{2 \pi}} \me^{-\frac{\left( x - \mu \right)^{2}}{2 \sigma^{2}}}
@@ -181,18 +183,18 @@ A periodic feature trajectory $\traj_{f}$ is modeled using a mixture of $K = \fl
 	f(x) = \sum_{k = 1}^{K}{\alpha_{k} \frac{1}{\pi \gamma_{k} \left( 1 + \left( \frac{x - \mu_{k}}{\gamma_{k}} \right)^2 \right)}}
 \end{equation*}
 
-The mixing parameters $\alpha_{k}, \sum_{k = 1}^{K}{\alpha_{k}} = 1$, location parameters $\mu_{k}$ and scale parameters $\gamma_{k}$ are estimated by applying the EM algorithm to $y_{f}$.
+The mixing parameters $\alpha_{k}, \sum_{k = 1}^{K}{\alpha_{k}} = 1$, location parameters $\mu_{k}$ and scale parameters $\gamma_{k}$ are estimated using the EM algorithm.
 
-The Cauchy distribution has a narrower peak and thicker tails than Gaussian distribution, which models the periodic burst more closely. The individual bursts of a periodic feature tend to be quite short, but even between bursts, the trajectory does not usually drop to zero, which makes the Cauchy distribution somewhat better choice.
+The Cauchy distribution has a narrower peak and thicker tails than the Gaussian distribution, which models the periodic bursts more closely. The individual bursts of a periodic feature tend to be quite short, but even between two consecutive bursts, the frequency remains at a non-negligible level, which makes the Cauchy distribution a somewhat better choice.
 
 \end{enumerate}
 
 
 \section{Event detection}
 
-During the event detection phase, the aim is to find sets of features highly correlated both in the time domain and in the document domain. The assumption is that features appearing in similar documents during the same time periods concern the same real-world events. Each such feature set then represents a single event.
+During the event detection phase, the aim is to find sets of word features highly correlated both in the time domain and in the document domain. The assumption is that words appearing in similar documents during the same time period concern the same real-world events. Each such feature set then represents a single event.
 
-By inspecting only the sets of high power features, we uncover only the features best describing the individual events. This also helps to reduce computation time, since there are generally much fewer high power features than the low power ones.
+By inspecting only the high power features, we uncover only the features best describing the individual events. This also helps to reduce computation time, since there are generally much fewer high power features than the low power ones.
 
 The aperiodic and periodic features are detected separately, since we assume no connection between aperiodic events and the periodic ones.
 
@@ -237,7 +239,7 @@ Since we aim to maximize the document overlap among a set of features, it makes 
 
 \subsection{Event detection}
 
-We can now measure the similarity of a feature set both in the time domain (using Jensen-Shannon divergence) and in the document domain (using document overlap). These two measures are combined into a cost function $\cost$, which we aim to minimize.
+We can now measure the similarity of a feature set both in the time domain (using JS-divergence) and in the document domain (using document overlap). These two measures are combined into a cost function $\cost$, which we aim to minimize.
 
 \begin{equation} \label{eq:cost-function}
 	\cost \left( \featset \right) \coloneqq \frac{\featsim \left( \featset \right)}{\docoverlap \left( \featset \right) \sum_{f \in \featset}{\text{DPS}_{f}}}
@@ -281,3 +283,5 @@ To perform the event detection itself, we mostly adapt the \textit{Unsupervised 
 We do make two changes, however. First, we sort the features in \textit{ascending} rather than descending order. This ensures that words with lower DPS value will get selected first and that the function \ref{eq:cost-function} will not be minimalized as quickly. As a result, the events will contain more representing features and will not be broken into several events concerning the same real-world event. This effectively relaxes the DPS part of the function \ref{eq:cost-function} while keeping emphasis on the trajectory similarity and document overlap.
 
 Second, we output the events as sets of word features rather than event trajectories. This is simply because we will need to access the individual features, and later, documents, of each event.
+
+Note that due to the usage of set intersection in the document overlap definition, every event will be comprised of words appearing in exactly the same documents. This makes it trivial to retrieve the documents later, but tends to select a relatively low number of features for each event.
