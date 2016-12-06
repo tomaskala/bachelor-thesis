@@ -1,5 +1,5 @@
+import numbers
 from collections import Counter, defaultdict
-from numbers import Integral
 from operator import itemgetter
 
 import numpy as np
@@ -32,7 +32,7 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         self.max_features = max_features
 
         if max_features is not None:
-            if not isinstance(max_features, Integral) or max_features <= 0:
+            if not isinstance(max_features, numbers.Integral) or max_features <= 0:
                 raise ValueError("max_features=%r, neither a positive integer nor None" % max_features)
 
         self.ngram_range = ngram_range
@@ -84,10 +84,54 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         j_indices = np.asarray(j_indices, dtype=np.intc)
         indptr = np.asarray(indptr, dtype=np.intc)
 
-        X = sp.csr_matrix((values, j_indices, indptr), shape=(len(indptr) - 1, len(self.vocabulary_)), dtype=self.dtype)
+        X = sp.csr_matrix((values, j_indices, indptr), shape=(len(indptr) - 1, len(vocabulary)), dtype=self.dtype)
         X.sort_indices()
 
         return X
+
+    # TODO: Make limit_features a public method and call it less often than fit on the whole BOW matrix so far.
+    # TODO: This should diminish the effect of obtaining a batch of documents concerning the same topic and removing
+    # TODO: valuable words naturally appearing often in the batch.
+    def _limit_features(self, X):
+        n_docs = X.shape[0]
+        high = self.max_df if isinstance(self.max_df, numbers.Integral) else self.max_df * n_docs
+        low = self.min_df if isinstance(self.min_df, numbers.Integral) else self.min_df * n_docs
+        limit = self.max_features
+
+        if high < low:
+            raise ValueError('max_df corresponds to < documents than min_df')
+
+        dfs = X.getnnz(axis=0)  # Document frequency.
+        tfs = np.asarray(X.sum(axis=0)).ravel()  # Term frequency.
+        mask = np.ones(len(dfs), dtype=bool)
+
+        if high is not None:
+            mask &= dfs <= high
+
+        if low is not None:
+            mask &= dfs >= low
+
+        if limit is not None and mask.sum() > limit:
+            mask_inds = (-tfs[mask]).argsort()[:limit]
+            new_mask = np.zeros(len(dfs), dtype=bool)
+            new_mask[np.where(mask)[0][mask_inds]] = True
+            mask = new_mask
+
+        new_indices = np.cumsum(mask) - 1
+        vocabulary = self.vocabulary_
+
+        for term, old_index in vocabulary.items():
+            if mask[old_index]:
+                vocabulary[term] = new_indices[old_index]
+            else:
+                del vocabulary[term]
+
+        kept_indices = np.where(mask)[0]
+
+        if len(kept_indices) == 0:
+            raise ValueError('After pruning, no terms remain. Try a lower min_df or a higher max_df.')
+
+        return X[:, kept_indices]
 
     def _sort_features(self, X):
         """
@@ -119,7 +163,10 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         if self.binary:
             X.data.fill(1)
 
-        self.bow_matrix = self._sort_features(self._append_matrix(X))
+        self._append_matrix(X)
+        self._sort_features(self.bow_matrix)
+        self.bow_matrix = self._limit_features(self.bow_matrix)
+
         return self.bow_matrix
 
     def partial_fit(self, raw_documents, y=None):
@@ -147,7 +194,7 @@ if __name__ == '__main__':
     docs, _ = data_fetchers.fetch_czech_corpus_dec_jan()
     subset = docs
 
-    step_size = 25000
+    step_size = 50000
     j = step_size
     online_vectorizer = OnlineVectorizer(binary=True)
 
