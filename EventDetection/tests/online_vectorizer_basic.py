@@ -18,7 +18,7 @@ OLD_WORDS = ['This document contains some words']
 NEW_WORDS = ['None of these was seen before']
 
 
-class TestOnlineVectorizer(unittest.TestCase):
+class OnlineVectorizerBasicTest(unittest.TestCase):
     def setUp(self):
         self.online_vectorizer = OnlineVectorizer(binary=True)
         self.reference_vectorizer = CountVectorizer(binary=True)

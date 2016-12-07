@@ -11,7 +11,7 @@ from sklearn.feature_extraction.text import VectorizerMixin
 class OnlineVectorizer(BaseEstimator, VectorizerMixin):
     def __init__(self, input='content', encoding='utf-8', decode_error='strict', strip_accents=None, lowercase=True,
                  preprocessor=None, tokenizer=None, stop_words=None, token_pattern=r"(?u)\b\w\w+\b", ngram_range=(1, 1),
-                 analyzer='word', max_df=1.0, min_df=1, max_features=None, binary=False, dtype=np.int64):
+                 analyzer='word', max_df=1.0, min_df=0, max_features=None, binary=False, dtype=np.int64):
 
         self.input = input
         self.encoding = encoding
@@ -38,8 +38,8 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         self.ngram_range = ngram_range
         self.binary = binary
         self.dtype = dtype
-        self.bow_matrix = None
 
+        self.bow_matrix_ = None
         self.vocabulary_ = defaultdict()
         self.vocabulary_.default_factory = self.vocabulary_.__len__
 
@@ -49,17 +49,20 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         :param batch_matrix: sparse matrix of term frequencies from the currently processed document batch
         :return: self.bow_matrix after appending it with batch_matrix
         """
-        if self.bow_matrix is None:
-            self.bow_matrix = batch_matrix
-            return self.bow_matrix
+        if self.bow_matrix_ is None:
+            self.bow_matrix_ = batch_matrix
+            return self.bow_matrix_
 
         # Pad the current BOW matrix by zero columns from the right to compensate for new words in this batch.
-        new_width = max(batch_matrix.shape[1], self.bow_matrix.shape[1])
-        self.bow_matrix = sp.csr_matrix((self.bow_matrix.data, self.bow_matrix.indices, self.bow_matrix.indptr),
-                                        copy=False, shape=(self.bow_matrix.shape[0], new_width))
+        new_width = max(batch_matrix.shape[1], self.bow_matrix_.shape[1])
+        self.bow_matrix_ = sp.csr_matrix((self.bow_matrix_.data, self.bow_matrix_.indices, self.bow_matrix_.indptr),
+                                         copy=False, shape=(self.bow_matrix_.shape[0], new_width))
 
-        self.bow_matrix = sp.vstack((self.bow_matrix, batch_matrix))
-        return self.bow_matrix
+        batch_matrix = sp.csr_matrix((batch_matrix.data, batch_matrix.indices, batch_matrix.indptr),
+                                     copy=False, shape=(batch_matrix.shape[0], new_width))
+
+        self.bow_matrix_ = sp.vstack((self.bow_matrix_, batch_matrix))
+        return self.bow_matrix_
 
     def _count_vocab(self, raw_documents):
         """
@@ -89,50 +92,6 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
 
         return X
 
-    # TODO: Make limit_features a public method and call it less often than fit on the whole BOW matrix so far.
-    # TODO: This should diminish the effect of obtaining a batch of documents concerning the same topic and removing
-    # TODO: valuable words naturally appearing often in the batch.
-    def _limit_features(self, X):
-        n_docs = X.shape[0]
-        high = self.max_df if isinstance(self.max_df, numbers.Integral) else self.max_df * n_docs
-        low = self.min_df if isinstance(self.min_df, numbers.Integral) else self.min_df * n_docs
-        limit = self.max_features
-
-        if high < low:
-            raise ValueError('max_df corresponds to < documents than min_df')
-
-        dfs = X.getnnz(axis=0)  # Document frequency.
-        tfs = np.asarray(X.sum(axis=0)).ravel()  # Term frequency.
-        mask = np.ones(len(dfs), dtype=bool)
-
-        if high is not None:
-            mask &= dfs <= high
-
-        if low is not None:
-            mask &= dfs >= low
-
-        if limit is not None and mask.sum() > limit:
-            mask_inds = (-tfs[mask]).argsort()[:limit]
-            new_mask = np.zeros(len(dfs), dtype=bool)
-            new_mask[np.where(mask)[0][mask_inds]] = True
-            mask = new_mask
-
-        new_indices = np.cumsum(mask) - 1
-        vocabulary = self.vocabulary_
-
-        for term, old_index in vocabulary.items():
-            if mask[old_index]:
-                vocabulary[term] = new_indices[old_index]
-            else:
-                del vocabulary[term]
-
-        kept_indices = np.where(mask)[0]
-
-        if len(kept_indices) == 0:
-            raise ValueError('After pruning, no terms remain. Try a lower min_df or a higher max_df.')
-
-        return X[:, kept_indices]
-
     def _sort_features(self, X):
         """
         Sort features by name and modify the vocabulary in place.
@@ -150,6 +109,57 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         X.indices = map_index.take(X.indices, mode='clip')
         return X
 
+    def limit_features(self, X, min_df=None, max_df=None, max_features=None):
+        min_df = min_df or self.min_df
+        max_df = max_df or self.max_df
+        max_features = max_features or self.max_features
+
+        if max_df < 0 or min_df < 0:
+            raise ValueError("negative value for max_df or min_df")
+
+        if max_features is not None:
+            if not isinstance(max_features, numbers.Integral) or max_features <= 0:
+                raise ValueError("max_features=%r, neither a positive integer nor None" % max_features)
+
+        n_docs = X.shape[0]
+        high = max_df if isinstance(max_df, numbers.Integral) else max_df * n_docs
+        low = min_df if isinstance(min_df, numbers.Integral) else min_df * n_docs
+
+        if high < low:
+            raise ValueError('max_df corresponds to < documents than min_df')
+
+        dfs = X.getnnz(axis=0)  # Document frequency.
+        tfs = np.asarray(X.sum(axis=0)).ravel()  # Term frequency.
+        mask = np.ones(len(dfs), dtype=bool)
+
+        if high is not None:
+            mask &= dfs <= high
+
+        if low is not None:
+            mask &= dfs >= low
+
+        if max_features is not None and mask.sum() > max_features:
+            mask_inds = (-tfs[mask]).argsort()[:max_features]
+            new_mask = np.zeros(len(dfs), dtype=bool)
+            new_mask[np.where(mask)[0][mask_inds]] = True
+            mask = new_mask
+
+        new_indices = np.cumsum(mask) - 1
+        vocabulary = self.vocabulary_
+
+        for term, old_index in list(vocabulary.items()):
+            if mask[old_index]:
+                vocabulary[term] = new_indices[old_index]
+            else:
+                del vocabulary[term]
+
+        kept_indices = np.where(mask)[0]
+
+        if len(kept_indices) == 0:
+            raise ValueError('After pruning, no terms remain. Try a lower min_df or a higher max_df.')
+
+        return X[:, kept_indices]
+
     def fit(self, raw_documents, y=None):
         self.fit_transform(raw_documents, y)
         return self
@@ -163,11 +173,10 @@ class OnlineVectorizer(BaseEstimator, VectorizerMixin):
         if self.binary:
             X.data.fill(1)
 
+        X = self.limit_features(X)
         self._append_matrix(X)
-        self._sort_features(self.bow_matrix)
-        self.bow_matrix = self._limit_features(self.bow_matrix)
 
-        return self.bow_matrix
+        return self._sort_features(self.bow_matrix_)
 
     def partial_fit(self, raw_documents, y=None):
         self.fit_transform(raw_documents, y)
@@ -194,15 +203,15 @@ if __name__ == '__main__':
     docs, _ = data_fetchers.fetch_czech_corpus_dec_jan()
     subset = docs
 
-    step_size = 50000
+    step_size = 164234
     j = step_size
-    online_vectorizer = OnlineVectorizer(binary=True)
+    online_vectorizer = OnlineVectorizer(binary=True, min_df=30, max_df=0.9)
 
     t0 = time()
 
     for i in range(0, len(subset), step_size):
         online_vectorizer.fit_transform(subset[i:j])
-        print(online_vectorizer.bow_matrix.shape)
+        print(online_vectorizer.bow_matrix_.shape)
         j += step_size
 
     print('Done in %fs' % (time() - t0))
