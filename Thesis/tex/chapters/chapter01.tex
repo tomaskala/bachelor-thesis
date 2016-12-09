@@ -285,3 +285,5 @@ We do make two changes, however. First, we sort the features in \textit{ascendin
 Second, we output the events as sets of word features rather than event trajectories. This is simply because we will need to access the individual features, and later, documents, of each event.
 
 Note that due to the usage of set intersection in the document overlap definition, every event will be comprised of words appearing in exactly the same documents. This makes it trivial to retrieve the documents later, but tends to select a relatively low number of features for each event.
+
+{\color{red} TODO: quote this: https://arxiv.org/pdf/1109.2378v1.pdf, the original article of the used method and the information retrieval book when writing about agglomerative clustering, use cosine similarity, compute test statistics from scipy to determine the method to use, also quote the article with Cauchy distribution}
