@@ -6,7 +6,7 @@ import sklearn.mixture as gmm
 from scipy.optimize import curve_fit
 from scipy.stats import cauchy, norm
 
-from event_detection.main import create_event_trajectory, moving_average
+from event_detection.event_detector import create_event_trajectory, moving_average
 
 
 def plot_events(feature_trajectories, events, id2word, dps, dp, dirname='../events'):
