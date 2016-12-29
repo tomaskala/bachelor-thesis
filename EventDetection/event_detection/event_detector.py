@@ -446,10 +446,6 @@ def main():
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
     t = time()
-    # documents, relative_days, weekdays = data_fetchers.fetch_signal_news(num_docs=100000)
-    # documents, relative_days, weekdays = data_fetchers.fetch_de_news()
-    # documents, relative_days, weekdays = data_fetchers.fetch_reuters()
-    # documents, relative_days, weekdays = data_fetchers.fetch_crawl_data(num_docs=100000)
     documents, relative_days = data_fetchers.fetch_czech_corpus_dec_jan()
     # documents, relative_days = data_fetchers.fetch_czech_corpus(num_docs=10000000)
 
