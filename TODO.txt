@@ -11,3 +11,12 @@ extract headlines for the hierarchy levels ('topics') -- plain keywords / phrase
 if we do "document title is to document vector" as "??? is to event vector", we might get something nice?
 
 when pre-clustering, use just the document titles as inputs?
+
+
+----
+NEW PAPERS
+----
+
+if scatter-gather is used, do some visualisations using PCA into 2D/3D, add this to the thesis
+
+also if scatter-gather is used, we could theoretically group the in-cluster documents by their publication days yet again to obtain events ?! (perhaps not that crudely, but a modification of the event detection algorithm could be used nevertheless)

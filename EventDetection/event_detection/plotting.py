@@ -1,12 +1,36 @@
 import os
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn.mixture as gmm
+import wordcloud
 from scipy.optimize import curve_fit
 from scipy.stats import cauchy, norm
 
-from event_detection.event_detector import create_event_trajectory, moving_average
+from event_detection.event_detector import create_event_trajectory
+from event_detection.original_method import moving_average
+
+matplotlib.rc('font', family='DejaVu Sans')
+
+
+def visualise_clusters(clusters, documents, output_dir='./wordcloud'):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    cluster_words = [[] for _ in range(len(clusters))]
+
+    for i, cluster in enumerate(clusters):
+        for doc in cluster:
+            cluster_words[i].extend(documents[doc].split(r'\s'))
+
+    for i, words in enumerate(cluster_words):
+        wc = wordcloud.WordCloud(width=2000, height=1200).generate(' '.join(words))
+        fig = plt.figure()
+        fig.set_size_inches(20, 12)
+        plt.imshow(wc)
+        plt.axis('off')
+        wc.to_file(os.path.join(output_dir, '{0:02d}.png'.format(i)))
 
 
 def plot_events(feature_trajectories, events, id2word, dps, dp, dirname='../events'):

@@ -1,38 +1,17 @@
-"""
-Implementation of He, Chang, Lim, 2007, Analyzing feature trajectories for event detection.
-"""
 import logging
 import math
+import os
+import pickle
 from time import time
 
 import numpy as np
 import scipy.sparse as sp
-import sklearn.mixture as gmm
-from scipy.optimize import curve_fit
 from scipy.signal import periodogram
-from scipy.stats import cauchy, entropy, norm
+from scipy.stats import entropy
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import normalize
 
-# Manually taken from the dataset. Some words are malformed due to stemming.
-CZECH_STOPWORDS = ['adsbygoogl', 'aftershar', 'api', 'appendchild', 'async', 'befor', 'btn', 'callback',
-                   'clankyodjinud', 'clankyvideoportal', 'click', 'com', 'comments', 'config', 'configuration',
-                   'copypast', 'count', 'createelement', 'css2', 'defaults', 'disqus', 'document', 'dsq', 'echo24cz',
-                   'edita', 'elm', 'enabl', 'enabled', 'escap', 'exampl', 'fals', 'fbs', 'fjs', 'formhtml', 'forum',
-                   'function', 'gatrackevents', 'gatracksocialinteractions', 'gcfg', 'getelementbyid',
-                   'getelementsbytagnam', 'getjson', 'getpocket', 'getstats', 'head', 'height', 'href', 'https', 'i18n',
-                   'ida', 'ihnedcz', 'insertbefor', 'into', 'javascript', 'json', 'lang', 'left', 'link', 'links',
-                   'local', 'location', 'method', 'mobileoverla', 'null', 'parentnod', 'pasting', 'php', 'platform',
-                   'pleas', 'pocket', 'pos', 'position', 'powered', 'ppc', 'publisherke', 'push', 'pwidget', 'queu',
-                   'readmor', 'replac', 'required', 'restserver', 'return', 'rhhar0uejt6tohi9', 'sashec', 'scriptum',
-                   'search', 'sharepopups', 'sharequot', 'sharer', 'shortnam', 'showerror', 'size',
-                   'sklikarticleinicialized', 'sklikd', 'sklikreklam', 'src', 'success', 'the', 'titl', 'toolbar',
-                   'true', 'u00edc', 'urls', 'var', 'variables', 'view', 'webpag', 'widget', 'widgets', 'width',
-                   'window', 'with', 'wjs', 'writ', 'wsj', 'www', 'your', 'zoneid', 'transitioncarousel',
-                   'itemloadcallback', 'initcallback', 'formatb', 'dynamiccallback', 'arrayd', 'galurl',
-                   'gallerycarousel', 'galid', 'onafteranimation', 'onbeforeanimation', 'description', 'plugins',
-                   'advide', 'secondtracker', 'trackingobject', 'xmlad', 'stretching', 'mous', 'navigation',
-                   'translation', 'sablon', 'donation', 'mainl', 'functions', 'although', 'formatovat', 'translated',
-                   'tagu', 'preddefin', 'iconk', 'formatovan', 'bbcod', 'dropdown', 'choosen']
+from event_detection import data_fetchers, plotting, preprocessing
 
 
 def construct_doc_to_day_matrix(num_docs, days):
@@ -174,17 +153,6 @@ def heuristic_stopwords_detection(feature_trajectories, dps, seed_sw_indices):
     return stopwords_indices, udps
 
 
-def moving_average(vector, window):
-    """
-    Compute the moving average along the given vector using a window of the given length.
-    :param vector: the vector whose moving average to compute
-    :param window: length of the window to use in the computation
-    :return: moving average of length len(vector) - window + 1
-    """
-    weights = np.ones(window) / window
-    return np.convolve(vector, weights, 'valid')
-
-
 def jensen_shannon_divergence(p, q):
     """
     Compute the Jensen-Shannon divergence between the two probability distributions. Jensen-Shannon divergence is
@@ -197,174 +165,70 @@ def jensen_shannon_divergence(p, q):
     return 0.5 * entropy(p, m, base=2) + 0.5 * entropy(q, m, base=2)
 
 
-def precompute_divergences(feature_trajectories, dominant_periods):
+def create_event_trajectory(event, feature_trajectories, dps, dp):
     """
-    Compute a matrix of information divergences between all pairs of feature trajectories. The matrix is symmetric
-    (since Jensen-Shannon divergence is used) so it is enough to store its upper triangular part. It is stored as
-    a dictionary mapping pairs of feature indices to their divergences.
-
-    The trajectories are first truncated to keep only the bursty parts. First, we compute a moving average of the
-    trajectory using the predefined window size. Then, we define cutoff = mean(moving_average) + std(moving_average).
-    We keep only the points of the trajectory greater than cutoff, which are then modeled by Normal distribution
-    (aperiodic features) or a mixture of Cauchy distributions (periodic features).
-
-    Depending on whether dominant_periods[0] > floor(len(stream) / 2), aperiodic or periodic features, respectively,
-    are assumed.
-    :param feature_trajectories: matrix of feature trajectories as row vectors
-    :param dominant_periods: dominant periods of all features matching feature_trajectories order
-    :return: matrix of feature trajectory divergences represented by a dictionary
-    """
-
-    def estimate_distribution_aperiodic(feature_trajectory):
-        """
-        Model the feature trajectory by a Gaussian curve. The parameters (mean and standard deviation) are estimated
-        using Least Squares fit.
-        :param feature_trajectory: trajectory of the feature to model
-        :return: feature trajectory modeled by a Gaussian curve.
-        """
-
-        def gaussian_curve(value, loc, scale):
-            return norm.pdf(value, loc=loc, scale=scale)
-
-        days = np.arange(n_days)
-        ma = moving_average(feature_trajectory, WINDOW)
-
-        ma_mean = np.mean(ma)
-        ma_std = np.std(ma)
-
-        cutoff = ma_mean + ma_std
-        peak_indices = np.where(feature_trajectory > cutoff)
-
-        peak_days = peak_indices[0]
-        peaks = feature_trajectory[peak_indices].reshape(-1)
-        peaks /= np.sum(peaks)  # Normalize the trajectory so it can be interpreted as probability.
-
-        # Initial guess for the parameters is mu ~ center of the peak period, sigma ~ quarter of the peak period length.
-        popt, pcov = curve_fit(gaussian_curve, peak_days, peaks,
-                               p0=(peak_days[len(peak_days) // 2], len(peak_days) / 4), bounds=(0.0, n_days))
-
-        mean, std = popt
-        return gaussian_curve(days, mean, std)
-
-    def estimate_distribution_periodic(feature_index):
-        """
-        Model the feature trajectory by a mixture of (stream_length / dominant_period) Cauchy distributions, whose
-        shape tends to represent the peaks more closely than Gaussians due to steeper peaks and fatter tails.
-        Cauchy distribution parameters are the location (GMM means are used) and half width at half maximum, which
-        is computed from GMM standard deviations as HWHM = sqrt(2 * ln(2)) * sigma.
-        :param feature_index: index of the feature whose trajectory to model
-        :return: feature trajectory modeled by a mixture of Cauchy distributions
-        """
-        days = np.arange(n_days).reshape(-1, 1)
-        ma = moving_average(feature_trajectories[feature_index].reshape(-1), WINDOW)
-
-        ma_mean = np.mean(ma)
-        ma_std = np.std(ma)
-
-        cutoff = ma_mean + ma_std
-        observations = np.hstack((days, feature_trajectories[feature_index].reshape(-1, 1)))
-        observations = observations[observations[:, 1] > cutoff, :]
-
-        # Sometimes the cutoff is too harsh and we end up with less observations than components. In that case,
-        # reduce the number of components to the number of features, since not all peaks were bursty enough.
-        n_components = min(math.floor(n_days / dominant_periods[feature_index]),
-                           len(observations))
-        g = gmm.GaussianMixture(n_components=int(n_components), covariance_type='diag', init_params='kmeans')
-        g.fit(observations)
-
-        components = np.squeeze(np.array(
-            [cauchy.pdf(days, mean[0], np.sqrt(2 * np.log(2)) * np.sqrt(cov[0])) for mean, cov in
-             zip(g.means_, g.covariances_)]))
-
-        return g.weights_ @ components
-
-    n_features, n_days = feature_trajectories.shape
-
-    if dominant_periods[0] > math.floor(n_days / 2):
-        distributions = np.apply_along_axis(estimate_distribution_aperiodic, axis=1, arr=feature_trajectories)
-    else:
-        indices = np.arange(len(feature_trajectories)).reshape(-1, 1)
-        distributions = np.apply_along_axis(estimate_distribution_periodic, axis=1, arr=indices)
-
-    return {(i, j): jensen_shannon_divergence(f1, f2) for i, f1 in enumerate(distributions) for j, f2 in
-            enumerate(distributions) if i < j}
-
-
-def precompute_df_overlaps(bow_matrix):
-    """
-    Compute a matrix of document overlaps between all pairs of features.
-    :param bow_matrix: Bag Of Words matrix output by the CountVectorizer
-    :return: matrix of feature document overlaps
-    """
-    feature_doc_counts = np.asarray(bow_matrix.sum(axis=0)).squeeze()
-    doc_set_minima = np.minimum.outer(feature_doc_counts, feature_doc_counts)
-
-    return (bow_matrix.T @ bow_matrix) / doc_set_minima
-
-
-def set_similarity(feature_indices, divergences):
-    """
-    Compute the similarity of a set of features using the precomputed KL-divergences. Set similarity is defined as
-    the maximum of divergences between all pairs of features from the set.
-    :param feature_indices: indices of the features from the set
-    :param divergences: precomputed matrix of feature trajectory divergences
-    :return: similarity of the set
-    """
-    return max(divergences[i, j] for i in feature_indices for j in feature_indices if i < j)
-
-
-def set_df_overlap(feature_indices, overlaps):
-    """
-    Compute the document overlap of a set of features using the precomputed document overlaps. Set document overlap
-    is defined as the minimum of overlaps between all pairs of features from the set.
-    :param feature_indices: indices of the features from the set
-    :param overlaps: precomputed matrix of feature document overlaps
-    :return: document overlap of the set
-    """
-    return np.min(overlaps[np.ix_(feature_indices, feature_indices)])
-
-
-def unsupervised_greedy_event_detection(global_indices, bow_matrix, feature_trajectories, dps, dp):
-    """
-    The main algorithm for event detection, as described in the paper.
-    :param global_indices: array of indices of the processed features with respect to the Bag Of Words matrix
-    :param bow_matrix: Bag Of Words matrix output by the CountVectorizer
+    Create a trajectory of the given event as the sum of trajectories of its features weighted by their DPS.
+    Also return the dominant period of the event, which is the most common dominant period of its features,
+    since not all of them have necessarily the same periodicity.
+    :param event: detected event (array of its feature indices)
     :param feature_trajectories: matrix of feature trajectories as row vectors
     :param dps: dominant power spectra of the processed features
     :param dp: dominant periods of the processed features
-    :return: yield the found events as numpy arrays of feature indices
+    :return: trajectory of the given event and its dominant period
+    """
+    e_feature_trajectories = feature_trajectories[event]
+    e_power_spectra = dps[event]
+    e_dominant_period = np.bincount(dp[event].astype(int)).argmax()
+    e_trajectory = (e_feature_trajectories.T @ e_power_spectra) / np.sum(e_power_spectra)
+
+    return e_trajectory, e_dominant_period
+
+
+# DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.03.
+DPS_BOUNDARY = 0.05  # Dominant power spectrum boundary between high and low power features.
+WINDOW = 7  # Length of the window to use in computing the moving average.
+
+
+def event_detection(global_indices, doc2vec_model, feature_trajectories, dps, id2word):
+    """
+    The main event detection method with explicit cost function minimization.
+    :param global_indices: mapping of word indices from local with respect to the examined set to global
+    :param doc2vec_model: precomputed Doc2Vec model which must contain word embeddings
+    :param feature_trajectories: matrix of feature trajectories
+    :param dps: vector of dominant power spectra
+    :param id2word: mapping from IDs to words to be used in Word2Vec
+    :return: yield the detected events as lists of keyword indices
     """
 
-    def cost_function(feature_indices):
-        with np.errstate(divide='ignore'):  # Denominator == 0 means no document overlap and return infinity.
-            return set_similarity(feature_indices, divergences) / (
-                set_df_overlap(feature_indices, overlaps) * np.sum(dps[feature_indices]))
+    def cost_function(old_indices, new_index):
+        old_traj = np.mean(feature_trajectories[old_indices], axis=0)
+        new_traj = feature_trajectories[new_index]
+        traj_div = jensen_shannon_divergence(old_traj, new_traj)
+
+        old_words = [id2word[global_indices[word_ix]] for word_ix in old_indices]
+        new_word = id2word[global_indices[new_index]]
+        doc_sim = math.exp(doc2vec_model.n_similarity(old_words, [new_word]))
+
+        dps_score = np.sum(dps[old_indices + [new_index]])
+        return traj_div / (doc_sim * dps_score)
 
     def minimizing_feature(event_so_far, feature_indices):
         index = feature_indices[0]
-        min_cost = cost_function(event_so_far + [feature_indices[0]])
+        min_cost = cost_function(event_so_far, feature_indices[0])
 
         for f in feature_indices[1:]:
-            added = event_so_far + [f]
-            added_cost = cost_function(added)
+            added_cost = cost_function(event_so_far, f)
 
             if added_cost < min_cost:
                 index, min_cost = f, added_cost
 
         return index, min_cost
 
+    logging.info('Detecting events using the classical approach.')
     logging.info('Examining %d features.', len(feature_trajectories))
 
     # Sort feature indices by DPS in ascending order.
     indices = list(sorted(range(len(feature_trajectories)), key=lambda i: dps[i]))
-
-    t = time()
-    divergences = precompute_divergences(feature_trajectories, dp)
-    logging.info('Precomputed information divergences in %fs.', time() - t)
-
-    t = time()
-    overlaps = precompute_df_overlaps(bow_matrix)
-    logging.info('Precomputed document overlaps in %fs.', time() - t)
 
     t = time()
     found_events = 0
@@ -390,15 +254,97 @@ def unsupervised_greedy_event_detection(global_indices, bow_matrix, feature_traj
     logging.info('Detected %d events in %fs.', found_events, time() - t)
 
 
-def detect_events(bow_matrix, feature_trajectories, dps, dp, aperiodic):
+def event_detection_cluster_based(global_indices, doc2vec_model, feature_trajectories, id2word):
+    from scipy.cluster.hierarchy import dendrogram, linkage
+    import matplotlib.pyplot as plt
+
+    def pairwise_distance(i, j):
+        i = i[0]
+        j = j[0]
+        word1 = id2word[global_indices[i]]
+        word2 = id2word[global_indices[j]]
+        similarity = math.exp(doc2vec_model.similarity(word1, word2))
+        divergence = jensen_shannon_divergence(feature_trajectories[i], feature_trajectories[j])
+        return divergence / similarity
+
+    indices = np.arange(len(global_indices))
+    labels = [id2word[global_indices[word_ix]] for word_ix in indices]
+
+    linkage_matrix = linkage(indices.reshape(-1, 1), method='complete', metric=pairwise_distance)
+    fig, ax = plt.subplots(figsize=(15, 20))  # set size
+    ax = dendrogram(linkage_matrix, orientation="right", labels=labels)
+
+    plt.tick_params(
+        axis='x',  # changes apply to the x-axis
+        which='both',  # both major and minor ticks are affected
+        bottom='off',  # ticks along the bottom edge are off
+        top='off',  # ticks along the top edge are off
+        labelbottom='off')
+
+    plt.tight_layout()  # show plot with tight layout
+    plt.show()
+
+
+def event_detection_cluster_based_old(global_indices, doc2vec_model, feature_trajectories, id2word):
+    n_features = len(global_indices)
+    logging.info('Detecting events using the clustering approach.')
+    logging.info('Examining %d features.', n_features)
+    t = time()
+
+    divergences = np.zeros((n_features, n_features), dtype=float)
+    overlaps = np.eye(n_features, dtype=float)
+
+    for i in range(len(overlaps)):
+        for j in range(len(overlaps)):
+            if i > j:
+                word1 = id2word[global_indices[i]]
+                word2 = id2word[global_indices[j]]
+                similarity = doc2vec_model.similarity(word1, word2)
+
+                overlaps[i, j] = math.exp(similarity)
+                divergences[i, j] = jensen_shannon_divergence(feature_trajectories[i], feature_trajectories[j])
+
+    overlaps += overlaps.T
+    divergences += divergences.T
+    divergences /= overlaps
+    del overlaps
+    logging.info('Precomputed word similarities in %fs.', time() - t)
+
+    from hdbscan import HDBSCAN  # TODO: Try hierarchical clustering with a reasonable cut.
+
+    t = time()
+    clusterer = HDBSCAN(metric='precomputed', min_samples=2, min_cluster_size=3)
+
+    labels = clusterer.fit_predict(divergences)
+    logging.info('Performed clustering in %fs.', time() - t)
+    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+
+    if n_clusters == 0:
+        logging.warning('No events detected.')
+        return []
+
+    events = [[] for _ in range(n_clusters)]
+
+    for feature_ix, label in np.ndenumerate(labels):
+        if label >= 0:  # Filter out the noisy samples.
+            events[label].append(global_indices[feature_ix[0]])
+
+    logging.info('Detected %d events in %fs.', len(events), time() - t)
+    logging.info('Covered %d word features out of %d.', sum(len(event) for event in events), n_features)
+    return events
+
+
+def detect_events(doc2vec_model, feature_trajectories, dps, dp, id2word, aperiodic, cluster_based):
     """
-    An interface over the main event detection function to prevent duplicated code.
-    :param bow_matrix: Bag Of Words matrix output by the CountVectorizer
-    :param feature_trajectories: matrix of feature trajectories as row vectors
-    :param dps: dominant power spectra of all features matching feature_trajectories order
-    :param dp: dominant periods of all features matching feature_trajectories order
+    Perform event detection.
+    :param doc2vec_model: precomputed Doc2Vec model which must contain word embeddings
+    :param feature_trajectories: matrix of feature trajectories
+    :param dps: vector of dominant power spectra
+    :param dp: vector of dominant periods
+    :param id2word: mapping from IDs to words to be used in Word2Vec
     :param aperiodic: whether to detect aperiodic or periodic events
-    :return: yield the found events as numpy arrays of feature indices
+    :param cluster_based: whether to use the cluster-based algorithm or the one with explicit minimization
+    :return: iterable of events as lists of keyword indices
     """
     _, n_days = feature_trajectories.shape
 
@@ -407,74 +353,162 @@ def detect_events(bow_matrix, feature_trajectories, dps, dp, aperiodic):
     else:
         feature_indices = np.where((dps > DPS_BOUNDARY) & (dp <= math.floor(n_days / 2)))[0]
 
-    bow_slice = bow_matrix[:, feature_indices]
-    features = feature_trajectories[feature_indices, :]
-    feature_dps = dps[feature_indices]
-    feature_dp = dp[feature_indices]
+    if len(feature_indices) == 0:
+        logging.warning('No features to detect events from.')
+        return []
 
-    return unsupervised_greedy_event_detection(feature_indices, bow_slice, features, feature_dps, feature_dp)
+    logging.info('Detecting %s events from %d features.', 'aperiodic' if aperiodic else 'periodic',
+                 len(feature_indices))
+
+    trajectories_slice = feature_trajectories[feature_indices, :]
+    dps_slice = dps[feature_indices]
+
+    if cluster_based:
+        return event_detection_cluster_based(feature_indices, doc2vec_model, trajectories_slice, id2word)
+    else:
+        return event_detection(feature_indices, doc2vec_model, trajectories_slice, dps_slice, id2word)
 
 
-def create_event_trajectory(event, feature_trajectories, dps, dp):
+def process_cluster(cluster, doc2vec_model, bow_matrix, relative_days, id2word, cluster_based, aperiodic_path,
+                    periodic_path):
     """
-    Create a trajectory of the given event as the sum of trajectories of its features weighted by their DPS
-    and normalized to probability. Also return the dominant period of the event, which is the most common
-    dominant period of its features, since not all of them have necessarily the same periodicity.
-    :param event: detected event (array of its feature indices)
-    :param feature_trajectories: matrix of feature trajectories as row vectors
-    :param dps: dominant power spectra of the processed features
-    :param dp: dominant periods of the processed features
-    :return: trajectory of the given event and its dominant period
+    Detect events from a cluster of documents.
+    :param cluster: indices of documents in the cluster
+    :param doc2vec_model: precomputed Doc2Vec model which must contain word embeddings
+    :param bow_matrix: bag-of-words matrix obtained from the documents
+    :param relative_days: list of publication days of the document in the same order as the documents appear in bow,
+        relative to the first date of the document set
+    :param id2word: mapping from IDs to words to be used in Word2Vec
+    :param cluster_based: whether to use the cluster-based algorithm or the one with explicit minimization
+    :param aperiodic_path: path to store the aperiodic events to
+    :param periodic_path: path to store the periodic events to
+    :return: iterable of events as lists of keyword indices
     """
-    e_feature_trajectories = feature_trajectories[event]
-    e_power_spectra = dps[event]
-    e_dominant_period = np.bincount(dp[event].astype(int)).argmax()
-    e_trajectory = np.sum(e_power_spectra) * e_feature_trajectories.T @ e_power_spectra
-
-    return e_trajectory, e_dominant_period
-
-
-DPS_BOUNDARY = 0.03  # Dominant power spectrum boundary between high and low power features.
-WINDOW = 7  # Length of the window to use in computing the moving average.
-
-
-# TODO: Try at least a subset of the full documents, possibly using n-gram models.
-# TODO: Output explained variance from LSI (see the document clustering example on sklearn webpage).
-def main():
-    from event_detection import data_fetchers, plotting
-    total_time = time()
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-
-    t = time()
-    documents, relative_days = data_fetchers.fetch_czech_corpus_dec_jan()
-    # documents, relative_days = data_fetchers.fetch_czech_corpus(num_docs=10000000)
-
-    stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
-    logging.info('Read input in %fs.', time() - t)
-    logging.info('Stream length: %d', stream_length)
-
-    t = time()
-    vectorizer = CountVectorizer(min_df=30, max_df=0.9, binary=True, stop_words=CZECH_STOPWORDS)
-    bow_matrix = vectorizer.fit_transform(documents)
-    id2word = {v: k for k, v in vectorizer.vocabulary_.items()}
-    logging.info('Created bag of words in %fs.', time() - t)
-    logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype), bow_matrix.getnnz())
-
-    trajectories = construct_feature_trajectories(bow_matrix, relative_days)
+    trajectories = construct_feature_trajectories(bow_matrix[cluster, :], relative_days[cluster])
     dps, dp = spectral_analysis(trajectories)
 
     # Aperiodic events
-    aperiodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=True)
-    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dp, dirname='../aperiodic')
+    aperiodic_events = detect_events(doc2vec_model, trajectories, dps, dp, id2word, aperiodic=True,
+                                     cluster_based=cluster_based)
+    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dp, dirname=aperiodic_path)
     logging.info('Aperiodic done')
 
     # Periodic events
-    periodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=False)
-    plotting.plot_events(trajectories, periodic_events, id2word, dps, dp, dirname='../periodic')
+    periodic_events = detect_events(doc2vec_model, trajectories, dps, dp, id2word, aperiodic=False,
+                                    cluster_based=cluster_based)
+    plotting.plot_events(trajectories, periodic_events, id2word, dps, dp, dirname=periodic_path)
     logging.info('Periodic done')
+
+
+# TODO: Once computed periodic events, split each event into several events whose keywords share the same periodicity.
+# TODO: Or, penalize different periodicity heavily in the cost function (multiply by exp(abs(dp_difference)))?
+def main(cluster_based, use_preclustering):
+    total_time = time()
+    fetcher = data_fetchers.CzechFullTexts(dataset='dec-jan', names=True, dates=True)
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
+    PICKLE_PATH = '../event_detection/pickle'
+    ID2WORD_PATH = os.path.join(PICKLE_PATH, 'vectorizer_dec_jan.pickle')
+    BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document_dec_jan.pickle')
+    RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days_dec_jan.pickle')
+
+    if os.path.exists(ID2WORD_PATH) and os.path.exists(BOW_MATRIX_PATH) and os.path.exists(RELATIVE_DAYS_PATH):
+        with open(ID2WORD_PATH, mode='rb') as f:
+            id2word = pickle.load(f)
+
+        with open(BOW_MATRIX_PATH, mode='rb') as f:
+            bow_matrix = pickle.load(f)
+
+        with open(RELATIVE_DAYS_PATH, mode='rb') as f:
+            relative_days = pickle.load(f)
+
+        stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
+
+        logging.info('Deserialized id2word, bag of words matrix and relative days')
+        logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
+                     bow_matrix.getnnz())
+        logging.info('Stream length: %d', stream_length)
+    else:
+        if not os.path.exists(PICKLE_PATH):
+            os.makedirs(PICKLE_PATH)
+
+        t = time()
+        relative_days = fetcher.fetch_relative_days()
+
+        stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
+        logging.info('Read input in %fs.', time() - t)
+        logging.info('Stream length: %d', stream_length)
+
+        documents = preprocessing.Preprocessor(fetcher)
+
+        t = time()
+        vectorizer = CountVectorizer(min_df=5, binary=True, tokenizer=lambda doc: doc, preprocessor=lambda doc: doc)
+        bow_matrix = vectorizer.fit_transform(documents)
+        id2word = {v: k for k, v in vectorizer.vocabulary_.items()}
+
+        with open(ID2WORD_PATH, mode='wb') as f:
+            pickle.dump(id2word, f)
+
+        with open(BOW_MATRIX_PATH, mode='wb') as f:
+            pickle.dump(bow_matrix, f)
+
+        with open(RELATIVE_DAYS_PATH, mode='wb') as f:
+            pickle.dump(relative_days, f)
+
+        logging.info('Created and serialized id2word, bag of words matrix and relative days in %fs.', time() - t)
+        logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
+                     bow_matrix.getnnz())
+
+    doc2vec_model = preprocessing.perform_doc2vec(fetcher)
+
+    if use_preclustering:
+        if cluster_based:
+            aperiodic_path = './aperiodic_preclustering_clusters'
+            periodic_path = './periodic_preclustering_clusters'
+        else:
+            aperiodic_path = './aperiodic_preclustering'
+            periodic_path = './periodic_preclustering'
+
+        document_vectors = doc2vec_model.docvecs[[i for i in range(bow_matrix.shape[0])]]
+        normalize(document_vectors, norm='l2', copy=False)
+
+        clusters = preprocessing.cluster_documents(document_vectors, n_clusters=6)
+        del document_vectors
+
+        for i, cluster in enumerate(clusters):
+            logging.info('Processing cluster #%d.', i)
+            t = time()
+
+            process_cluster(cluster, doc2vec_model, bow_matrix, relative_days, id2word, cluster_based,
+                            os.path.join(aperiodic_path, str(i)),
+                            os.path.join(periodic_path, str(i)))
+
+            logging.info('Cluster #%d processed in %fs.', i, time() - t)
+    else:
+        trajectories = construct_feature_trajectories(bow_matrix, relative_days)
+        dps, dp = spectral_analysis(trajectories)
+
+        if cluster_based:
+            aperiodic_path = './aperiodic_clusters'
+            periodic_path = './periodic_clusters'
+        else:
+            aperiodic_path = './aperiodic'
+            periodic_path = './periodic'
+
+        # Aperiodic events
+        aperiodic_events = detect_events(doc2vec_model, trajectories, dps, dp, id2word, aperiodic=True,
+                                         cluster_based=cluster_based)
+        plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dp, dirname=aperiodic_path)
+        logging.info('Aperiodic done')
+
+        # Periodic events
+        periodic_events = detect_events(doc2vec_model, trajectories, dps, dp, id2word, aperiodic=False,
+                                        cluster_based=cluster_based)
+        plotting.plot_events(trajectories, periodic_events, id2word, dps, dp, dirname=periodic_path)
+        logging.info('Periodic done')
 
     logging.info('All done in %fs.', time() - total_time)
 
 
 if __name__ == '__main__':
-    main()
+    main(cluster_based=True, use_preclustering=False)
