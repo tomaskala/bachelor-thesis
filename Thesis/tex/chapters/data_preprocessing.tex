@@ -1,0 +1,26 @@
+\section{Document collection}
+The input to the algorithm is a collection of news documents containing full text articles along with their publication days, headlines and, possibly, additional metadata. We assume no preprocessing was done prior to the algorithm.
+
+If we denote $t_{i}$ as the publication day of a document $d_{i}$, the collection can be understood as a stream $\left\{ (d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{\doccount}, t_{\doccount}) \right\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $\streamlen$ to be the length of the stream, and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{\doccount} = \streamlen$.
+
+
+\section{Preprocessing}
+We intentionally employ very little preprocessing due to the word embedding methods requiring continuous text. Some of the documents contain residual HTML entities from web scraping, which we filter out using a manually constructed stopwords list.
+
+No traditional stopwords filtering, e.g. keeping only Nouns, Verbs, Adjectives and Adverbs, is used. Instead, our method chooses the important words based on their overall frequency and power of appearance in the collection.
+
+The only additional preprocessing step is to convert all documents to lowercase, tokenize them by whitespace and strip punctuation marks.
+
+{\color{red} TODO: Mikolov's phrase detection model?}
+
+
+\section{Word embeddings} \label{word-embeddings}
+Before we proceed to the detection itself, we represent the word features as vectors by embedding them in a vector space. This representation will then be used to compare semantic similarity of words in a hope to obtain clusters or words relating to similar topics.
+
+The method used is the Word2Vec model \cite{word2vec} introduced by Mikolov et al. More specifically, we train its generalization, the paragraph2vec model \cite{doc2vec} to obtain both document and word embeddings. The word vectors obtained will be used during the event detection phase, and the document vectors afterwards when examining the events during the postprocessing step.
+
+For the purposes of this project, we use the Gensim \cite{gensim} implementation of these algorithms.
+
+{\color{red} TODO: Describe the settings used in the algorithm (vector space dimensionality, avg/concat, etc.)}
+
+{\color{red} TODO: Briefly describe how word2vec works.}

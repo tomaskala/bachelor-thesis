@@ -48,7 +48,6 @@
 \newcommand{\R}{\mathbb{R}}  % Pretty set of real numbers.
 \newcommand{\N}{\mathbb{N}}  % Pretty set of natural numbers.
 \newcommand{\T}{\text{T}}  % Pretty transpose.
-\newcommand{\me}{\mathrm{e}}  % Pretty Euler number.
 \newcommand{\mi}{\mathrm{i}}  % Pretty imaginary unit.
 \DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}  % The ceiling function.
 \DeclarePairedDelimiter{\floor}{\lfloor}{\rfloor}  % The floor function.
@@ -58,6 +57,11 @@
 
 \DeclareMathOperator*{\argmin}{argmin}  % Argmin
 \DeclareMathOperator*{\argmax}{argmax}  % Argmax
+
+
+% Document collection
+\newcommand{\doccount}{N}
+\newcommand{\streamlen}{T}
 
 
 
@@ -93,15 +97,21 @@ These are my acknowledgements.
 
 
 % Chapters
-\chapter*{Introduction}
-\addcontentsline{toc}{chapter}{Introduction}
+\chapter{Introduction}
+%\addcontentsline{toc}{chapter}{Introduction}
 \input{tex/chapters/introduction}
 
-\chapter{Event detection algorithm}
-\input{tex/chapters/chapter01}
+\chapter{Data preprocessing}
+\input{tex/chapters/data_preprocessing}
 
-\chapter*{Conclusion}
-\addcontentsline{toc}{chapter}{Conclusion}
+\chapter{Event detection algorithm}
+\input{tex/chapters/event_detection}
+
+\chapter{Event examination}
+\input{tex/chapters/event_examination}
+
+\chapter{Conclusion}
+%\addcontentsline{toc}{chapter}{Conclusion}
 \input{tex/chapters/conclusion}
 
 
