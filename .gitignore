@@ -333,3 +333,6 @@ sample-1M.jsonl
 # Gensim serialization
 *.lsi
 *.projection
+
+# Thesis
+Thesis.pdf
