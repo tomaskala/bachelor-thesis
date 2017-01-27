@@ -6,6 +6,7 @@ from time import time
 
 import numpy as np
 import scipy.sparse as sp
+from hdbscan import HDBSCAN
 from scipy.signal import periodogram
 from scipy.stats import entropy
 from sklearn.feature_extraction.text import CountVectorizer
@@ -153,18 +154,6 @@ def heuristic_stopwords_detection(feature_trajectories, dps, seed_sw_indices):
     return stopwords_indices, udps
 
 
-def jensen_shannon_divergence(p, q):
-    """
-    Compute the Jensen-Shannon divergence between the two probability distributions. Jensen-Shannon divergence is
-    symmetric (in contrast to Kullback-Leibler divergence) and its square root is a proper metric.
-    :param p: the true probability distribution
-    :param q: the theoretical probability distribution
-    :return: Jensen-Shannon divergence between the two probability distributions
-    """
-    m = 0.5 * (p + q)
-    return 0.5 * entropy(p, m, base=2) + 0.5 * entropy(q, m, base=2)
-
-
 def create_event_trajectory(event, feature_trajectories, dps, dp):
     """
     Create a trajectory of the given event as the sum of trajectories of its features weighted by their DPS.
@@ -184,7 +173,7 @@ def create_event_trajectory(event, feature_trajectories, dps, dp):
     return e_trajectory, e_dominant_period
 
 
-# DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.03.
+# DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
 DPS_BOUNDARY = 0.05  # Dominant power spectrum boundary between high and low power features.
 WINDOW = 7  # Length of the window to use in computing the moving average.
 
@@ -203,14 +192,14 @@ def event_detection(global_indices, doc2vec_model, feature_trajectories, dps, id
     def cost_function(old_indices, new_index):
         old_traj = np.mean(feature_trajectories[old_indices], axis=0)
         new_traj = feature_trajectories[new_index]
-        traj_div = jensen_shannon_divergence(old_traj, new_traj)
+        trajectory_divergence = entropy(old_traj, new_traj, base=2)
 
         old_words = [id2word[global_indices[word_ix]] for word_ix in old_indices]
         new_word = id2word[global_indices[new_index]]
-        doc_sim = math.exp(doc2vec_model.n_similarity(old_words, [new_word]))
+        semantic_similarity = math.exp(doc2vec_model.n_similarity(old_words, [new_word]))
 
         dps_score = np.sum(dps[old_indices + [new_index]])
-        return traj_div / (doc_sim * dps_score)
+        return trajectory_divergence / (semantic_similarity * dps_score)
 
     def minimizing_feature(event_so_far, feature_indices):
         index = feature_indices[0]
@@ -255,68 +244,38 @@ def event_detection(global_indices, doc2vec_model, feature_trajectories, dps, id
 
 
 def event_detection_cluster_based(global_indices, doc2vec_model, feature_trajectories, id2word):
-    from scipy.cluster.hierarchy import dendrogram, linkage
-    import matplotlib.pyplot as plt
+    def jsd(p, q):
+        """
+        Compute the Jensen-Shannon divergence between the two probability distributions. Jensen-Shannon divergence is
+        symmetric (in contrast to Kullback-Leibler divergence) and its square root is a proper metric.
+        :param p: the true probability distribution
+        :param q: the theoretical probability distribution
+        :return: Jensen-Shannon divergence between the two probability distributions
+        """
+        m = 0.5 * (p + q)
+        return 0.5 * entropy(p, m, base=2) + 0.5 * entropy(q, m, base=2)
 
-    def pairwise_distance(i, j):
-        i = i[0]
-        j = j[0]
-        word1 = id2word[global_indices[i]]
-        word2 = id2word[global_indices[j]]
-        similarity = math.exp(doc2vec_model.similarity(word1, word2))
-        divergence = jensen_shannon_divergence(feature_trajectories[i], feature_trajectories[j])
-        return divergence / similarity
-
-    indices = np.arange(len(global_indices))
-    labels = [id2word[global_indices[word_ix]] for word_ix in indices]
-
-    linkage_matrix = linkage(indices.reshape(-1, 1), method='complete', metric=pairwise_distance)
-    fig, ax = plt.subplots(figsize=(15, 20))  # set size
-    ax = dendrogram(linkage_matrix, orientation="right", labels=labels)
-
-    plt.tick_params(
-        axis='x',  # changes apply to the x-axis
-        which='both',  # both major and minor ticks are affected
-        bottom='off',  # ticks along the bottom edge are off
-        top='off',  # ticks along the top edge are off
-        labelbottom='off')
-
-    plt.tight_layout()  # show plot with tight layout
-    plt.show()
-
-
-def event_detection_cluster_based_old(global_indices, doc2vec_model, feature_trajectories, id2word):
     n_features = len(global_indices)
     logging.info('Detecting events using the clustering approach.')
     logging.info('Examining %d features.', n_features)
     t = time()
 
-    divergences = np.zeros((n_features, n_features), dtype=float)
-    overlaps = np.eye(n_features, dtype=float)
+    distance_matrix = np.zeros((n_features, n_features), dtype=float)
 
-    for i in range(len(overlaps)):
-        for j in range(len(overlaps)):
+    for i in range(n_features):
+        for j in range(n_features):
             if i > j:
                 word1 = id2word[global_indices[i]]
                 word2 = id2word[global_indices[j]]
                 similarity = doc2vec_model.similarity(word1, word2)
+                trajectory_divergence = jsd(feature_trajectories[i], feature_trajectories[j])
+                distance_matrix[i, j] = trajectory_divergence / math.exp(similarity)
+                distance_matrix[j, i] = distance_matrix[i, j]
 
-                overlaps[i, j] = math.exp(similarity)
-                divergences[i, j] = jensen_shannon_divergence(feature_trajectories[i], feature_trajectories[j])
-
-    overlaps += overlaps.T
-    divergences += divergences.T
-    divergences /= overlaps
-    del overlaps
     logging.info('Precomputed word similarities in %fs.', time() - t)
 
-    from hdbscan import HDBSCAN  # TODO: Try hierarchical clustering with a reasonable cut.
-
-    t = time()
     clusterer = HDBSCAN(metric='precomputed', min_samples=2, min_cluster_size=3)
-
-    labels = clusterer.fit_predict(divergences)
-    logging.info('Performed clustering in %fs.', time() - t)
+    labels = clusterer.fit_predict(distance_matrix)
     n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
     if n_clusters == 0:
@@ -511,4 +470,4 @@ def main(cluster_based, use_preclustering):
 
 
 if __name__ == '__main__':
-    main(cluster_based=True, use_preclustering=False)
+    main(cluster_based=False, use_preclustering=False)
