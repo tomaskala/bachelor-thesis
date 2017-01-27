@@ -7,9 +7,9 @@
 
 To perform the actual event detection, we propose two algorithms. The first one is a modification of the greedy approach introduced by \cite{event-detection}, which forms events by greedily minimizing temporal and semantical distance of words. We build on top of this algorithm to incorporate the word embeddings as well as alter the temporal distance measure.
 
-The second approach interprets events as literal clusters of words and uses a clustering algorithm to obtain them, rather than explicit cost minimization.
+The second approach interprets events as literal clusters of words and uses a clustering algorithm to obtain them, rather than explicitly minimize the cost function.
 
-In this section, we describe both algorithms, which we will later compare.
+In this chapter, we describe both algorithms, which we will later compare.
 
 
 \section{Greedy approach}
@@ -18,15 +18,15 @@ This algorithm works by grouping word features together by greedily minimizing a
 An event will be represented by a set of keywords. In each iteration, the keyword closest to the event built so far will be added to that event. We will therefore need to measure the distance between a word feature and a whole set of features.
 
 \subsection{Measuring trajectory distance}
-After normalization to sum up to 1, the trajectory $\vect{\traj}_{f}$ of a word feature $f$ can be interpreted as a probability distribution over days, with $\traj_{f}(i)$ denoting the probability that a random document published on day $i$ will contain the word feature $f$. This interpretation allows us to compare the trajectories using information-theoretic techniques, notably the information divergence.
+After normalization to sum up to 1, the trajectory $\vect{\traj}_{f}$ of a word feature $f$ can be interpreted as a probability distribution over days, with $\traj_{f}(i)$ denoting the probability that a random document published on day $i$ contains $f$. This interpretation allows us to compare the trajectories using information-theoretic techniques, notably the information divergence.
 
 Given a set of word features $\featset$ and another feature $f$ with all trajectories normalized to probabilities, the temporal distance of $f$ to $\featset$ is
 
 \begin{equation}
-	\trajdist( \featset, f ) \coloneqq \kl{\vect{\bar{\traj}}_{\featset}}{\vect{\traj}_{f}},
+	\trajdist{\featset}{f} \coloneqq \kl{\vect{\bar{\traj}}_{\featset}}{\vect{\traj}_{f}},
 \end{equation}
 
-where $\vect{\bar{\traj}}_{\featset}$ is the mean of all trajectories of features in $\featset$, $\vect{\traj}_{f}$ is the trajectory of feature f and $\kl{\cdot}{\cdot}$ denotes the Kullback-Leibler divergence.
+where $\vect{\bar{\traj}}_{\featset}$ is the mean of all trajectories of features in $\featset$, $\vect{\traj}_{f}$ is the trajectory of feature $f$ and $\kl{\cdot}{\cdot}$ denotes the Kullback-Leibler divergence.
 
 
 \subsection{Measuring semantic similarity}
@@ -37,7 +37,7 @@ Note that we use cosine \textit{similarity} rather than \textit{distance}, which
 Given a set of word features $\featset$ and another feature $f$, the semantic similarity of $f$ and $\featset$ is
 
 \begin{equation}
-	\semsim( \featset, f ) \coloneqq \frac{\inp[\big]{\bar{\embed}_{\featset}}{\embed_{j}}}{\| \bar{\embed}_{\featset} \| \cdot \| \embed_{j} \|},
+	\semsim{\featset}{f} \coloneqq \frac{\inp[\big]{\bar{\embed}_{\featset}}{\embed_{j}}}{\| \bar{\embed}_{\featset} \| \cdot \| \embed_{j} \|},
 \end{equation}
 
 where $\bar{\embed}_{\featset}$ is the mean of all vector embeddings of features in $\featset$ and $\embed_{f}$ is the vector embedding of the feature $f$. Here, the mean vector is supposed to represent a shared topic among words from $\featset$.
@@ -49,7 +49,7 @@ Intuitively, an event should be represented by keywords highly correlated in the
 A cost function incorporating all these requirements is therefore defined as
 
 \begin{equation} \label{eq:cost-function}
-	\cost( \featset, f ) \coloneqq \frac{\trajdist( \featset, f )}{\exp(\semsim( \featset, f )) \cdot \sum_{g \in \featset \cup f}{\text{DPS}_{g}}},
+	\cost{\featset}{f} \coloneqq \frac{\trajdist{\featset}{f}}{\exp(\semsim{\featset}{f}) \cdot \sum_{g \in \featset \cup f}{\text{DPS}_{g}}},
 \end{equation}
 
 where we exponentiate the cosine similarity so that the resulting value is always positive. As the algorithm will minimize this function, the resulting events will have low trajectory divergence, high semantic similarity will consist of important keywords.
@@ -74,10 +74,10 @@ To perform the event detection itself, we mostly adapt the \textit{Unsupervised 
 	\State $F = F \setminus f$
 	
 	\While{$F \neq \emptyset$}
-		\State $m = \argmin\limits_{m}{\cost( e_{k}, f_{m} )}$
+		\State $m = \argmin\limits_{m}{\cost{e_{k}}{f_{m}}}$
 
-		\If{$\cost( e_{k}, f_{m} ) < cost_{e_{k}}$}
-			\State $cost_{e_{k}} = \cost( e_{k}, f_{m} )$
+		\If{$\cost{e_{k}}{f_{m}} < cost_{e_{k}}$}
+			\State $cost_{e_{k}} = \cost{e_{k}}{f_{m}}$
 			\State $e_{k} = e_{k} \cup f_{m}$
 			\State $F = F \setminus f_{m}$
 		\Else
@@ -92,43 +92,28 @@ To perform the event detection itself, we mostly adapt the \textit{Unsupervised 
 
 
 \section{Cluster-based approach}
+This approach uses a clustering algorithm to create clusters out of word features directly, instead of explicitly minimizing a cost function. To achieve this, we need to define a proper distance function, and choose the right clustering algorithm.
 
+\subsection{Distance function}
+The distance function used is similar to the cost function in the previous algorithm, except that it is defined pairwise. Since the KL-divergence is not symmetric, we use the Jensen-Shannon divergence instead to measure trajectory distance. The semantic similarity remains unchanged in the form of cosine similarity.
 
-\section{Event detection}
-To cluster the word features in both time and semantic domains, we will need to measure their distance. We first define a pairwise distance measure in each domain. These measures are then generalized to measure the distance of a feature from a whole set of features, so we can assign the closest feature to a partially constructed event. In the last step, these distances are combined into a single cost function which we aim to minimize.
-
-
-\subsection{Measuring trajectory distance}
-
-Distance between two feature trajectories is defined in terms of their information divergence. Unlike \cite{event-detection}, we use the \textit{Jensen-Shannon} divergence:
-
-\begin{equation*}
-	\featsim( \vect{p} \| \vect{q} ) = \frac{1}{2} \text{D}( \vect{p} \| \vect{m} ) + \frac{1}{2} \text{D}( \vect{q} \| \vect{m} ),
-\end{equation*}
-
-where $\vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$ and $\text{D}( \cdot \| \cdot )$ denotes the \textit{Kullback-Leibler} divergence.
-
-
-
-{\color{red} TODO: Move the pairwise similarities to the cluster-based algorithm, keep only the set-feature ones here.}
-
-{\color{blue} TODO: Try KL(mean(M),f) instead of JSD(mean(M),f)? Like M is the true distribution and f assumed. Keep JSD in pairwise similarity though, clustering likes symmetry.}
-
-
-\subsection{Measuring semantic similarity}
-
-The semantic similarity is again first defined for two features, and then generalized to a similarity between a feature set and another feature. Here, we utilize the word embeddings computed in \ref{word-embeddings}.
-
-Most of the astounding results of the word2vec model come from semantic relations between words being preserved under vector arithmetic, with words concerning the same topic having roughly the same angle. Thus, we use the cosine similarity between embeddings $\embed_{i}$ and $\embed_{j}$ of word features $i$ and $j$:
+The distance between two word features $f_{i}$,\ $f_{j}$ with trajectories $\vect{\traj}_{i},\ \vect{\traj}_{j}$ and embeddings $\embed_{i},\ \embed_{j}$ is therefore defined as
 
 \begin{equation}
-	\semsim( f_{i}, f_{j} ) \coloneqq \frac{\inp[\big]{\embed_{i}}{\embed_{j}}}{\| \embed_{i} \| \cdot \| \embed_{j} \|}
+	\distfunc{f_{i}}{f_{j}} \coloneqq \frac{\jsd{\vect{\traj}_{i}}{\vect{\traj}_{j}}}{\exp(\semsim{\embed_{i}}{\embed_{j}})},
 \end{equation}
 
-Next, we generalize the similarity for a feature set $\featset$ and another feature $f$ as
+with $\jsd{\vect{p}}{\vect{q}} = \frac{1}{2} \left( \kl{\vect{p}}{\vect{m}} + \kl{\vect{q}}{\vect{m}} \right) ,\ \vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$.
 
-\begin{equation}
-	\semsim( \featset, f ) \coloneqq \frac{\inp[\big]{\bar{\embed}_{\featset}}{\embed_{j}}}{\| \bar{\embed}_{\featset} \| \cdot \| \embed_{j} \|},
-\end{equation}
 
-where $\bar{\embed}_{\featset}$ is the mean of all vector embeddings of features in $\featset$ and $\embed_{f}$ is the vector embedding of the feature $f$. Here, the mean vector is supposed to represent a shared topic among words from $\featset$.
+\subsection{Clustering algorithm}
+We will need to select an appropriate clustering algorithm. The obvious requirement is that the algorithm must not depend on an a priori knowledge of the desired number of clusters. Another requirement is that the algorithm must work with custom distance measures. Speed is not the essence, since the number of representative words is typically in tens to hundreds.
+
+Our experimentation suggests that the best results come from the HDBSCAN algorithm \cite{hdbscan}.
+
+{\color{red} TODO: Describe how that works.}
+
+{\color{blue} TODO: Some comparison of algorithms tested?}
+
+
+\subsection{Event detection}

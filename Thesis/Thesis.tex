@@ -58,14 +58,11 @@
 \DeclareMathOperator*{\argmin}{argmin}  % Argmin
 \DeclareMathOperator*{\argmax}{argmax}  % Argmax
 
-% Inner product
-\DeclarePairedDelimiterX{\inp}[2]{\langle}{\rangle}{#1, #2}
+\DeclarePairedDelimiterX{\inp}[2]{\langle}{\rangle}{#1, #2}  % Inner product
 
-% KL-Divergence
-\DeclarePairedDelimiterX{\kl}[2]{\text{D}(}{)}{#1 \| #2}
+\DeclarePairedDelimiterX{\kl}[2]{\text{D}(}{)}{#1 \| #2}  % KL-Divergence
+\DeclarePairedDelimiterX{\jsd}[2]{\text{JSD}(}{)}{#1 \| #2}  % JSD-Divergence
 
-
-%% Global definitions %%
 \newcommand{\doccount}{N}
 \newcommand{\streamlen}{T}
 
@@ -80,10 +77,10 @@
 \newcommand{\dtdmat}{\mat{D}}
 \newcommand{\trajmat}{\mat{T}}
 
-\newcommand{\semsim}{\text{SemSim}}
-\newcommand{\trajdist}{\text{TrajDist}}
-\newcommand{\featsim}{\text{JSD}}
-\newcommand{\cost}{\text{C}}
+\DeclarePairedDelimiterX{\cost}[2]{\text{C}(}{)}{#1, #2}  % Cost function
+\DeclarePairedDelimiterX{\trajdist}[2]{\text{TrajDist}(}{)}{#1, #2}  % Trajectory distance
+\DeclarePairedDelimiterX{\semsim}[2]{\text{SemSim}(}{)}{#1, #2}  % Semantic similarity
+\DeclarePairedDelimiterX{\distfunc}[2]{\text{d}(}{)}{#1, #2}  % Distance function
 
 
 
