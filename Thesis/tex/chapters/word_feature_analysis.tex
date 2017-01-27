@@ -1,0 +1,107 @@
+In this section, we will analyze the document collection, focusing on individual words. The goal is to uncover representative keywords which could possibly relate to actual real world events. The analysis aims to find words with frequency high enough to be considered meaningful, but not that high to be considered stopwords. Furthemore, these words are categorized into periodic and aperiodic ones.
+
+Once we have found these words, we will perform the actual event detection by grouping words into clusters correlated both in the time domain and in the semantic domain. Afterwards, we will move on from word representation to document representation to further examine the events detected.
+
+The core of this algorithm is taken from \cite{event-detection}.
+
+
+\section{Binary bag of words model}
+Apart from word embeddings, we will use yet another vector representation of the word features. This time, the vectors will represent trajectories of word frequency in time. Each word feature $f$ will in the end be represented by two vectors; $\vect{\traj}_{f}$ being its time trajectory, and $\embed_{f}$ being its semantic word embedding.
+
+We first adapt the binary form of the standard bag of words model to obtain a term-document matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \times \featcount}$, where $\featcount$ is the total vocabulary size. The document collection can then be interpreted as a set of $\doccount$ observations, each consisting of $\featcount$ binary features. The matrix $\bowmat$ is defined as
+
+\begin{equation} \label{eq:bow-matrix}
+	\bowmat_{ij} \coloneqq
+	\begin{cases}
+		1, & \text{document}~i~\text{contains the word}~j \text{;} \\
+		0, & \text{otherwise.}
+	\end{cases}
+\end{equation}
+
+{\color{red} TODO: Figure out the min\_freq and max\_freq of words to keep.}
+
+To limit the feature space, we trim the words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\bowmat$ reasonably sized.
+
+From now on, we focus our analysis on the individual word features rather than whole documents.
+
+
+\section{Computing feature trajectories}
+The time trajectory of a feature $f$ is a vector $\vect{\traj}_f = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$ with each element $\traj_{f}(t)$ representing the relative frequency of $f$ at time $t$. This frequency is defined using the DFIDF score:
+
+\begin{equation}
+	\traj_{f}(t) \coloneqq \underbrace{\frac{\text{\df}_{f}(t)}{\text{\doccount}(t)}}_{\text{DF}} \cdot \underbrace{\log{\frac{\doccount}{\text{\df}_{f}}}}_{\text{IDF}},
+\end{equation}
+
+where $\text{\df}_{f}(t)$ is the number of documents published on day $t$ containing the feature $f$ (time-local document frequency), $\text{\doccount}(t)$ is the number of documents published on day $t$ and $\text{\df}_{f}$ is the number of documents containing the feature $f$ (global document frequency).
+
+These feature trajectories are stored in a matrix $\trajmat \in \R^{\featcount \times \streamlen}$, with $\vect{\traj}_f$ being the $f$-th row of $\trajmat$. Here we take advantage of the normalization of the publication days, since they can now be used as column indices of $\trajmat$.
+
+To make the computation efficient, we vectorize most of the operations. Along with the matrix $\bowmat$ defined in \ref{eq:bow-matrix}, we define a matrix $\dtdmat \in \left\{ 0, 1 \right\}^{\doccount \times \streamlen}$ mapping the documents to their publication days:
+
+\begin{equation}
+	\dtdmat_{ij} \coloneqq
+	\begin{cases}
+		1, & \text{document}~i~\text{was published on day}~j \text{;} \\
+		0, & \text{otherwise}.
+	\end{cases}
+\end{equation}
+
+Next, we sum the rows of $\bowmat$ together to obtain $\vect{\df} = \left[ \text{\df}_{1}, \text{\df}_{2}, \dots, \text{\df}_{\featcount} \right]$, and similarly the rows of $\dtdmat$ to obtain $\vect{\doccount}_{t} = \left[ \text{\doccount}(1), \text{\doccount}(2), \dots, \text{\doccount}(\streamlen) \right]$.
+
+Using these matrices and vectors, we can compute $\trajmat$ as follows:
+
+\begin{equation}
+	\trajmat \coloneqq
+		\underbrace{\text{diag} \left( \log{\frac{\doccount}{\vect{\df}}} \right)}_{\text{IDF}}
+		\cdot
+		\underbrace{\bowmat^{\T}
+		\cdot \dtdmat
+		\cdot \text{diag} \left( \frac{1}{\vect{\doccount}_{t}} \right)}_{\text{DF}}
+\end{equation}
+
+
+\section{Spectral analysis}
+In this section, we interpret each feature trajectory as a time signal, which allows us to employ spectral analysis techniques to discover periodicities and estimate signal power of the features. Results from this section are then used to extract only a fraction of features with high overall frequency and to distinguish between periodic and aperiodic features.
+
+We apply the discrete Fourier transform to each feature trajectory, which represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
+
+\begin{equation*}
+	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \exp(- \frac{2 \pi \mi}{\streamlen} (k - 1) t}), ~ k = 1, 2, \dots, \streamlen.
+\end{equation*}
+
+The absolute value of the Fourier coefficient $X_{k}$ denotes the amplitude of the complex sinusoid at frequency $\frac{k}{\streamlen}$.
+
+Having moved from the time domain to the frequency domain, we can now analyze the signal power and dominant periodicity of each feature.
+
+We observe peaks in the power spectrum of the transformed data and obtain the signal power and periodicity from those. The power spectrum is estimated using the periodogram estimator
+
+\begin{equation*}
+	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
+\end{equation*}
+
+To measure the overall signal power, we define the dominant power spectrum of the feature $f$ as the value of the highest peak in the power spectrum, that is
+
+\begin{equation}
+	\text{DPS}_{f} \coloneqq \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
+\end{equation}
+
+The dominant period is then defined as the inverse of the frequency corresponding to the highest peak:
+
+\begin{equation}
+	\text{DP}_{f} \coloneqq \frac{\streamlen}{\argmax\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}},
+\end{equation}
+
+When applied to rows of the matrix $\trajmat$, this method yields two vectors $\vect{DPS},\ \vect{DP} \in \R^{\featcount}$, containing the dominant power spectra and dominant periods, respectively.
+
+
+\section{Feature categorization}
+Based on the dominant power spectra and dominant periods, we divide the features into \underline{H}igh power-\underline{H}igh period and \underline{H}igh power-\underline{L}ow period categories \footnote{\cite{event-detection} actually define \textit{five} such categories; however, our method uses only the two sets of the most powerful features.}:
+
+\begin{equation}
+\begin{split}
+	\text{HH} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound},\ \text{DP}_{f} > \ceil{\streamlen / 2} \right\}, \\
+	\text{HL} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound},\ \text{DP}_{f} \leq \ceil{\streamlen / 2} \right\}.
+\end{split}
+\end{equation}
+
+{\color{red}TODO: Define dps-bound!}

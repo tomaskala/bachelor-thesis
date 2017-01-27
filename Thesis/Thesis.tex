@@ -61,11 +61,29 @@
 % Inner product
 \DeclarePairedDelimiterX{\inp}[2]{\langle}{\rangle}{#1, #2}
 
+% KL-Divergence
+\DeclarePairedDelimiterX{\kl}[2]{\text{D}(}{)}{#1 \| #2}
 
-% Document collection
+
+%% Global definitions %%
 \newcommand{\doccount}{N}
 \newcommand{\streamlen}{T}
 
+\newcommand{\traj}{y}
+\newcommand{\embed}{\vect{v}}
+
+\newcommand{\featset}{\text{M}}
+\newcommand{\featcount}{V}
+\newcommand{\df}{DF}
+
+\newcommand{\bowmat}{\mat{B}}
+\newcommand{\dtdmat}{\mat{D}}
+\newcommand{\trajmat}{\mat{T}}
+
+\newcommand{\semsim}{\text{SemSim}}
+\newcommand{\trajdist}{\text{TrajDist}}
+\newcommand{\featsim}{\text{JSD}}
+\newcommand{\cost}{\text{C}}
 
 
 
@@ -106,6 +124,9 @@ These are my acknowledgements.
 
 \chapter{Data preprocessing}
 \input{tex/chapters/data_preprocessing}
+
+\chapter{Word feature analysis}
+\input{tex/chapters/word_feature_analysis}
 
 \chapter{Event detection algorithm}
 \input{tex/chapters/event_detection}
