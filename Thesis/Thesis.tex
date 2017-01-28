@@ -73,9 +73,10 @@
 \newcommand{\featcount}{V}
 \newcommand{\df}{DF}
 
-\newcommand{\bowmat}{\mat{B}}
-\newcommand{\dtdmat}{\mat{D}}
-\newcommand{\trajmat}{\mat{T}}
+\newcommand{\bowmat}{\mat{B}}  % Bag of Words matrix
+\newcommand{\dtdmat}{\mat{D}}  % Document to Day matrix
+\newcommand{\trajmat}{\mat{T}}  % Trajectory matrix
+\newcommand{\distmat}{\mat{Dist}}  % Distance matrix
 
 \DeclarePairedDelimiterX{\cost}[2]{\text{C}(}{)}{#1, #2}  % Cost function
 \DeclarePairedDelimiterX{\trajdist}[2]{\text{TrajDist}(}{)}{#1, #2}  % Trajectory distance
@@ -125,7 +126,7 @@ These are my acknowledgements.
 \chapter{Word feature analysis}
 \input{tex/chapters/word_feature_analysis}
 
-\chapter{Event detection algorithm}
+\chapter{Event detection algorithms}
 \input{tex/chapters/event_detection}
 
 \chapter{Event examination}

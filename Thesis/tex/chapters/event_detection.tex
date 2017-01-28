@@ -58,7 +58,7 @@ where we exponentiate the cosine similarity so that the resulting value is alway
 \subsection{Event detection}
 To perform the event detection itself, we mostly adapt the \textit{Unsupervised greedy event detection} algorithm from \cite{event-detection}. We do make a change in the initial sorting and sort the word features in \textit{ascending} rather than descending order. This ensures that words with lower DPS value will get selected first and that the cost function will not be minimized as quickly. As a result, the events will contain more representative keywords. This effectively relaxes the DPS part of the cost function while keeping emphasis on the trajectory distance and semantic similarity.
 
-\begin{algorithm}[H]
+\begin{algorithm}[H] \label{alg:greedy-event-detection}
 \begin{algorithmic}[1]
 \caption{Unsupervised greedy event detection}
 \Input $\text{Feature set} ~ F = \text{HH or HL}$
@@ -107,13 +107,33 @@ with $\jsd{\vect{p}}{\vect{q}} = \frac{1}{2} \left( \kl{\vect{p}}{\vect{m}} + \k
 
 
 \subsection{Clustering algorithm}
-We will need to select an appropriate clustering algorithm. The obvious requirement is that the algorithm must not depend on an a priori knowledge of the desired number of clusters. Another requirement is that the algorithm must work with custom distance measures. Speed is not the essence, since the number of representative words is typically in tens to hundreds.
+We will need to select an appropriate clustering algorithm. The obvious requirement is that the algorithm must not depend on an a priori knowledge of the desired number of clusters. Another requirement is that the algorithm must accept custom distance measures. Speed is not the essence, since the number of representative words is typically in tens to hundreds.
 
-Our experimentation suggests that the best results come from the HDBSCAN algorithm \cite{hdbscan}.
+Our experimentation suggests that the best results are obtained using the HDBSCAN algorithm \cite{hdbscan}.
 
-{\color{red} TODO: Describe how that works.}
+{\color{red} TODO: Describe how that works, including automatic noise detection.}
 
-{\color{blue} TODO: Some comparison of algorithms tested?}
+{\color{blue} TODO: Some comparison of the algorithms tested?}
 
 
 \subsection{Event detection}
+The input and output of the event detection algorithm remains the same as in \ref{alg:greedy-event-detection}, only the internals are different. That makes it easy to swap the two algorithms for comparison.
+
+\begin{algorithm}[H]
+\begin{algorithmic}[1]
+\caption{Cluster-based event detection}
+\Input $\text{Feature set} ~ F = \text{HH or HL}$
+
+\State Precompute a distance matrix $\distmat \in \R^{\left\vert F \right\vert \times \left\vert F \right\vert}$ with $\distmat_{ij} = \distfunc{f_{i}}{f_{j}}$
+
+\State Apply HDBSCAN to $\distmat$, obtaining $k$ clusters and the noisy cluster
+
+\ForEach{$(f, cluster) \in \text{HDBSCAN.clusters}$}
+	\If{$cluster \neq noise$}
+		\State $e_{cluster} = e_{cluster} \cup f$
+	\EndIf
+\EndFor
+
+\Output $\text{Events} ~ \{ e_{1}, e_{2}, \dots, e_{k} \}$
+\end{algorithmic}
+\end{algorithm}
