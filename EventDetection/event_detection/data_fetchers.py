@@ -1,3 +1,4 @@
+import logging
 import os
 
 import numpy as np
@@ -26,6 +27,30 @@ CZECH_FULL_TEXTS_DEC_JAN = ['PDFull.2014-12-01.txt', 'PDFull.2014-12-02.txt', 'P
                             'PDFull.2015-01-24.txt', 'PDFull.2015-01-25.txt', 'PDFull.2015-01-26.txt',
                             'PDFull.2015-01-27.txt', 'PDFull.2015-01-28.txt', 'PDFull.2015-01-29.txt',
                             'PDFull.2015-01-30.txt', 'PDFull.2015-01-31.txt']
+
+CZECH_TAGGED_TEXTS = '../../tagged_docs'
+CZECH_TAGGED_TEXTS_DEC_JAN = ['2014-12-01.txt.tagged', '2014-12-02.txt.tagged', '2014-12-03.txt.tagged',
+                              '2014-12-04.txt.tagged', '2014-12-05.txt.tagged', '2014-12-06.txt.tagged',
+                              '2014-12-07.txt.tagged', '2014-12-08.txt.tagged', '2014-12-09.txt.tagged',
+                              '2014-12-10.txt.tagged', '2014-12-11.txt.tagged', '2014-12-12.txt.tagged',
+                              '2014-12-13.txt.tagged', '2014-12-14.txt.tagged', '2014-12-15.txt.tagged',
+                              '2014-12-16.txt.tagged', '2014-12-17.txt.tagged', '2014-12-18.txt.tagged',
+                              '2014-12-19.txt.tagged', '2014-12-20.txt.tagged', '2014-12-21.txt.tagged',
+                              '2014-12-22.txt.tagged', '2014-12-23.txt.tagged', '2014-12-24.txt.tagged',
+                              '2014-12-25.txt.tagged', '2014-12-26.txt.tagged', '2014-12-27.txt.tagged',
+                              '2014-12-28.txt.tagged', '2014-12-29.txt.tagged', '2014-12-30.txt.tagged',
+                              '2014-12-31.txt.tagged', '2015-01-01.txt.tagged', '2015-01-02.txt.tagged',
+                              '2015-01-03.txt.tagged', '2015-01-04.txt.tagged', '2015-01-05.txt.tagged',
+                              '2015-01-06.txt.tagged', '2015-01-07.txt.tagged', '2015-01-08.txt.tagged',
+                              '2015-01-09.txt.tagged', '2015-01-10.txt.tagged', '2015-01-11.txt.tagged',
+                              '2015-01-12.txt.tagged', '2015-01-13.txt.tagged', '2015-01-14.txt.tagged',
+                              '2015-01-15.txt.tagged', '2015-01-16.txt.tagged', '2015-01-17.txt.tagged',
+                              '2015-01-18.txt.tagged', '2015-01-19.txt.tagged', '2015-01-20.txt.tagged',
+                              '2015-01-21.txt.tagged', '2015-01-22.txt.tagged', '2015-01-23.txt.tagged',
+                              '2015-01-24.txt.tagged', '2015-01-25.txt.tagged', '2015-01-26.txt.tagged',
+                              '2015-01-27.txt.tagged', '2015-01-28.txt.tagged', '2015-01-29.txt.tagged',
+                              '2015-01-30.txt.tagged', '2015-01-31.txt.tagged']
+
 # Total: 2,090,635
 DOCS_IN_MONTHS = [3002, 5442, 5559, 3059, 3163, 6089, 6013, 6284, 5918, 5916, 3221, 3304, 6139, 5978, 6293, 6103, 5821,
                   3463, 3204, 6128, 6018, 6328, 6168, 3855, 4847, 3269, 6252, 5989, 6343, 6036, 6197, 3343, 3408, 6258,
@@ -178,6 +203,118 @@ class CzechFullTexts:
         return np.repeat(np.arange(self.relative_days.size), self.relative_days)
 
 
+class TaggedDocument:
+    __slots__ = ['name', 'text']
+
+    def __init__(self):
+        self.name = []
+        self.text = []
+
+
+class CzechTaggedTexts:
+    """
+    By default, extract all POS except for Unknown (X) and Punctuation (Z). POS tags:
+    A ... Adjective
+    C ... Numeral
+    D ... Adverb
+    I ... Interjection
+    J ... Conjunction
+    N ... Noun
+    P ... Pronoun
+    V ... Verb
+    R ... Preposition
+    T ... Particle
+    X ... Unknown, Not Determined, Unclassifiable
+    Z ... Punctuation (also used for the Sentence Boundary token)
+    """
+
+    def __init__(self, dataset, fetch_forms, pos=('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T')):
+        """
+        Initialize the document fetcher which yields `TaggedDocument` objects upon iteration.
+        :param dataset: which dataset to use (full/dec-jan)
+        :param fetch_forms: whether to fetch forms od lemmas of the individual words
+        :param pos: which POS categories to fetch
+        """
+        if dataset == 'full':
+            self.document_paths = os.listdir(CZECH_TAGGED_TEXTS)
+            self.relative_days = FULL_TEXTS
+            raise NotImplementedError('Full tagged dataset not yet implemented')
+        elif dataset == 'dec-jan':
+            self.document_paths = CZECH_TAGGED_TEXTS_DEC_JAN
+            self.relative_days = FULL_TEXTS_DEC_JAN
+        else:
+            raise ValueError('Unknown dataset - select either `full` or `dec-jan`.')
+
+        self.fetch_forms = fetch_forms
+        self.pos = frozenset(pos)
+
+    def __iter__(self):
+        in_title = False
+        in_text = False
+
+        fetch_forms = self.fetch_forms
+        pos = self.pos
+
+        for file in self.document_paths:
+            with open(os.path.join(CZECH_TAGGED_TEXTS, file), 'r', encoding='utf8', errors='ignore') as f:
+                for line in f:
+                    line = line.strip()
+
+                    if line.startswith('#'):
+                        # Control lines
+                        if line == '#docstart':
+                            document = TaggedDocument()
+                        elif line == '#titlestart':
+                            in_title = True
+                        elif line == '#titleend':
+                            in_title = False
+                        elif line == '#textstart':
+                            in_text = True
+                        elif line == '#textend':
+                            in_text = False
+                        elif line == '#docend':
+                            yield document
+                        else:
+                            # Something else, though ignore the '#' sign by itself, as it appears in some documents.
+                            if line.split('\t')[0] == '#':
+                                continue
+
+                            raise ValueError('Invalid control line encountered: {}'.format(line))
+                    elif not line:
+                        # Skip empty lines.
+                        continue
+                    else:
+                        # Actual content
+                        split = line.split('\t')
+
+                        if len(split) != 3:
+                            logging.warning('Content line does not have 3 parts separated by tabs: %s', line)
+                            continue
+
+                        # Skip undesired POS tags.
+                        if split[2][0] not in pos:
+                            continue
+
+                        if in_title:
+                            if fetch_forms:
+                                document.name.append(split[0])
+                            else:
+                                document.name.append(split[1])
+                        elif in_text:
+                            if fetch_forms:
+                                document.text.append(split[0])
+                            else:
+                                document.text.append(split[1])
+
+    def fetch_relative_days(self):
+        """
+        Return a numpy array of relative days for the dataset. Implemented separately so the original texts can be
+        comfortably streamed while keeping relative days in an array.
+        :return: numpy array of relative days in the same order as the documents
+        """
+        return np.repeat(np.arange(self.relative_days.size), self.relative_days)
+
+
 def fetch_czech_corpus(num_docs):
     """
     Load documents from preprocessed text files.
@@ -225,57 +362,3 @@ def fetch_czech_corpus_dec_jan():
     assert len(docs) == len(dates)
 
     return docs, np.array(dates)
-
-
-def fetch_czech_full_texts_dec_jan(names=None, dates=None, categories=None, abstracts=None, texts=True):
-    """
-    Load documents from full text files for the DEC-JAN period. The documents are represented by the `Document`
-    object containing only those values chosen to retrieve, and None everywhere else. The documents are yielded
-    to make the process as memory efficient as possible. Setting an argument to `True` will mark that field for
-    retrieval.
-
-    :param names: whether to retrieve document headlines
-    :param dates: whether to retrieve true publication dates, not just relative to start
-    :param categories: whether to retrieve category marks
-    :param abstracts: whether to retrieve document abstracts
-    :param texts: whether to retrieve document texts
-    :return: yields documents
-    """
-    in_text = False
-
-    for file in CZECH_FULL_TEXTS_DEC_JAN:
-        with open(os.path.join(CZECH_FULL_TEXTS, file), 'r', encoding='utf8', errors='ignore') as f:
-            loaded_text = []
-
-            for line in f:
-                line = line.strip()
-
-                if line.startswith('#'):
-                    line = line.split(':')
-                    key = line[0].strip()
-                    val = ''.join(line[1:]).strip()
-
-                    if key == '#name':
-                        document = FullTextDocument()  # Start a new document when '#name' is encountered.
-                        if names:
-                            document.name = val
-                    elif key == '#date' and dates:
-                        document.date = val
-                    elif key == '#category' and categories:
-                        document.category = val
-                    elif key == '#abstract' and abstracts:
-                        document.abstract = val
-                    elif key == '#text':
-                        in_text = True
-                    elif key == '#text.end':
-                        if texts:
-                            document.text = ''.join(loaded_text)
-                            del loaded_text[:]
-                        in_text = False
-                    elif key == '#end#':
-                        yield document
-                elif not line:
-                    continue  # Skip empty lines.
-                else:
-                    if texts and in_text:
-                        loaded_text.append(line)

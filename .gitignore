@@ -323,6 +323,7 @@ ENV/
 ### Custom ###
 /de-news
 /fulltexts
+/tagged_docs
 /Papers
 /reuters
 crawl
