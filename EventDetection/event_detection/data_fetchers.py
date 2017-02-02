@@ -203,7 +203,7 @@ class CzechFullTexts:
         return np.repeat(np.arange(self.relative_days.size), self.relative_days)
 
 
-class TaggedDocument:
+class LemmatizedDocument:
     __slots__ = ['name', 'text']
 
     def __init__(self):
@@ -211,7 +211,7 @@ class TaggedDocument:
         self.text = []
 
 
-class CzechTaggedTexts:
+class CzechLemmatizedTexts:
     """
     By default, extract all POS except for Unknown (X) and Punctuation (Z). POS tags:
     A ... Adjective
@@ -230,15 +230,15 @@ class CzechTaggedTexts:
 
     def __init__(self, dataset, fetch_forms, pos=('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T')):
         """
-        Initialize the document fetcher which yields `TaggedDocument` objects upon iteration.
+        Initialize the document fetcher which yields `LemmatizedDocument` objects upon iteration.
         :param dataset: which dataset to use (full/dec-jan)
-        :param fetch_forms: whether to fetch forms od lemmas of the individual words
+        :param fetch_forms: whether to fetch forms or lemmas of the individual words
         :param pos: which POS categories to fetch
         """
         if dataset == 'full':
             self.document_paths = os.listdir(CZECH_TAGGED_TEXTS)
             self.relative_days = FULL_TEXTS
-            raise NotImplementedError('Full tagged dataset not yet implemented')
+            raise NotImplementedError('Full lemmatized dataset not yet implemented')
         elif dataset == 'dec-jan':
             self.document_paths = CZECH_TAGGED_TEXTS_DEC_JAN
             self.relative_days = FULL_TEXTS_DEC_JAN
@@ -263,7 +263,7 @@ class CzechTaggedTexts:
                     if line.startswith('#'):
                         # Control lines
                         if line == '#docstart':
-                            document = TaggedDocument()
+                            document = LemmatizedDocument()
                         elif line == '#titlestart':
                             in_title = True
                         elif line == '#titleend':
@@ -297,14 +297,14 @@ class CzechTaggedTexts:
 
                         if in_title:
                             if fetch_forms:
-                                document.name.append(split[0])
+                                document.name.append(split[0].strip())
                             else:
-                                document.name.append(split[1])
+                                document.name.append(split[1].strip())
                         elif in_text:
                             if fetch_forms:
-                                document.text.append(split[0])
+                                document.text.append(split[0].strip())
                             else:
-                                document.text.append(split[1])
+                                document.text.append(split[1].strip())
 
     def fetch_relative_days(self):
         """

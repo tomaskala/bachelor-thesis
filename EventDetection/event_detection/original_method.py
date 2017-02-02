@@ -18,7 +18,7 @@ from event_detection.event_detector import construct_feature_trajectories, spect
 from event_detection.preprocessing import CZECH_STOPWORDS
 
 WINDOW = 7
-DPS_BOUNDARY = 0.03
+DPS_BOUNDARY = 0.05
 
 
 def moving_average(vector, window):
@@ -286,10 +286,10 @@ def main():
     total_time = time()
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
-    PICKLE_PATH = './original_method_pickle'
-    ID2WORD_PATH = os.path.join(PICKLE_PATH, 'vectorizer_dec_jan_full_sw.pickle')
-    BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document_dec_jan_full_sw.pickle')
-    RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days_dec_jan_full_sw.pickle')
+    PICKLE_PATH = './pickle'
+    ID2WORD_PATH = os.path.join(PICKLE_PATH, 'vectorizer_dec_jan_lemma_nvad.pickle')
+    BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document_dec_jan_lemma_nvad.pickle')
+    RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days_dec_jan_lemma_nvad.pickle')
 
     if os.path.exists(ID2WORD_PATH) and os.path.exists(BOW_MATRIX_PATH) and os.path.exists(RELATIVE_DAYS_PATH):
         with open(ID2WORD_PATH, mode='rb') as f:

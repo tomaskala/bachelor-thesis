@@ -10,7 +10,6 @@ from hdbscan import HDBSCAN
 from scipy.signal import periodogram
 from scipy.stats import entropy
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.preprocessing import normalize
 
 from event_detection import data_fetchers, plotting, preprocessing
 
@@ -171,11 +170,6 @@ def create_event_trajectory(event, feature_trajectories, dps, dp):
     e_trajectory = (e_feature_trajectories.T @ e_power_spectra) / np.sum(e_power_spectra)
 
     return e_trajectory, e_dominant_period
-
-
-# DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
-DPS_BOUNDARY = 0.05  # Dominant power spectrum boundary between high and low power features.
-WINDOW = 7  # Length of the window to use in computing the moving average.
 
 
 def event_detection(global_indices, doc2vec_model, feature_trajectories, dps, id2word):
@@ -361,15 +355,30 @@ def process_cluster(cluster, doc2vec_model, bow_matrix, relative_days, id2word, 
 
 # TODO: Once computed periodic events, split each event into several events whose keywords share the same periodicity.
 # TODO: Or, penalize different periodicity heavily in the cost function (multiply by exp(abs(dp_difference)))?
+
+# TODO: Putting a threshold on trajectory variation (take only std > DPS_BOUNDARY * 1.5) improves cluster based
+# TODO: detection quite a bit.
+
+# Doc2Vec settings:
+# 1) Concat ... Greedy OK, clusters tragic
+# 2) Mean ... Greedy OK, clusters awesome
+# 3) Sum ... Greedy not much, clusters awesome
+
+# DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
+DPS_BOUNDARY = 0.05  # Dominant power spectrum boundary between high and low power features.
+WINDOW = 7  # Length of the window to use in computing the moving average.
+
+
 def main(cluster_based, use_preclustering):
     total_time = time()
-    fetcher = data_fetchers.CzechFullTexts(dataset='dec-jan', names=True, dates=True)
+    fetcher = data_fetchers.CzechLemmatizedTexts(dataset='dec-jan', fetch_forms=False, pos=['N', 'V', 'A', 'D'])
+
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
     PICKLE_PATH = '../event_detection/pickle'
-    ID2WORD_PATH = os.path.join(PICKLE_PATH, 'vectorizer_dec_jan.pickle')
-    BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document_dec_jan.pickle')
-    RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days_dec_jan.pickle')
+    ID2WORD_PATH = os.path.join(PICKLE_PATH, 'vectorizer_dec_jan_lemma_nvad.pickle')
+    BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document_dec_jan_lemma_nvad.pickle')
+    RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days_dec_jan_lemma_nvad.pickle')
 
     if os.path.exists(ID2WORD_PATH) and os.path.exists(BOW_MATRIX_PATH) and os.path.exists(RELATIVE_DAYS_PATH):
         with open(ID2WORD_PATH, mode='rb') as f:
@@ -393,15 +402,14 @@ def main(cluster_based, use_preclustering):
 
         t = time()
         relative_days = fetcher.fetch_relative_days()
+        documents = preprocessing.LemmaPreprocessor(fetcher)
 
         stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
         logging.info('Read input in %fs.', time() - t)
         logging.info('Stream length: %d', stream_length)
 
-        documents = preprocessing.Preprocessor(fetcher)
-
         t = time()
-        vectorizer = CountVectorizer(min_df=5, binary=True, tokenizer=lambda doc: doc, preprocessor=lambda doc: doc)
+        vectorizer = CountVectorizer(min_df=10, binary=True, tokenizer=lambda doc: doc, preprocessor=lambda doc: doc)
         bow_matrix = vectorizer.fit_transform(documents)
         id2word = {v: k for k, v in vectorizer.vocabulary_.items()}
 
@@ -418,7 +426,7 @@ def main(cluster_based, use_preclustering):
         logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
                      bow_matrix.getnnz())
 
-    doc2vec_model = preprocessing.perform_doc2vec(fetcher)
+    doc2vec_model = preprocessing.perform_doc2vec_lemma(fetcher)
 
     if use_preclustering:
         if cluster_based:
@@ -429,7 +437,6 @@ def main(cluster_based, use_preclustering):
             periodic_path = './periodic_preclustering'
 
         document_vectors = doc2vec_model.docvecs[[i for i in range(bow_matrix.shape[0])]]
-        normalize(document_vectors, norm='l2', copy=False)
 
         clusters = preprocessing.cluster_documents(document_vectors, n_clusters=6)
         del document_vectors
