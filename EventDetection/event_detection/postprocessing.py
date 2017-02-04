@@ -1,0 +1,170 @@
+import math
+
+import numpy as np
+import sklearn.mixture as gmm
+from scipy.optimize import curve_fit
+from scipy.stats import norm
+
+WINDOW = 7  # Length of the window to use in computing the moving average.
+
+
+def moving_average(vector, window):
+    """
+    Compute the moving average along the given vector using a window of the given length.
+    :param vector: the vector whose moving average to compute
+    :param window: length of the window to use in the computation
+    :return: moving average of length len(vector) - window + 1
+    """
+    weights = np.ones(window) / window
+    return np.convolve(vector, weights, 'valid')
+
+
+def estimate_distribution_aperiodic(event_trajectory):
+    """
+    Model the event trajectory by a Gaussian curve. The parameters (mean and standard deviation) are estimated
+    using non-linear least squares.
+    :param event_trajectory: trajectory of the event
+    :return: mean and standard deviation of the model
+    """
+
+    def gaussian_curve(value, loc, scale):
+        return norm.pdf(value, loc=loc, scale=scale)
+
+    n_days = len(event_trajectory)
+    ma = moving_average(event_trajectory, WINDOW)
+
+    ma_mean = np.mean(ma)
+    ma_std = np.std(ma)
+
+    cutoff = ma_mean + ma_std
+    peak_indices = np.where(event_trajectory > cutoff)
+
+    peak_days = peak_indices[0]
+    peaks = event_trajectory[peak_indices].reshape(-1)
+    peaks /= np.sum(peaks)  # Normalize the trajectory so it can be interpreted as probability.
+
+    # Initial guess for the parameters is mu ~ center of the peak period, sigma ~ quarter of the peak period length.
+    popt, pcov = curve_fit(gaussian_curve, peak_days, peaks, p0=(peak_days[len(peak_days) // 2], len(peak_days) / 4),
+                           bounds=(0.0, n_days))
+
+    return popt  # Mean, Std
+
+
+def estimate_distribution_periodic(event_trajectory, event_period):
+    """
+    Model the event trajectory by a mixture of (stream_length / dominant_period) Cauchy distributions, whose
+    shape tends to represent the peaks more closely than Gaussians due to steeper peaks and fatter tails.
+    Cauchy distribution parameters are the location (GMM means are used) and half width at half maximum, which
+    is computed from GMM standard deviations as HWHM = sqrt(2 * ln(2)) * sigma.
+    :param event_trajectory: trajectory of the event
+    :param event_period: dominant period of the event
+    :return: [(loc, hwhm)] for each burst in the event -- length = stream_length / dominant_period
+    """
+    n_days = len(event_trajectory)
+    days = np.arange(n_days).reshape(-1, 1)
+    ma = moving_average(event_trajectory.reshape(-1), WINDOW)
+
+    ma_mean = np.mean(ma)
+    ma_std = np.std(ma)
+
+    cutoff = ma_mean + ma_std
+    observations = np.hstack((days, event_trajectory.reshape(-1, 1)))
+    observations = observations[observations[:, 1] > cutoff, :]
+
+    # Sometimes the cutoff is too harsh and we end up with less observations than components. In that case,
+    # reduce the number of components to the number of features, since not all peaks were bursty enough.
+    n_components = min(math.floor(n_days / event_period), len(observations))
+    g = gmm.GaussianMixture(n_components=int(n_components), covariance_type='diag', init_params='kmeans',
+                            random_state=1)
+    g.fit(observations)
+    e_parameters = []
+
+    # Extract parameters.
+    for mean_, cov_ in zip(g.means_, g.covariances_):
+        loc = mean_[0]
+        hwhm = np.sqrt(2 * np.log(2)) * np.sqrt(cov_[0])
+
+        e_parameters.append((loc, hwhm))
+
+    return e_parameters
+
+
+def create_event_trajectory(event, feature_trajectories, dps, dp):
+    """
+    Create a trajectory of the given event as the sum of trajectories of its features weighted by their DPS.
+    Also return the dominant period of the event, which is the most common dominant period of its features,
+    since not all of them have necessarily the same periodicity.
+    :param event: detected event (array of its feature indices)
+    :param feature_trajectories: matrix of feature trajectories as row vectors
+    :param dps: dominant power spectra of the processed features
+    :param dp: dominant periods of the processed features
+    :return: trajectory of the given event and its dominant period
+    """
+    e_feature_trajectories = feature_trajectories[event]
+    e_power_spectra = dps[event]
+    e_dominant_period = np.bincount(dp[event].astype(int)).argmax()
+    e_trajectory = (e_feature_trajectories.T @ e_power_spectra) / np.sum(e_power_spectra)
+
+    return e_trajectory, e_dominant_period
+
+
+def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd, bow_matrix):
+    """
+    Convert the keyword representation of events to document representation. Do this in a simple manner by using all
+    documents published in an event bursty period containing all its keywords. Although this punishes having too many
+    distinct keywords, it may have some information value, e.g. events with an empty document set are likely garbage.
+    Would work only on lemmatized texts, obviously.
+    :param events: list of events which in turn are lists of their keyword indices
+    :param feature_trajectories:
+    :param dps: dominant power spectra of the processed features
+    :param dp: dominant periods of the processed features
+    :param dtd: document-to-day matrix
+    :param bow_matrix: bag-of-words matrix
+    :return: list of document indices of each events in the same order as the events were given
+    """
+    n_days = feature_trajectories.shape[1]
+    documents = []
+
+    for event in events:
+        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
+        is_aperiodic = event_period == n_days
+
+        if is_aperiodic:
+            event_mean, event_std = estimate_distribution_aperiodic(event_trajectory)
+
+            # If an event burst starts right at day 0, this would get negative.
+            burst_start = max(math.floor(event_mean - event_std), 0)
+            # If an event burst ends at stream length, this would exceed the boundary.
+            burst_end = min(math.ceil(event_mean + event_std), n_days - 1)
+
+            # Documents published on burst days. There is exactly one '1' in every row.
+            docs_dates, _ = dtd[:, burst_start:burst_end + 1].nonzero()
+        else:
+            event_parameters = estimate_distribution_periodic(event_trajectory, event_period)
+
+            # Documents published on burst days.
+            docs_dates = []
+
+            for loc, scale in event_parameters:
+                # If an event burst started right at day 0, this would get negative.
+                burst_start = max(math.floor(loc - scale), 0)
+                # If an event burst ended at the last day, this would exceed the boundary.
+                burst_end = min(math.ceil(loc + scale), n_days - 1)
+
+                burst_dates, _ = dtd[:, burst_start:burst_end + 1].nonzero()
+                docs_dates.extend(burst_dates.tolist())
+
+        # TODO: Do not take those that contain all keywords but maximize the number of keywords contained?
+        # Documents containing at least one of the event word features.
+        docs_either_words = bow_matrix[:, event]
+
+        # Documents containing all of the event word features.
+        docs_words = np.where(docs_either_words.getnnz(axis=1) == len(event))[0]
+
+        # Documents both published on burst days and containing all event word features. Do not assume unique for
+        # periodic events, as some bursty periods may overlap.
+        docs_both = np.intersect1d(docs_dates, docs_words, assume_unique=is_aperiodic)
+
+        documents.append(docs_both)
+
+    return documents

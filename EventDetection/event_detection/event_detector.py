@@ -11,7 +11,7 @@ from scipy.signal import periodogram
 from scipy.stats import entropy
 from sklearn.feature_extraction.text import CountVectorizer
 
-from event_detection import data_fetchers, plotting, preprocessing
+from event_detection import data_fetchers, plotting, postprocessing, preprocessing
 
 
 def construct_doc_to_day_matrix(num_docs, days):
@@ -151,25 +151,6 @@ def heuristic_stopwords_detection(feature_trajectories, dps, seed_sw_indices):
     logging.info('Boundary between high and low DPS: %f', udps)
 
     return stopwords_indices, udps
-
-
-def create_event_trajectory(event, feature_trajectories, dps, dp):
-    """
-    Create a trajectory of the given event as the sum of trajectories of its features weighted by their DPS.
-    Also return the dominant period of the event, which is the most common dominant period of its features,
-    since not all of them have necessarily the same periodicity.
-    :param event: detected event (array of its feature indices)
-    :param feature_trajectories: matrix of feature trajectories as row vectors
-    :param dps: dominant power spectra of the processed features
-    :param dp: dominant periods of the processed features
-    :return: trajectory of the given event and its dominant period
-    """
-    e_feature_trajectories = feature_trajectories[event]
-    e_power_spectra = dps[event]
-    e_dominant_period = np.bincount(dp[event].astype(int)).argmax()
-    e_trajectory = (e_feature_trajectories.T @ e_power_spectra) / np.sum(e_power_spectra)
-
-    return e_trajectory, e_dominant_period
 
 
 def event_detection(global_indices, doc2vec_model, feature_trajectories, dps, id2word):
@@ -357,7 +338,7 @@ def process_cluster(cluster, doc2vec_model, bow_matrix, relative_days, id2word, 
 # TODO: Or, penalize different periodicity heavily in the cost function (multiply by exp(abs(dp_difference)))?
 
 # TODO: Putting a threshold on trajectory variation (take only std > DPS_BOUNDARY * 1.5) improves cluster based
-# TODO: detection quite a bit.
+# TODO: detection quite a bit. Do this only for the greedy approach, clusters are fine?
 
 # Doc2Vec settings:
 # 1) Concat ... Greedy OK, clusters tragic
@@ -366,7 +347,6 @@ def process_cluster(cluster, doc2vec_model, bow_matrix, relative_days, id2word, 
 
 # DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
 DPS_BOUNDARY = 0.05  # Dominant power spectrum boundary between high and low power features.
-WINDOW = 7  # Length of the window to use in computing the moving average.
 
 
 def main(cluster_based, use_preclustering):
@@ -462,19 +442,37 @@ def main(cluster_based, use_preclustering):
             periodic_path = './periodic'
 
         # Aperiodic events
-        aperiodic_events = detect_events(doc2vec_model, trajectories, dps, dp, id2word, aperiodic=True,
-                                         cluster_based=cluster_based)
+        aperiodic_events = list(detect_events(doc2vec_model, trajectories, dps, dp, id2word, aperiodic=True,
+                                              cluster_based=cluster_based))
         plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dp, dirname=aperiodic_path)
         logging.info('Aperiodic done')
 
         # Periodic events
-        periodic_events = detect_events(doc2vec_model, trajectories, dps, dp, id2word, aperiodic=False,
-                                        cluster_based=cluster_based)
+        periodic_events = list(detect_events(doc2vec_model, trajectories, dps, dp, id2word, aperiodic=False,
+                                             cluster_based=cluster_based))
         plotting.plot_events(trajectories, periodic_events, id2word, dps, dp, dirname=periodic_path)
         logging.info('Periodic done')
+
+        dtd = construct_doc_to_day_matrix(bow_matrix.shape[0], relative_days)
+
+        print('APERIODIC')
+        aperiodic_docs = postprocessing.keywords2documents_simple(aperiodic_events, trajectories, dps, dp, dtd,
+                                                                  bow_matrix)
+
+        for i, docs in enumerate(aperiodic_docs):
+            keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
+            print('Event {:02d}: {:d} docs, keywords: [{}]'.format(i, len(docs), ', '.join(keywords)))
+
+        print('PERIODIC')
+        periodic_docs = postprocessing.keywords2documents_simple(periodic_events, trajectories, dps, dp, dtd,
+                                                                 bow_matrix)
+
+        for i, docs in enumerate(periodic_docs):
+            keywords = [id2word[word_id] for word_id in periodic_events[i]]
+            print('Event {:02d}: {:d} docs, keywords: [{}]'.format(i, len(docs), ', '.join(keywords)))
 
     logging.info('All done in %fs.', time() - total_time)
 
 
 if __name__ == '__main__':
-    main(cluster_based=False, use_preclustering=False)
+    main(cluster_based=True, use_preclustering=False)
