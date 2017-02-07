@@ -340,6 +340,13 @@ def process_cluster(cluster, doc2vec_model, bow_matrix, relative_days, id2word, 
 # TODO: Putting a threshold on trajectory variation (take only std > DPS_BOUNDARY * 1.5) improves cluster based
 # TODO: detection quite a bit. Do this only for the greedy approach, clusters are fine?
 
+# TODO: To get the document representation of events:
+# 1) the simple approach already implemented (simple intersection)
+# 2) random sampling (rank all documents from the event period by their similarity, create a distribution out of that
+#    and sample from it)
+# 3) moar clustering (take all documents from the event period, cluster them by their semantics and take the cluster
+#    most similar to the event vector)
+
 # Doc2Vec settings:
 # 1) Concat ... Greedy OK, clusters tragic
 # 2) Mean ... Greedy OK, clusters awesome
