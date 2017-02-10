@@ -1,9 +1,12 @@
+import logging
 import math
 
+import gensim
 import numpy as np
 import sklearn.mixture as gmm
 from scipy.optimize import curve_fit
 from scipy.stats import norm
+from sklearn.preprocessing import normalize
 
 WINDOW = 7  # Length of the window to use in computing the moving average.
 
@@ -154,7 +157,6 @@ def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd, bow_ma
                 burst_dates, _ = dtd[:, burst_start:burst_end + 1].nonzero()
                 docs_dates.extend(burst_dates.tolist())
 
-        # TODO: Do not take those that contain all keywords but maximize the number of keywords contained?
         # Documents containing at least one of the event word features.
         docs_either_words = bow_matrix[:, event]
 
@@ -166,5 +168,65 @@ def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd, bow_ma
         docs_both = np.intersect1d(docs_dates, docs_words, assume_unique=is_aperiodic)
 
         documents.append(docs_both)
+
+    return documents
+
+
+def keywords2documents_knn(events, feature_trajectories, dps, dp, dtd, doc2vec_model, id2word, k=None):
+    """
+    Convert the keyword representation of events to document representation. Do this by inferring a vector of the
+    event and then using it to query the documents within the event bursty period. For each event, take `k` most
+    similar documents to the query vector in terms of cosine similarity.
+    :param events: list of events which in turn are lists of their keyword indices
+    :param feature_trajectories:
+    :param dps: dominant power spectra of the processed features
+    :param dp: dominant periods of the processed features
+    :param dtd: document-to-day matrix
+    :param doc2vec_model:
+    :param id2word: mapping of word IDs to the actual words
+    :param k: number of most similar documents to return for each event or `None` to return the square root of the
+        number of documents within an event bursty period
+    :return: list of document indices of each events in the same order as the events were given
+    """
+    n_days = feature_trajectories.shape[1]
+    documents = []
+
+    for i, event in enumerate(events):
+        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
+        is_aperiodic = event_period == n_days
+
+        if is_aperiodic:
+            event_mean, event_std = estimate_distribution_aperiodic(event_trajectory)
+
+            # If an event burst starts right at day 0, this would get negative.
+            burst_start = max(math.floor(event_mean - event_std), 0)
+            # If an event burst ends at stream length, this would exceed the boundary.
+            burst_end = min(math.ceil(event_mean + event_std), n_days - 1)
+
+            # Documents published on burst days. There is exactly one '1' in every row.
+            docs_dates, _ = dtd[:, burst_start:burst_end + 1].nonzero()
+        else:
+            # TODO: Return a list of 3-tuples (period start, period end, documents), for the simple approach as well.
+            raise NotImplementedError('KNN based document retrieval is not yet implemented for periodic events.')
+
+        document_vectors = doc2vec_model.docvecs[docs_dates.tolist()]
+        event_vector = doc2vec_model.infer_vector([id2word[keyword] for keyword in event], steps=5)
+
+        # Normalize to unit l2 norm, as gensim similarity queries assume the vectors are already normalized.
+        normalize(document_vectors, copy=False)
+        event_vector /= np.linalg.norm(event_vector)
+
+        if k is None:
+            num_best = round(math.sqrt(len(docs_dates)))
+        else:
+            num_best = k
+
+        index = gensim.similarities.MatrixSimilarity(document_vectors, num_best=num_best,
+                                                     num_features=doc2vec_model.vector_size)
+        event_documents = index[event_vector]
+        documents.append(event_documents)
+
+        logging.info('Processed event %d consisting of %d documents. Most similar: %s, least similar: %s.', i,
+                     len(event_documents), str(event_documents[0]), str(event_documents[-1]))
 
     return documents

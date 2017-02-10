@@ -463,12 +463,17 @@ def main(cluster_based, use_preclustering):
         dtd = construct_doc_to_day_matrix(bow_matrix.shape[0], relative_days)
 
         print('APERIODIC')
-        aperiodic_docs = postprocessing.keywords2documents_simple(aperiodic_events, trajectories, dps, dp, dtd,
-                                                                  bow_matrix)
+        aperiodic_docs = postprocessing.keywords2documents_knn(aperiodic_events, trajectories, dps, dp, dtd,
+                                                               doc2vec_model, id2word)
+
+        # aperiodic_docs = postprocessing.keywords2documents_simple(aperiodic_events, trajectories, dps, dp, dtd,
+        #                                                           bow_matrix)
 
         for i, docs in enumerate(aperiodic_docs):
             keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
             print('Event {:02d}: {:d} docs, keywords: [{}]'.format(i, len(docs), ', '.join(keywords)))
+
+        exit()  # TODO: Don't exit
 
         print('PERIODIC')
         periodic_docs = postprocessing.keywords2documents_simple(periodic_events, trajectories, dps, dp, dtd,
