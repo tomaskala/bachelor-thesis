@@ -111,7 +111,7 @@ def create_event_trajectory(event, feature_trajectories, dps, dp):
     return e_trajectory, e_dominant_period
 
 
-def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd_matrix, bow_matrix):
+def keywords2docids_simple(events, feature_trajectories, dps, dp, dtd_matrix, bow_matrix):
     """
     Convert the keyword representation of events to document representation. Do this in a simple manner by using all
     documents published in an event bursty period containing all its keywords. Although this punishes having too many
@@ -177,7 +177,7 @@ def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd_matrix,
     return documents
 
 
-def keywords2documents_knn(events, feature_trajectories, dps, dp, dtd_matrix, doc2vec_model, id2word, k=None):
+def keywords2docids_knn(events, feature_trajectories, dps, dp, dtd_matrix, doc2vec_model, id2word, k=None):
     """
     Convert the keyword representation of events to document representation. Do this by inferring a vector of the
     event and then using it to query the documents within the event bursty period. For each event, take `k` most

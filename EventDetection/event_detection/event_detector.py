@@ -11,7 +11,7 @@ from scipy.signal import periodogram
 from scipy.stats import entropy
 from sklearn.feature_extraction.text import CountVectorizer
 
-from event_detection import data_fetchers, plotting, postprocessing, preprocessing
+from event_detection import annotations, data_fetchers, plotting, postprocessing, preprocessing
 
 
 def construct_doc_to_day_matrix(num_docs, days):
@@ -467,30 +467,31 @@ def main(cluster_based, use_preclustering):
         dtd = construct_doc_to_day_matrix(bow_matrix.shape[0], relative_days)
 
         print('APERIODIC')
-        aperiodic_docs = postprocessing.keywords2documents_knn(aperiodic_events, trajectories, dps, dp, dtd,
-                                                               doc2vec_model, id2word)
-
-        # aperiodic_docs = postprocessing.keywords2documents_simple(aperiodic_events, trajectories, dps, dp, dtd,
-        #                                                           bow_matrix)
+        aperiodic_docs = postprocessing.keywords2docids_knn(aperiodic_events, trajectories, dps, dp, dtd,
+                                                            doc2vec_model, id2word)
 
         for i, bursts in enumerate(aperiodic_docs):
             keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
-            docs_count = 0
+            print(keywords)
+            annotations.get_event_documents(bursts, data_fetchers.CzechLemmatizedTexts, dataset='dec-jan',
+                                            fetch_forms='True')
+            print('=' * 20)
+            # keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
+            # docs_count = 0
+            #
+            # for _, _, docs in bursts:
+            #     docs_count += len(docs)
+            #
+            # bursts_repr = map(lambda burst: str((burst[0], burst[1], len(burst[2]))), bursts)
+            # print('Aperiodic event {:02d}: {:d} docs, keywords: [{}], bursts: [{}]'.format(i, docs_count,
+            #                                                                                ', '.join(keywords),
+            #                                                                                ', '.join(bursts_repr)))
 
-            for _, _, docs in bursts:
-                docs_count += len(docs)
-
-            bursts_repr = map(lambda burst: str((burst[0], burst[1], len(burst[2]))), bursts)
-            print('Aperiodic event {:02d}: {:d} docs, keywords: [{}], bursts: [{}]'.format(i, docs_count,
-                                                                                           ', '.join(keywords),
-                                                                                           ', '.join(bursts_repr)))
+        exit()
 
         print('PERIODIC')
-        periodic_docs = postprocessing.keywords2documents_knn(periodic_events, trajectories, dps, dp, dtd,
-                                                              doc2vec_model, id2word)
-
-        # periodic_docs = postprocessing.keywords2documents_simple(periodic_events, trajectories, dps, dp, dtd,
-        #                                                          bow_matrix)
+        periodic_docs = postprocessing.keywords2docids_knn(periodic_events, trajectories, dps, dp, dtd,
+                                                           doc2vec_model, id2word)
 
         for i, bursts in enumerate(periodic_docs):
             keywords = [id2word[word_id] for word_id in periodic_events[i]]
