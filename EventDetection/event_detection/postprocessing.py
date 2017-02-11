@@ -111,7 +111,7 @@ def create_event_trajectory(event, feature_trajectories, dps, dp):
     return e_trajectory, e_dominant_period
 
 
-def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd, bow_matrix):
+def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd_matrix, bow_matrix):
     """
     Convert the keyword representation of events to document representation. Do this in a simple manner by using all
     documents published in an event bursty period containing all its keywords. Although this punishes having too many
@@ -121,41 +121,21 @@ def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd, bow_ma
     :param feature_trajectories:
     :param dps: dominant power spectra of the processed features
     :param dp: dominant periods of the processed features
-    :param dtd: document-to-day matrix
+    :param dtd_matrix: document-to-day matrix
     :param bow_matrix: bag-of-words matrix
-    :return: list of document indices of each events in the same order as the events were given
+    :return: list of tuples (burst_start, burst_end, burst_documents) for all bursts of each event (that is, each inner
+        list represents an event and contains 1 tuple for every aperiodic event and T tuples for every periodic event
+        with T = stream_length / event_period
     """
-    n_days = feature_trajectories.shape[1]
-    documents = []
 
-    for event in events:
-        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
-        is_aperiodic = event_period == n_days
+    def process_burst(loc, scale, aperiodic):
+        # If an event burst starts right at day 0, this would get negative.
+        start = max(math.floor(loc - scale), 0)
+        # If an event burst ends at stream length, this would exceed the boundary.
+        end = min(math.ceil(loc + scale), n_days - 1)
 
-        if is_aperiodic:
-            event_mean, event_std = estimate_distribution_aperiodic(event_trajectory)
-
-            # If an event burst starts right at day 0, this would get negative.
-            burst_start = max(math.floor(event_mean - event_std), 0)
-            # If an event burst ends at stream length, this would exceed the boundary.
-            burst_end = min(math.ceil(event_mean + event_std), n_days - 1)
-
-            # Documents published on burst days. There is exactly one '1' in every row.
-            docs_dates, _ = dtd[:, burst_start:burst_end + 1].nonzero()
-        else:
-            event_parameters = estimate_distribution_periodic(event_trajectory, event_period)
-
-            # Documents published on burst days.
-            docs_dates = []
-
-            for loc, scale in event_parameters:
-                # If an event burst started right at day 0, this would get negative.
-                burst_start = max(math.floor(loc - scale), 0)
-                # If an event burst ended at the last day, this would exceed the boundary.
-                burst_end = min(math.ceil(loc + scale), n_days - 1)
-
-                burst_dates, _ = dtd[:, burst_start:burst_end + 1].nonzero()
-                docs_dates.extend(burst_dates.tolist())
+        # All documents published on burst days. There is exactly one '1' in every row.
+        burst_docs_all, _ = dtd_matrix[:, start:end + 1].nonzero()
 
         # Documents containing at least one of the event word features.
         docs_either_words = bow_matrix[:, event]
@@ -165,29 +145,10 @@ def keywords2documents_simple(events, feature_trajectories, dps, dp, dtd, bow_ma
 
         # Documents both published on burst days and containing all event word features. Do not assume unique for
         # periodic events, as some bursty periods may overlap.
-        docs_both = np.intersect1d(docs_dates, docs_words, assume_unique=is_aperiodic)
+        docs_both = np.intersect1d(burst_docs_all, docs_words, assume_unique=aperiodic)
 
-        documents.append(docs_both)
+        return start, end, docs_both
 
-    return documents
-
-
-def keywords2documents_knn(events, feature_trajectories, dps, dp, dtd, doc2vec_model, id2word, k=None):
-    """
-    Convert the keyword representation of events to document representation. Do this by inferring a vector of the
-    event and then using it to query the documents within the event bursty period. For each event, take `k` most
-    similar documents to the query vector in terms of cosine similarity.
-    :param events: list of events which in turn are lists of their keyword indices
-    :param feature_trajectories:
-    :param dps: dominant power spectra of the processed features
-    :param dp: dominant periods of the processed features
-    :param dtd: document-to-day matrix
-    :param doc2vec_model:
-    :param id2word: mapping of word IDs to the actual words
-    :param k: number of most similar documents to return for each event or `None` to return the square root of the
-        number of documents within an event bursty period
-    :return: list of document indices of each events in the same order as the events were given
-    """
     n_days = feature_trajectories.shape[1]
     documents = []
 
@@ -196,37 +157,106 @@ def keywords2documents_knn(events, feature_trajectories, dps, dp, dtd, doc2vec_m
         is_aperiodic = event_period == n_days
 
         if is_aperiodic:
-            event_mean, event_std = estimate_distribution_aperiodic(event_trajectory)
-
-            # If an event burst starts right at day 0, this would get negative.
-            burst_start = max(math.floor(event_mean - event_std), 0)
-            # If an event burst ends at stream length, this would exceed the boundary.
-            burst_end = min(math.ceil(event_mean + event_std), n_days - 1)
-
-            # Documents published on burst days. There is exactly one '1' in every row.
-            docs_dates, _ = dtd[:, burst_start:burst_end + 1].nonzero()
+            burst_loc, burst_scale = estimate_distribution_aperiodic(event_trajectory)
+            burst_start, burst_end, burst_docs = process_burst(burst_loc, burst_scale, is_aperiodic)
+            documents.append([(burst_start, burst_end, burst_docs)])
+            logging.info('Processed aperiodic event %d consisting of %d documents.', i, len(burst_docs))
         else:
-            # TODO: Return a list of 3-tuples (period start, period end, documents), for the simple approach as well.
-            raise NotImplementedError('KNN based document retrieval is not yet implemented for periodic events.')
+            event_parameters = estimate_distribution_periodic(event_trajectory, event_period)
+            event_bursts = []
+            num_docs = 0
 
-        document_vectors = doc2vec_model.docvecs[docs_dates.tolist()]
-        event_vector = doc2vec_model.infer_vector([id2word[keyword] for keyword in event], steps=5)
+            for burst_loc, burst_scale in sorted(event_parameters, key=lambda item: item[0]):
+                burst_start, burst_end, burst_docs = process_burst(burst_loc, burst_scale, is_aperiodic)
+                event_bursts.append((burst_start, burst_end, burst_docs))
+                num_docs += len(burst_docs)
+
+            documents.append(event_bursts)
+            logging.info('Processed periodic event %d consisting of %d documents.', i, num_docs)
+
+    return documents
+
+
+def keywords2documents_knn(events, feature_trajectories, dps, dp, dtd_matrix, doc2vec_model, id2word, k=None):
+    """
+    Convert the keyword representation of events to document representation. Do this by inferring a vector of the
+    event and then using it to query the documents within the event bursty period. For each event, take `k` most
+    similar documents to the query vector in terms of cosine similarity.
+    :param events: list of events which in turn are lists of their keyword indices
+    :param feature_trajectories:
+    :param dps: dominant power spectra of the processed features
+    :param dp: dominant periods of the processed features
+    :param dtd_matrix: document-to-day matrix
+    :param doc2vec_model:
+    :param id2word: mapping of word IDs to the actual words
+    :param k: number of most similar documents to return for each event or `None` to return the square root of the
+        number of documents within an event bursty period
+    :return: list of tuples (burst_start, burst_end, burst_documents) for all bursts of each event (that is, each inner
+        list represents an event and contains 1 tuple for every aperiodic event and T tuples for every periodic event
+        with T = stream_length / event_period. Each document is a pair (document_id, document_cosine_similarity) so
+        that further event cleaning can be performed based on the similarities.
+    """
+
+    def process_burst(loc, scale, embedding):
+        # If an event burst starts right at day 0, this would get negative.
+        start = max(math.floor(loc - scale), 0)
+        # If an event burst ends at stream length, this would exceed the boundary.
+        end = min(math.ceil(loc + scale), n_days - 1)
+
+        # All documents published on burst days. There is exactly one '1' in every row.
+        burst_docs_all, _ = dtd_matrix[:, start:end + 1].nonzero()
+        document_vectors = doc2vec_model.docvecs[burst_docs_all.tolist()]
 
         # Normalize to unit l2 norm, as gensim similarity queries assume the vectors are already normalized.
         normalize(document_vectors, copy=False)
-        event_vector /= np.linalg.norm(event_vector)
 
         if k is None:
-            num_best = round(math.sqrt(len(docs_dates)))
+            num_best = round(math.sqrt(len(burst_docs_all)))
         else:
             num_best = k
 
         index = gensim.similarities.MatrixSimilarity(document_vectors, num_best=num_best,
                                                      num_features=doc2vec_model.vector_size)
-        event_documents = index[event_vector]
-        documents.append(event_documents)
+        event_documents = index[embedding]
 
-        logging.info('Processed event %d consisting of %d documents. Most similar: %s, least similar: %s.', i,
-                     len(event_documents), str(event_documents[0]), str(event_documents[-1]))
+        return start, end, event_documents
+
+    n_days = feature_trajectories.shape[1]
+    documents = []
+
+    for i, event in enumerate(events):
+        # Normalize to unit l2 norm, as gensim similarity queries assume the vectors are already normalized.
+        event_vector = doc2vec_model.infer_vector([id2word[keyword] for keyword in event], steps=5)
+        event_vector /= np.linalg.norm(event_vector)
+
+        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
+        is_aperiodic = event_period == n_days
+
+        if is_aperiodic:
+            burst_loc, burst_scale = estimate_distribution_aperiodic(event_trajectory)
+            burst_start, burst_end, burst_docs = process_burst(burst_loc, burst_scale, event_vector)
+            documents.append([(burst_start, burst_end, burst_docs)])
+            logging.info(
+                'Processed aperiodic event %d consisting of %d documents. Most similar: %s, least similar: %s.', i,
+                len(burst_docs), str(burst_docs[0]), str(burst_docs[-1]))
+        else:
+            event_parameters = estimate_distribution_periodic(event_trajectory, event_period)
+            event_bursts = []
+
+            num_docs = 0
+            most_similar = (None, -2)
+            least_similar = (None, 2)
+
+            for burst_loc, burst_scale in sorted(event_parameters, key=lambda item: item[0]):
+                burst_start, burst_end, burst_docs = process_burst(burst_loc, burst_scale, event_vector)
+                event_bursts.append((burst_start, burst_end, burst_docs))
+
+                num_docs += len(burst_docs)
+                most_similar = max(most_similar, burst_docs[0], key=lambda item: item[1])
+                least_similar = min(least_similar, burst_docs[-1], key=lambda item: item[1])
+
+            documents.append(event_bursts)
+            logging.info('Processed periodic event %d consisting of %d documents. Most similar: %s, least similar: %s.',
+                         i, num_docs, str(most_similar), str(least_similar))
 
     return documents

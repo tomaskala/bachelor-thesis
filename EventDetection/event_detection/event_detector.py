@@ -347,6 +347,10 @@ def process_cluster(cluster, doc2vec_model, bow_matrix, relative_days, id2word, 
 # 3) moar clustering (take all documents from the event period, cluster them by their semantics and take the cluster
 #    most similar to the event vector)
 
+# TODO: Once retrieved the event documents, use Doc2Vec to put a threshold on event quality - throw away events with
+# TODO: the highest similarity being < THRESHOLD (there was an event with the highest similarity being negative
+# TODO: described by nonsensical words).
+
 # Doc2Vec settings:
 # 1) Concat ... Greedy OK, clusters tragic
 # 2) Mean ... Greedy OK, clusters awesome
@@ -469,19 +473,36 @@ def main(cluster_based, use_preclustering):
         # aperiodic_docs = postprocessing.keywords2documents_simple(aperiodic_events, trajectories, dps, dp, dtd,
         #                                                           bow_matrix)
 
-        for i, docs in enumerate(aperiodic_docs):
+        for i, bursts in enumerate(aperiodic_docs):
             keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
-            print('Event {:02d}: {:d} docs, keywords: [{}]'.format(i, len(docs), ', '.join(keywords)))
+            docs_count = 0
 
-        exit()  # TODO: Don't exit
+            for _, _, docs in bursts:
+                docs_count += len(docs)
+
+            bursts_repr = map(lambda burst: str((burst[0], burst[1], len(burst[2]))), bursts)
+            print('Aperiodic event {:02d}: {:d} docs, keywords: [{}], bursts: [{}]'.format(i, docs_count,
+                                                                                           ', '.join(keywords),
+                                                                                           ', '.join(bursts_repr)))
 
         print('PERIODIC')
-        periodic_docs = postprocessing.keywords2documents_simple(periodic_events, trajectories, dps, dp, dtd,
-                                                                 bow_matrix)
+        periodic_docs = postprocessing.keywords2documents_knn(periodic_events, trajectories, dps, dp, dtd,
+                                                              doc2vec_model, id2word)
 
-        for i, docs in enumerate(periodic_docs):
+        # periodic_docs = postprocessing.keywords2documents_simple(periodic_events, trajectories, dps, dp, dtd,
+        #                                                          bow_matrix)
+
+        for i, bursts in enumerate(periodic_docs):
             keywords = [id2word[word_id] for word_id in periodic_events[i]]
-            print('Event {:02d}: {:d} docs, keywords: [{}]'.format(i, len(docs), ', '.join(keywords)))
+            docs_count = 0
+
+            for _, _, docs in bursts:
+                docs_count += len(docs)
+
+            bursts_repr = map(lambda burst: str((burst[0], burst[1], len(burst[2]))), bursts)
+            print(' Periodic event {:02d}: {:d} docs, keywords: [{}], bursts: [{}]'.format(i, docs_count,
+                                                                                           ', '.join(keywords),
+                                                                                           ', '.join(bursts_repr)))
 
     logging.info('All done in %fs.', time() - total_time)
 
