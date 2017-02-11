@@ -62,16 +62,21 @@ def plot_events(feature_trajectories, events, id2word, dps, dp, dirname='../even
         plt.grid(True)
 
         event_trajectory, event_period = post.create_event_trajectory(event, feature_trajectories, dps, dp)
-        plt.plot(days, event_trajectory, label=('Period: %d' % event_period), color='red', linewidth=1.5)
+        plt.plot(days, event_trajectory, label='Period: {:d}'.format(event_period), color='red', linewidth=1.5)
 
         if event_period == n_days:
             # Aperiodic
             mean, std = post.estimate_distribution_aperiodic(event_trajectory)
-            xticks_pos = [mean - std, mean, mean + std]
-            xticks = [('%.2f' % (mean - std)), ('%.2f' % mean), ('%.2f' % (mean + std))]
-            plt.axvline(mean - std, color='b')
-            plt.axvline(mean + std, color='b')
-            plt.xticks(xticks_pos, xticks, rotation=45)
+
+            burst_start = int(max(np.floor(mean - std), 0))
+            burst_end = int(min(np.ceil(mean + std), n_days - 1))
+            burst_loc = (burst_start + burst_end) / 2
+
+            xticks_pos = [burst_start, burst_loc, burst_end]
+            xticks = [('{:d}'.format(burst_start)), ('{:.01f}'.format(burst_loc)), ('{:d}'.format(burst_end))]
+            plt.axvline(burst_start, color='b')
+            plt.axvline(burst_end, color='b')
+            plt.xticks(xticks_pos, xticks)
         else:
             # Periodic
             params = post.estimate_distribution_periodic(event_trajectory, event_period)
@@ -80,12 +85,16 @@ def plot_events(feature_trajectories, events, id2word, dps, dp, dirname='../even
             xticks = []
 
             for mean, std in params:
-                xticks_pos.extend([mean - std, mean, mean + std])
-                xticks.extend([('%.2f' % (mean - std)), ('%.2f' % mean), ('%.2f' % (mean + std))])
-                plt.axvline(mean - std, color='b')
-                plt.axvline(mean + std, color='b')
+                burst_start = int(max(np.floor(mean - std), 0))
+                burst_end = int(min(np.ceil(mean + std), n_days - 1))
+                burst_loc = (burst_start + burst_end) / 2
 
-            plt.xticks(xticks_pos, xticks, rotation=45)
+                xticks_pos.extend([burst_start, burst_loc, burst_end])
+                xticks.extend([('{:d}'.format(burst_start)), ('{:.01f}'.format(burst_loc)), ('{:d}'.format(burst_end))])
+                plt.axvline(burst_start, color='b')
+                plt.axvline(burst_end, color='b')
+
+            plt.xticks(xticks_pos, xticks)
 
         plt.xlabel('Days')
         plt.ylabel('DFIDF')
@@ -93,7 +102,7 @@ def plot_events(feature_trajectories, events, id2word, dps, dp, dirname='../even
 
         fig.set_size_inches(16, 10)
         plt.tight_layout()
-        fig.savefig(os.path.join(dirname, '%03d.png' % i))
+        fig.savefig(os.path.join(dirname, '{:03d}.png'.format(i)))
         plt.close(fig)
         plt.clf()
 
