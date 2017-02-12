@@ -466,44 +466,73 @@ def main(cluster_based, use_preclustering):
 
         dtd = construct_doc_to_day_matrix(bow_matrix.shape[0], relative_days)
 
-        print('APERIODIC')
-        aperiodic_docs = postprocessing.keywords2docids_knn(aperiodic_events, trajectories, dps, dp, dtd,
+        aperiodic_docs = postprocessing.keywords2docids_wmd(aperiodic_events, trajectories, dps, dp, dtd,
                                                             doc2vec_model, id2word)
 
-        for i, bursts in enumerate(aperiodic_docs):
+        # aperiodic_docs = postprocessing.keywords2docids_simple(aperiodic_events, trajectories, dps, dp, dtd, bow_matrix)
+
+        # for i, bursts in enumerate(aperiodic_docs):
+        #     keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
+        #     print(keywords)
+        #     annotations.get_event_documents(bursts, data_fetchers.CzechLemmatizedTexts, dataset='dec-jan',
+        #                                     fetch_forms='True')
+        #     print('=' * 20)
+        #     # keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
+        #     # docs_count = 0
+        #     #
+        #     # for _, _, docs in bursts:
+        #     #     docs_count += len(docs)
+        #     #
+        #     # bursts_repr = map(lambda burst: str((burst[0], burst[1], len(burst[2]))), bursts)
+        #     # print('Aperiodic event {:02d}: {:d} docs, keywords: [{}], bursts: [{}]'.format(i, docs_count,
+        #     #                                                                                ', '.join(keywords),
+        #     #                                                                                ', '.join(bursts_repr)))
+        #
+        # exit()
+
+        # print('PERIODIC')
+        # periodic_docs = postprocessing.keywords2docids_knn(periodic_events, trajectories, dps, dp, dtd,
+        #                                                    doc2vec_model, id2word)
+
+        # for i, bursts in enumerate(periodic_docs):
+        #     keywords = [id2word[word_id] for word_id in periodic_events[i]]
+        #     docs_count = 0
+        #
+        #     for _, _, docs in bursts:
+        #         docs_count += len(docs)
+        #
+        #     bursts_repr = map(lambda burst: str((burst[0], burst[1], len(burst[2]))), bursts)
+        #     print(' Periodic event {:02d}: {:d} docs, keywords: [{}], bursts: [{}]'.format(i, docs_count,
+        #                                                                                    ', '.join(keywords),
+        #                                                                                    ', '.join(bursts_repr)))
+
+        import random
+        # annotations_fetcher = data_fetchers.CzechLemmatizedTexts(dataset='dec-jan', fetch_forms=True)
+        # aperiodic_representation = annotations.docids2documents(aperiodic_docs, annotations_fetcher)
+
+        print('Aperiodic')
+
+        for i, event in enumerate(aperiodic_docs):
             keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
-            print(keywords)
-            annotations.get_event_documents(bursts, data_fetchers.CzechLemmatizedTexts, dataset='dec-jan',
-                                            fetch_forms='True')
-            print('=' * 20)
-            # keywords = [id2word[word_id] for word_id in aperiodic_events[i]]
-            # docs_count = 0
-            #
-            # for _, _, docs in bursts:
-            #     docs_count += len(docs)
-            #
-            # bursts_repr = map(lambda burst: str((burst[0], burst[1], len(burst[2]))), bursts)
-            # print('Aperiodic event {:02d}: {:d} docs, keywords: [{}], bursts: [{}]'.format(i, docs_count,
-            #                                                                                ', '.join(keywords),
-            #                                                                                ', '.join(bursts_repr)))
+            print('Aperiodic event {:d}: {:s}'.format(i, ', '.join(keywords)))
 
-        exit()
+            for burst_start, burst_end, burst_docs in event:
+                print('Burst ({:d} - {:d})'.format(burst_start, burst_end))
 
-        print('PERIODIC')
-        periodic_docs = postprocessing.keywords2docids_knn(periodic_events, trajectories, dps, dp, dtd,
-                                                           doc2vec_model, id2word)
+                try:
+                    random_sample = random.sample(burst_docs, 10)
+                except ValueError:
+                    continue
 
-        for i, bursts in enumerate(periodic_docs):
-            keywords = [id2word[word_id] for word_id in periodic_events[i]]
-            docs_count = 0
+                for doc_ in random_sample:
+                    print(doc_, 'sim:', doc_.similarity)
 
-            for _, _, docs in bursts:
-                docs_count += len(docs)
+                print()
+            print()
 
-            bursts_repr = map(lambda burst: str((burst[0], burst[1], len(burst[2]))), bursts)
-            print(' Periodic event {:02d}: {:d} docs, keywords: [{}], bursts: [{}]'.format(i, docs_count,
-                                                                                           ', '.join(keywords),
-                                                                                           ', '.join(bursts_repr)))
+        # periodic_representation = annotations.docids2documents(periodic_docs, annotations_fetcher)
+
+        print('Periodic')
 
     logging.info('All done in %fs.', time() - total_time)
 

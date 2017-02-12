@@ -35,7 +35,7 @@ def docids2documents(events, fetcher):
     # Collect document IDs for all events altogether and retrieve them at once, so the collection is iterated only once.
     for event in events:
         for _, _, burst_docs in event:
-            if type(burst_docs[0]) is tuple:
+            if len(burst_docs) > 0 and type(burst_docs[0]) is tuple:
                 # If K-NN was used to retrieve the documents, each document is a tuple (doc_id, doc_similarity).
                 docs = list(map(lambda item: item[0], burst_docs))
                 docids.extend(docs)
@@ -50,7 +50,7 @@ def docids2documents(events, fetcher):
         event_out = []
 
         for burst_start, burst_end, burst_docs in event:
-            if type(burst_docs[0]) is tuple:
+            if len(burst_docs) > 0 and type(burst_docs[0]) is tuple:
                 docs_out = [LemmatizedDocument(doc_id, docids2docs[doc_id], similarity) for doc_id, similarity in
                             burst_docs]
             else:

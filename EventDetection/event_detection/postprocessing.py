@@ -215,9 +215,12 @@ def keywords2docids_knn(events, feature_trajectories, dps, dp, dtd_matrix, doc2v
         else:
             num_best = k
 
-        index = gensim.similarities.MatrixSimilarity(document_vectors, num_best=num_best,
-                                                     num_features=doc2vec_model.vector_size)
-        event_documents = index[embedding]
+        index = gensim.similarities.MatrixSimilarity(document_vectors, num_features=doc2vec_model.vector_size)
+        all_sims = index[embedding]
+        sorted_indices = np.argsort(all_sims)[::-1]
+        sorted_sims = all_sims[sorted_indices]
+
+        event_documents = list(zip(sorted_indices, sorted_sims))[:num_best]
 
         return start, end, event_documents
 
@@ -226,7 +229,8 @@ def keywords2docids_knn(events, feature_trajectories, dps, dp, dtd_matrix, doc2v
 
     for i, event in enumerate(events):
         # Normalize to unit l2 norm, as gensim similarity queries assume the vectors are already normalized.
-        event_vector = doc2vec_model.infer_vector([id2word[keyword] for keyword in event], steps=5)
+        # event_vector = doc2vec_model.infer_vector([id2word[keyword] for keyword in event], steps=5)
+        event_vector = np.mean([doc2vec_model[id2word[keyword]] for keyword in event], axis=0)
         event_vector /= np.linalg.norm(event_vector)
 
         event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
@@ -260,3 +264,102 @@ def keywords2docids_knn(events, feature_trajectories, dps, dp, dtd_matrix, doc2v
                          i, num_docs, str(most_similar), str(least_similar))
 
     return documents
+
+
+def get_burst_docids(dtd_matrix, burst_loc, burst_scale):
+    n_days = dtd_matrix.shape[1]
+
+    # If an event burst starts right at day 0, this would get negative.
+    start = max(math.floor(burst_loc - burst_scale), 0)
+    # If an event burst ends at stream length, this would exceed the boundary.
+    end = min(math.ceil(burst_loc + burst_scale), n_days - 1)
+
+    # All documents published on burst days. There is exactly one '1' in every row.
+    burst_docs_all, _ = dtd_matrix[:, start:end + 1].nonzero()
+
+    return start, end, burst_docs_all
+
+
+def keywords2docids_wmd(events, feature_trajectories, dps, dp, dtd_matrix, word2vec_model, id2word, k=None):
+    def burst_docs2event_docs(corpus, keywords):
+        if k is None:
+            num_best = round(math.sqrt(len(corpus)))
+        else:
+            num_best = k
+
+        headlines = [doc.name for doc in corpus]
+
+        # TODO: Normalize or not?
+        index = gensim.similarities.WmdSimilarity(headlines, w2v_model=word2vec_model, num_best=num_best)
+        event_documents = index[keywords]
+
+        return event_documents
+
+    # Step 1: Assemble a list of event bursty periods and IDs of all documents within each period.
+    logging.info('Assembling documents of all bursty periods.')
+    n_days = feature_trajectories.shape[1]
+    event_bursts_docids = []
+
+    for i, event in enumerate(events):
+        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
+        is_aperiodic = event_period == n_days
+
+        if is_aperiodic:
+            burst_loc, burst_scale = estimate_distribution_aperiodic(event_trajectory)
+            burst_start, burst_end, burst_docs = get_burst_docids(dtd_matrix, burst_loc, burst_scale)
+            event_bursts_docids.append([(burst_start, burst_end, burst_docs)])
+        else:
+            event_parameters = estimate_distribution_periodic(event_trajectory, event_period)
+            event_bursts = []
+
+            for burst_loc, burst_scale in sorted(event_parameters, key=lambda item: item[0]):
+                burst_start, burst_end, burst_docs = get_burst_docids(dtd_matrix, burst_loc, burst_scale)
+                event_bursts.append((burst_start, burst_end, burst_docs))
+
+            event_bursts_docids.append(event_bursts)
+
+    # Step 2: Convert the document IDs to actual documents.
+    logging.info('Converting document IDs to documents.')
+    from event_detection import annotations, data_fetchers
+    fetcher = data_fetchers.CzechLemmatizedTexts(dataset='dec-jan', fetch_forms=False, pos=['N', 'V', 'A', 'D'])
+    event_bursts_documents = annotations.docids2documents(event_bursts_docids, fetcher)
+
+    # Step 3: Get the documents concerning each event using WM distance.
+    logging.info('Calculating document similarities.')
+    events_out = []
+
+    # class Dummy:
+    #     def __init__(self, similarity):
+    #         self.similarity = similarity
+    #
+    #     def __str__(self):
+    #         return 'Dummy'
+
+    for i, event in enumerate(event_bursts_documents):
+        event_out = []
+        event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
+
+        num_docs = 0
+        # most_similar = Dummy(-math.inf)
+        # least_similar = Dummy(math.inf)
+
+        # TODO: Disable logging here.
+
+        for burst in event:
+            burst_start, burst_end, burst_docs = burst
+            event_burst_docids = burst_docs2event_docs(burst_docs, event_keywords)
+
+            event_burst_docs = [burst_docs[doc_id] for doc_id, _ in event_burst_docids]  # TODO: Attach sims to docs.
+            event_out.append((burst_start, burst_end, event_burst_docs))
+
+            num_docs += len(event_burst_docs)
+            # most_similar = max(most_similar, event_burst_docs[0], key=lambda item: item.similarity)
+            # least_similar = min(least_similar, event_burst_docs[-1], key=lambda item: item.similarity)
+
+        # TODO: Enable logging here & log that an event is done.
+
+        events_out.append(event_out)
+        logging.info('Processed event %d consisting of %d documents.', i, num_docs)
+        logging.info('Event keywords: %s', ', '.join(event_keywords))
+
+    return events_out

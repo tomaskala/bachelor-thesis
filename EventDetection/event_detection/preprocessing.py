@@ -10,6 +10,7 @@ from event_detection.sphere import SphericalKMeans
 
 GENSIM_OUT = './gensim'
 DOC2VEC_PATH = os.path.join(GENSIM_OUT, './doc2vec_lemma_avg')
+WORD2VEC_PATH = os.path.join(GENSIM_OUT, './word2vec_lemma')
 
 # Manually taken from the dataset. Some words are malformed due to stemming.
 CZECH_STOPWORDS = frozenset(
@@ -112,6 +113,31 @@ class LemmaPreprocessor:
                    word.lower() not in CZECH_STOPWORDS and min_length <= len(word) <= max_length]
 
 
+def perform_word2vec_lemma_headlines(fetcher):
+    class HeadlineFetcher:
+        def __init__(self, doc_fetcher):
+            self.doc_fetcher = doc_fetcher
+
+        def __iter__(self):
+            for doc in self.doc_fetcher:
+                yield [word for word in doc.name if word.lower() not in CZECH_STOPWORDS]
+
+    headline_fetcher = HeadlineFetcher(fetcher)
+    t = time()
+
+    if os.path.exists(WORD2VEC_PATH):
+        logging.info('Loading Word2Vec')
+        word2vec_model = gensim.models.Word2Vec.load(WORD2VEC_PATH)
+        logging.info('Loaded Word2Vec in %fs.', time() - t)
+    else:
+        logging.info('Training Word2Vec')
+        word2vec_model = gensim.models.Word2Vec(headline_fetcher, size=100, negative=5, hs=0, min_count=2, window=5, iter=5)
+        word2vec_model.save(WORD2VEC_PATH)
+        logging.info('Created and saved Word2Vec in %fs.', time() - t)
+
+    return word2vec_model
+
+
 def perform_doc2vec_lemma(fetcher, min_length=3, max_length=15):
     doc_tagger = LemmatizedDocumentTagger(fetcher, min_length, max_length)
     t = time()
@@ -122,8 +148,9 @@ def perform_doc2vec_lemma(fetcher, min_length=3, max_length=15):
         logging.info('Loaded Doc2Vec in %fs.', time() - t)
     else:
         logging.info('Training Doc2Vec')
-        doc2vec_model = gensim.models.Doc2Vec(doc_tagger, dm=1, dm_mean=0, dm_concat=0, size=100, min_count=10,
-                                              window=5, iter=5)
+        # doc2vec_model = gensim.models.Doc2Vec(doc_tagger, dm=1, dm_mean=0, dm_concat=0, size=100, min_count=10,
+        #                                       window=5, iter=5)
+        doc2vec_model = gensim.models.Doc2Vec(doc_tagger, dm=0, dbow_words=1, size=100)
         doc2vec_model.save(DOC2VEC_PATH)
         logging.info('Created and saved Doc2Vec in %fs.', time() - t)
 
