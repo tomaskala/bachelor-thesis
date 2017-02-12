@@ -1,4 +1,3 @@
-import logging
 import os
 
 import numpy as np
@@ -288,7 +287,6 @@ class CzechLemmatizedTexts:
                         split = line.split('\t')
 
                         if len(split) != 3:
-                            logging.warning('Content line does not have 3 parts separated by tabs: %s', line)
                             continue
 
                         # Skip undesired POS tags.
