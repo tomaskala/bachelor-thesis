@@ -227,12 +227,13 @@ class CzechLemmatizedTexts:
     Z ... Punctuation (also used for the Sentence Boundary token)
     """
 
-    def __init__(self, dataset, fetch_forms, pos=('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T')):
+    def __init__(self, dataset, fetch_forms, pos=('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T'), names_only=False):
         """
         Initialize the document fetcher which yields `LemmatizedDocument` objects upon iteration.
         :param dataset: which dataset to use (full/dec-jan)
         :param fetch_forms: whether to fetch forms or lemmas of the individual words
         :param pos: which POS categories to fetch
+        :param names_only: whether to fetch only document names (to save memory) or whole documents
         """
         if dataset == 'full':
             self.document_paths = os.listdir(CZECH_TAGGED_TEXTS)
@@ -246,6 +247,7 @@ class CzechLemmatizedTexts:
 
         self.fetch_forms = fetch_forms
         self.pos = frozenset(pos)
+        self.names_only = names_only
 
     def __iter__(self):
         in_title = False
@@ -253,6 +255,7 @@ class CzechLemmatizedTexts:
 
         fetch_forms = self.fetch_forms
         pos = self.pos
+        names_only = self.names_only
 
         for file in self.document_paths:
             with open(os.path.join(CZECH_TAGGED_TEXTS, file), 'r', encoding='utf8', errors='ignore') as f:
@@ -298,7 +301,7 @@ class CzechLemmatizedTexts:
                                 document.name.append(split[0].strip())
                             else:
                                 document.name.append(split[1].strip())
-                        elif in_text:
+                        elif in_text and not names_only:
                             if fetch_forms:
                                 document.text.append(split[0].strip())
                             else:
