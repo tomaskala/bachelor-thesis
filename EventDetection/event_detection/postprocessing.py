@@ -7,12 +7,11 @@ import numpy as np
 import sklearn.mixture as gmm
 from scipy.optimize import curve_fit
 from scipy.stats import norm
-from sklearn.preprocessing import normalize
 
 WINDOW = 7  # Length of the window to use when computing the moving average.
 
 
-def moving_average(vector, window):
+def _moving_average(vector, window):
     """
     Compute the moving average along the given vector using a window of the given length.
     :param vector: the vector whose moving average to compute
@@ -35,7 +34,7 @@ def estimate_distribution_aperiodic(event_trajectory):
         return norm.pdf(value, loc=loc, scale=scale)
 
     n_days = len(event_trajectory)
-    ma = moving_average(event_trajectory, WINDOW)
+    ma = _moving_average(event_trajectory, WINDOW)
 
     ma_mean = np.mean(ma)
     ma_std = np.std(ma)
@@ -66,7 +65,7 @@ def estimate_distribution_periodic(event_trajectory, event_period):
     """
     n_days = len(event_trajectory)
     days = np.arange(n_days).reshape(-1, 1)
-    ma = moving_average(event_trajectory.reshape(-1), WINDOW)
+    ma = _moving_average(event_trajectory.reshape(-1), WINDOW)
 
     ma_mean = np.mean(ma)
     ma_std = np.std(ma)
@@ -205,7 +204,7 @@ def keywords2docids_wmd(doc_fetcher, events, feature_trajectories, dps, dp, dtd_
     t = time()
     logging.info('Assembling documents of all bursty periods.')
 
-    event_docids = assemble_event_documents(events, feature_trajectories, dps, dp, dtd_matrix)
+    event_bursts_docids = _describe_event_bursts(events, feature_trajectories, dps, dp, dtd_matrix)
 
     logging.info('Documents assembled in %fs.', time() - t)
 
@@ -213,7 +212,7 @@ def keywords2docids_wmd(doc_fetcher, events, feature_trajectories, dps, dp, dtd_
     t = time()
     logging.info('Converting document IDs to documents.')
 
-    event_bursts_documents = docids2headlines(event_docids, doc_fetcher)
+    event_bursts_documents = _docids2headlines(event_bursts_docids, doc_fetcher)
 
     logging.info('Documents converted in %fs.', time() - t)
 
@@ -221,7 +220,7 @@ def keywords2docids_wmd(doc_fetcher, events, feature_trajectories, dps, dp, dtd_
     t = time()
     logging.info('Calculating document similarities.')
 
-    event_bursts_out = get_relevant_documents(events, event_bursts_documents, w2v_model, id2word, k)
+    event_bursts_out = _get_relevant_documents(events, event_bursts_documents, w2v_model, id2word, k)
 
     logging.info('Similarities computed in %fs.', time() - t)
     logging.info('Document representation computed in %fs total.', time() - t0)
@@ -229,7 +228,15 @@ def keywords2docids_wmd(doc_fetcher, events, feature_trajectories, dps, dp, dtd_
     return event_bursts_out
 
 
-def get_burst_docids(dtd_matrix, burst_loc, burst_scale):
+def _get_burst_docids(dtd_matrix, burst_loc, burst_scale):
+    """
+    Given a burst and width of an event burst, retrieve all documents published within that burst, regardless of
+    whether they actually concern any event.
+    :param dtd_matrix: document-to-day matrix
+    :param burst_loc: location of the burst
+    :param burst_scale: scale of the burst
+    :return: start day of the burst, end day of the burst, indices of documents within the burst
+    """
     n_days = dtd_matrix.shape[1]
 
     # If an event burst starts right at day 0, this would get negative.
@@ -243,25 +250,37 @@ def get_burst_docids(dtd_matrix, burst_loc, burst_scale):
     return burst_start, burst_end, burst_docs
 
 
-def assemble_event_documents(events, feature_trajectories, dps, dp, dtd_matrix):
+def _describe_event_bursts(events, feature_trajectories, dps, dp, dtd_matrix):
+    """
+    Retrieve the burst information of the given events. Each event will be represented by a list of its burst
+    descriptions (1 burst for an aperiodic events, `stream_length / periodicity` bursts for a periodic event).
+    Each burst is represented by a tuple (burst_start, burst_end, burst_document_ids).
+    :param events: list of events which in turn are lists of their keyword indices
+    :param feature_trajectories: matrix of feature trajectories
+    :param dps: dominant power spectra of the processed features
+    :param dp: dominant periods of the processed features
+    :param dtd_matrix: document-to-day matrix
+    :return: burst description of the events
+    """
     n_days = feature_trajectories.shape[1]
     events_out = []
 
     for i, event in enumerate(events):
         event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
-        is_aperiodic = event_period == n_days
 
-        if is_aperiodic:
+        if event_period == n_days:
+            # Aperiodic event
             burst_loc, burst_scale = estimate_distribution_aperiodic(event_trajectory)
-            burst_start, burst_end, burst_docs = get_burst_docids(dtd_matrix, burst_loc, burst_scale)
+            burst_start, burst_end, burst_docs = _get_burst_docids(dtd_matrix, burst_loc, burst_scale)
             events_out.append([(burst_start, burst_end, burst_docs)])
         else:
+            # Periodic event
             event_parameters = estimate_distribution_periodic(event_trajectory, event_period)
             event_bursts = []
 
             # Sort the bursts by their location from stream start to end.
             for burst_loc, burst_scale in sorted(event_parameters, key=lambda item: item[0]):
-                burst_start, burst_end, burst_docs = get_burst_docids(dtd_matrix, burst_loc, burst_scale)
+                burst_start, burst_end, burst_docs = _get_burst_docids(dtd_matrix, burst_loc, burst_scale)
                 event_bursts.append((burst_start, burst_end, burst_docs))
 
             events_out.append(event_bursts)
@@ -269,21 +288,28 @@ def assemble_event_documents(events, feature_trajectories, dps, dp, dtd_matrix):
     return events_out
 
 
-def docids2headlines(events, fetcher):
+def _docids2headlines(event_bursts_docids, fetcher):
+    """
+    Given a burst description of an event with document represented by their IDs, return a similar representation with
+    document IDs replaced by tuples (document ID, document headline).
+    :param event_bursts_docids: events in the burst description format with document IDs
+    :param fetcher: data fetcher to load the document headlines with
+    :return: burst description of the events with document IDs replaced by document IDs and headlines
+    """
     t = time()
-    logging.info('Retrieving documents for %d events.', len(events))
+    logging.info('Retrieving documents for %d events.', len(event_bursts_docids))
     docids = []
 
     # Collect document IDs for all events altogether and retrieve them at once, so the collection is iterated only once.
-    for event in events:
+    for event in event_bursts_docids:
         for _, _, burst_docs in event:
             docids.extend(burst_docs)
 
-    docids2heads = load_headlines(docids, fetcher)
+    docids2heads = _load_headlines(docids, fetcher)
     events_out = []
 
-    # Redistribute the documents back to the individual events, keeping similarities if they were retrieved previously.
-    for event in events:
+    # Redistribute the documents back to the individual events.
+    for event in event_bursts_docids:
         event_out = []
 
         for burst_start, burst_end, burst_docs in event:
@@ -296,7 +322,13 @@ def docids2headlines(events, fetcher):
     return events_out
 
 
-def load_headlines(docids, fetcher):
+def _load_headlines(docids, fetcher):
+    """
+    Load the headlines of documents from the `fetcher` with the given IDs.
+    :param docids: IDs of the documents to load
+    :param fetcher: data fetcher to load the document headlines with
+    :return: a dictionary mapping the given document IDs to their respective headlines
+    """
     if len(docids) == 0:
         raise ValueError('No document IDs given.')
 
@@ -319,7 +351,17 @@ def load_headlines(docids, fetcher):
     return dict(zip(docids, headlines))
 
 
-def query_corpus_wmd(corpus, keywords, w2v_model, k):
+def _query_corpus_wmd(corpus, keywords, w2v_model, k):
+    """
+    Given a list of keywords representing an event, query the `corpus` using these keywords and return the `k` most
+    similar documents according to WMD-based similarity.
+    :param corpus: corpus of documents represented by a list of tuple (document ID, document headline), each headline
+        being a list of strings
+    :param keywords: keywords representation of an event, a list of strings
+    :param w2v_model: trained Word2Vec model
+    :param k: number of most similar documents to return; if None, it will be set to `round(sqrt(len(corpus)))`
+    :return: list of tuples (document ID, document similarity) of length `k`
+    """
     if k is None:
         num_best = round(math.sqrt(len(corpus)))
     else:
@@ -334,10 +376,20 @@ def query_corpus_wmd(corpus, keywords, w2v_model, k):
     return event_documents
 
 
-def get_relevant_documents(events, event_bursts, w2v_model, id2word, k):
+def _get_relevant_documents(events, event_bursts_headlines, w2v_model, id2word, k):
+    """
+    Retrieve the IDs of documents relevant to the given events. This is the function employing a measure of semantic
+    similarity to the corpus of documents published within the bursty periods retrieved previously.
+    :param events: list of events which in turn are lists of their keyword indices
+    :param event_bursts_headlines: burst description of the events with document headlines
+    :param w2v_model: trained Word2Vec model
+    :param id2word: mapping of word IDs to the actual words
+    :param k: number of most similar documents to return; if None, it will be set to `round(sqrt(len(corpus)))`
+    :return: burst description of the events with document IDs, only those documents relevant to the events will be here
+    """
     event_bursts_out = []
 
-    for event_id, (event, bursts) in enumerate(zip(events, event_bursts)):
+    for event_id, (event, bursts) in enumerate(zip(events, event_bursts_headlines)):
         bursts_out = []
         event_keywords = [id2word[keyword_id] for keyword_id in event]
 
@@ -349,7 +401,7 @@ def get_relevant_documents(events, event_bursts, w2v_model, id2word, k):
         for burst in bursts:
             burst_start, burst_end, burst_headlines = burst
             # Local IDs with respect to the burst.
-            event_burst_docids_local = query_corpus_wmd(burst_headlines, event_keywords, w2v_model, k)
+            event_burst_docids_local = _query_corpus_wmd(burst_headlines, event_keywords, w2v_model, k)
 
             # Global IDs with respect to the whole document collection.
             event_burst_docids = [(burst_headlines[doc_id][0], doc_sim) for doc_id, doc_sim in event_burst_docids_local]

@@ -1,4 +1,7 @@
+import logging
 import os
+import pickle
+from time import time
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -7,8 +10,10 @@ import sklearn.mixture as gmm
 import wordcloud
 from scipy.optimize import curve_fit
 from scipy.stats import cauchy, norm
+from sklearn.neighbors import NearestNeighbors
 
 import event_detection.postprocessing as post
+from event_detection import annotations, data_fetchers
 from event_detection.original_method import moving_average
 
 matplotlib.rc('font', family='DejaVu Sans')
@@ -31,6 +36,92 @@ def visualise_clusters(clusters, documents, output_dir='./wordcloud'):
         plt.imshow(wc)
         plt.axis('off')
         wc.to_file(os.path.join(output_dir, '{0:02d}.png'.format(i)))
+
+
+def output_events(events, events_docids_repr, id2word, doc2vec_model, num_aperiodic, aperiodic_path, periodic_path,
+                  cluster_based):
+    from event_detection import event_detector
+
+    full_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=event_detector.DATASET, fetch_forms=True,
+                                                      pos=event_detector.POS_EMBEDDINGS + ('Z', 'X'))
+
+    if cluster_based:
+        if os.path.exists(event_detector.EVENT_FULL_DOCS_CLUSTERS_PATH):
+            logging.info('Deserializing full documents.')
+
+            with open(event_detector.EVENT_FULL_DOCS_CLUSTERS_PATH, mode='rb') as f:
+                events_docs_repr = pickle.load(f)
+
+            logging.info('Deserialized full documents.')
+        else:
+            logging.info('Retrieving full documents.')
+            t = time()
+
+            events_docs_repr = annotations.docids2documents(events_docids_repr, full_fetcher)
+
+            with open(event_detector.EVENT_FULL_DOCS_CLUSTERS_PATH, mode='wb') as f:
+                pickle.dump(events_docs_repr, f)
+
+            logging.info('Retrieved and serialized full documents in %fs.', time() - t)
+    else:
+        if os.path.exists(event_detector.EVENT_FULL_DOCS_GREEDY_PATH):
+            logging.info('Deserializing full documents.')
+
+            with open(event_detector.EVENT_FULL_DOCS_GREEDY_PATH, mode='rb') as f:
+                events_docs_repr = pickle.load(f)
+
+            logging.info('Deserialized full documents.')
+        else:
+            logging.info('Retrieving full documents.')
+            t = time()
+
+            events_docs_repr = annotations.docids2documents(events_docids_repr, full_fetcher)
+
+            with open(event_detector.EVENT_FULL_DOCS_GREEDY_PATH, mode='wb') as f:
+                pickle.dump(events_docs_repr, f)
+
+            logging.info('Retrieved and serialized full documents in %fs.', time() - t)
+
+    aperiodic_events = events[:num_aperiodic]
+    periodic_events = events[num_aperiodic:]
+
+    aperiodic_events_docs_repr = events_docs_repr[:num_aperiodic]
+    periodic_events_docs_repr = events_docs_repr[num_aperiodic:]
+
+    output_events_inner(aperiodic_events_docs_repr, aperiodic_events, id2word, doc2vec_model, dirname=aperiodic_path)
+    output_events_inner(periodic_events_docs_repr, periodic_events, id2word, doc2vec_model, dirname=periodic_path)
+
+
+def output_events_inner(events_doc_repr, events, id2word, doc2vec_model, dirname):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    with open(os.path.join(dirname, 'events.txt'), 'w') as f:
+        for i, event in enumerate(events_doc_repr):
+            event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
+            print('Event {:03d}: [{:s}]'.format(i, ', '.join(event_keywords)), file=f)
+
+            for burst in event:
+                burst_start, burst_end, burst_docs = burst
+                doc_vecs = doc2vec_model.docvecs[[doc.doc_id.item() for doc in burst_docs]]
+                mean_vec = np.mean(doc_vecs, axis=0)
+                neighbors = NearestNeighbors(n_neighbors=1)
+                neighbors.fit(doc_vecs)
+                centroid_id = neighbors.kneighbors(np.array([mean_vec]), return_distance=False)
+                centroid_doc = burst_docs[centroid_id]
+
+                print('Burst ({:d} - {:d}) with {:d} documents'.format(burst_start, burst_end, len(burst_docs)), file=f)
+                print('Most similar headline: "{:s}" (document #{:d})'.format(' '.join(burst_docs[0].name),
+                                                                              burst_docs[0].doc_id), file=f)
+                print('Centroid headline: "{:s}" (document #{:d})'.format(' '.join(centroid_doc.name),
+                                                                          centroid_doc.doc_id),
+                      file=f)
+                print('Least similar headline: "{:s}" (document #{:d})'.format(' '.join(burst_docs[-1].name),
+                                                                               burst_docs[-1].doc_id), file=f)
+                print(file=f)
+
+            if len(event) > 1:
+                print(file=f)
 
 
 def plot_events(feature_trajectories, events, id2word, dps, dp, dirname='../events'):
