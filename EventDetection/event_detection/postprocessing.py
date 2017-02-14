@@ -369,7 +369,6 @@ def _query_corpus_wmd(corpus, keywords, w2v_model, k):
 
     headlines = [doc[1] for doc in corpus]  # Corpus is a list of (doc_id, doc_headline) pairs.
 
-    # TODO: Normalize or not?
     index = gensim.similarities.WmdSimilarity(headlines, w2v_model=w2v_model, num_best=num_best)
     event_documents = index[keywords]
 
