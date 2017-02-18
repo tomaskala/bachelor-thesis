@@ -1,5 +1,12 @@
 import logging
+import math
+import re
 from time import time
+
+import numpy as np
+from sklearn.preprocessing import normalize
+
+from event_detection import sphere
 
 
 class LemmatizedDocument:
@@ -87,6 +94,171 @@ def load_documents(docids, fetcher):
             break
 
     return dict(zip(docids, documents))
+
+
+class Summarizer:
+    def __init__(self, w2v_model, a=0.75, l=6.0, r=1.0):
+        self.w2v_model = w2v_model
+
+        assert 0 <= a <= 1, 'The parameter `a` must be in [0,1]'
+        assert l >= 0, 'The parameter `l` must be >= 0'
+        assert r > 0, 'The parameter `r` must be > 0'
+
+        self.a = a
+        self.l = l
+        self.r = r
+        self.similarity_matrix = None
+        self.cluster_similarity = None
+
+    def summarize(self, documents, budget, constraint_type):
+        t = time()
+        sentences = self._docs2sents(documents)
+        logging.info('Created sentences in %fs.', time() - t)
+
+        n = len(sentences)
+        k = n // 5
+
+        t = time()
+        sentence_vectors = self._sents2vecs(sentences)
+        logging.info('Created sentence vectors in %fs.', time() - t)
+
+        t = time()
+        cluster_representation = self._cluster_sentences(sentence_vectors, k)
+        logging.info('Performed sentence clustering in %fs.', time() - t)
+
+        t = time()
+        self._precompute_similarities(sentence_vectors)
+        logging.info('Precomputed similarities in %fs.', time() - t)
+
+        del sentence_vectors
+        self.cluster_similarity = self.similarity_matrix @ cluster_representation
+        del cluster_representation
+
+        if constraint_type == 'words':
+            constraints = np.fromiter(map(lambda sentence: sum(map(len, sentence)), sentences), dtype=int, count=n)
+        elif constraint_type == 'sentences':
+            constraints = np.ones(shape=n, dtype=int)
+        else:
+            raise ValueError('Invalid value for `mode`. Use either "words" or "sentences".')
+
+        selected_indices = self._greedy_summarization(constraints, budget)
+        return [sentences[index] for index in selected_indices]
+
+    @staticmethod
+    def _docs2sents(documents):
+        # TODO: Do something less idiotic, like recognizing sentence boundaries. Check out the morphological tags for
+        # TODO: some note about a period symbol being a sentence boundary or not.
+        sentences = []
+
+        for doc in documents:
+            doc_text = doc.text
+            sentences.extend(list(map(str.split, re.split('(?<=[.!?]) +', ' '.join(doc_text)))))
+
+        return sentences
+
+    def _sents2vecs(self, sentences):
+        w2v_model = self.w2v_model
+        sentence_vectors = np.empty(shape=(len(sentences), w2v_model.vector_size), dtype=float)
+
+        for i, sentence in enumerate(sentences):
+            sentence_vector = np.mean([w2v_model[word] if word in w2v_model else np.zeros(100, dtype=float) for word in sentence], axis=0)
+            sentence_vectors[i] = sentence_vector
+
+        normalize(sentence_vectors, copy=False)
+        return sentence_vectors
+
+    @staticmethod
+    def _cluster_sentences(sentence_vectors, k):
+        clusterer = sphere.SphericalKMeans(n_clusters=k, random_state=1)
+        labels = clusterer.fit_predict(sentence_vectors)
+
+        n_sentences = sentence_vectors.shape[0]
+        observations = np.arange(n_sentences)
+        cluster_representation = np.zeros(shape=(n_sentences, k), dtype=int)
+
+        cluster_representation[observations, labels] = 1
+
+        logging.info('Clustered %d sentences into %d clusters.', n_sentences, k)
+
+        return cluster_representation
+
+    def _precompute_similarities(self, sentence_vectors):
+        self.similarity_matrix = sentence_vectors @ sentence_vectors.T
+
+        # Transform the similarities into from [-1,1] to [0,1].
+        self.similarity_matrix += 1
+        self.similarity_matrix /= 2
+
+    def _greedy_summarization(self, constraints, budget):
+        n_sentences = self.similarity_matrix.shape[0]
+        summary = []
+        remainder = set(range(n_sentences))
+
+        cost_so_far = 0
+        objective_function = 0
+
+        while len(remainder) > 0:
+            t = time()
+            k, val = self._argmax(summary, remainder, objective_function, constraints)
+
+            if cost_so_far + constraints[k] <= budget and val - objective_function >= 0:
+                cost_so_far += constraints[k]
+                objective_function = val
+                summary.append(k)
+
+            remainder.remove(k)
+            logging.info('Performed greedy optimization iteration in %fs.', time() - t)
+
+        singleton_candidates = set(filter(lambda singleton: constraints[singleton] <= budget, range(n_sentences)))
+        fake_constraints = np.ones(n_sentences, dtype=int)
+        singleton_ix, singleton_val = self._argmax([], singleton_candidates, 0.0, fake_constraints)
+
+        if singleton_val > objective_function:
+            return [singleton_ix]
+        else:
+            return summary
+
+    def _argmax(self, summary, remainder, objective_function_value, constraints):
+        argmax_ix = None
+        max_val = -math.inf
+        r = self.r
+
+        # t = time()
+
+        for i, sentence_ix in enumerate(remainder):
+            new_objective_value = self._quality(summary + [sentence_ix])
+            scaled_constraint = constraints[sentence_ix] ** r
+
+            function_gain = (new_objective_value - objective_function_value) / scaled_constraint
+
+            if function_gain > max_val:
+                argmax_ix = sentence_ix
+                max_val = function_gain
+
+            # if i > 0 and i % 100 == 0:
+            #     logging.info('Performed 100 argmax iterations in %fs.', time() - t)
+            #     t = time()
+
+        return argmax_ix, self._quality(summary + [argmax_ix])
+
+    def _quality(self, summary):
+        return self._similarity(summary) + self.l * self._diversity(summary)
+
+    def _similarity(self, summary):
+        similarity_matrix = self.similarity_matrix
+
+        inter_similarity = np.sum(similarity_matrix[:, summary], axis=1)
+        outer_similarity = np.sum(similarity_matrix, axis=1)
+
+        return np.sum(np.minimum(inter_similarity, self.a * outer_similarity))
+
+    def _diversity(self, summary):
+        cluster_rewards = np.mean(self.cluster_similarity[summary], axis=0)
+        return np.sum(np.sqrt(cluster_rewards))
+
+    def __str__(self):
+        return 'Summarizer(W2W: {:s}, alpha: {:f}, lambda: {:f}, r: {:f})'.format(str(self.w2v_model), self.a, self.l,
+                                                                                  self.r)
 
 
 def main():

@@ -92,12 +92,12 @@ def output_events(events, events_docids_repr, id2word, doc2vec_model, num_aperio
     output_events_inner(periodic_events_docs_repr, periodic_events, id2word, doc2vec_model, dirname=periodic_path)
 
 
-def output_events_inner(events_doc_repr, events, id2word, doc2vec_model, dirname):
+def output_events_inner(events_docs_repr, events, id2word, doc2vec_model, dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
     with open(os.path.join(dirname, 'events.txt'), 'w') as f:
-        for i, event in enumerate(events_doc_repr):
+        for i, event in enumerate(events_docs_repr):
             event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
             print('Event {:03d}: [{:s}]'.format(i, ', '.join(event_keywords)), file=f)
 

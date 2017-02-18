@@ -374,6 +374,10 @@ EVENT_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_docs_dec_jan_cluster
 EVENT_FULL_DOCS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_full_docs_dec_jan_greedy.pickle')
 EVENT_FULL_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_full_docs_dec_jan_clusters.pickle')
 
+# [[(burst_start, burst_end, [annotations.LemmatizedDocument] ... event_bursts] ... events]
+EVENT_SUMM_DOCS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_dec_jan_greedy.pickle')
+EVENT_SUMM_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_dec_jan_clusters.pickle')
+
 
 def main(cluster_based, use_preclustering):
     total_time = time()
@@ -540,8 +544,13 @@ def main(cluster_based, use_preclustering):
         aperiodic_docs = all_docs[:len(aperiodic_events)]
         periodic_docs = all_docs[len(aperiodic_events):]
 
-        plotting.output_events(all_events, all_docids, id2word, doc2vec_model, len(aperiodic_events), aperiodic_path,
-                               periodic_path, cluster_based)
+        # TODO: Uncomment this
+        # plotting.output_events(all_events, all_docids, id2word, doc2vec_model, len(aperiodic_events), aperiodic_path,
+        #                        periodic_path, cluster_based)
+
+        summarize_events(all_events, all_docids, id2word, doc2vec_model, len(aperiodic_events), cluster_based)
+
+
         exit()  # TODO: Don't exit
 
         print('Aperiodic events:', len(aperiodic_docs))
@@ -573,6 +582,77 @@ def main(cluster_based, use_preclustering):
             print()
 
     logging.info('All done in %fs.', time() - total_time)
+
+
+def summarize_events(events, events_docids_repr, id2word, doc2vec_model, num_aperiodic, cluster_based):
+    full_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_EMBEDDINGS + ('Z', 'X'))
+
+    if cluster_based:
+        if os.path.exists(EVENT_SUMM_DOCS_CLUSTERS_PATH):
+            logging.info('Deserializing full documents.')
+
+            with open(EVENT_SUMM_DOCS_CLUSTERS_PATH, mode='rb') as f:
+                events_docs_repr = pickle.load(f)
+
+            logging.info('Deserialized full documents.')
+        else:
+            logging.info('Retrieving full documents.')
+            t = time()
+
+            events_docs_repr = annotations.docids2documents(events_docids_repr, full_fetcher)
+
+            with open(EVENT_SUMM_DOCS_CLUSTERS_PATH, mode='wb') as f:
+                pickle.dump(events_docs_repr, f)
+
+            logging.info('Retrieved and serialized full documents in %fs.', time() - t)
+    else:
+        if os.path.exists(EVENT_SUMM_DOCS_GREEDY_PATH):
+            logging.info('Deserializing full documents.')
+
+            with open(EVENT_SUMM_DOCS_GREEDY_PATH, mode='rb') as f:
+                events_docs_repr = pickle.load(f)
+
+            logging.info('Deserialized full documents.')
+        else:
+            logging.info('Retrieving full documents.')
+            t = time()
+
+            events_docs_repr = annotations.docids2documents(events_docids_repr, full_fetcher)
+
+            with open(EVENT_SUMM_DOCS_GREEDY_PATH, mode='wb') as f:
+                pickle.dump(events_docs_repr, f)
+
+            logging.info('Retrieved and serialized full documents in %fs.', time() - t)
+
+    aperiodic_events = events[:num_aperiodic]
+    periodic_events = events[num_aperiodic:]
+
+    aperiodic_events_docs_repr = events_docs_repr[:num_aperiodic]
+    periodic_events_docs_repr = events_docs_repr[num_aperiodic:]
+
+    summarize_inner(aperiodic_events_docs_repr, aperiodic_events, id2word, doc2vec_model)
+
+
+def summarize_inner(events_docs_repr, events, id2word, doc2vec_model):
+    summarizer = annotations.Summarizer(doc2vec_model)
+    constraint_type = 'words'
+    budget = 100
+
+    for i, event in enumerate(events_docs_repr):
+        event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
+        print('Event {:03d}: [{:s}]'.format(i, ', '.join(event_keywords)))
+
+        for burst in event:
+            burst_start, burst_end, burst_docs = burst
+            sentences = summarizer.summarize(burst_docs[:25], budget, constraint_type)
+
+            for j, sentence in enumerate(sentences):
+                print('{:02d}: {:s}'.format(j, str(sentence)))
+
+            print()
+
+        if len(event) > 1:
+            print()
 
 
 if __name__ == '__main__':
