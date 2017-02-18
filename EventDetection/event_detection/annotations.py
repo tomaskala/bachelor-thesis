@@ -2,8 +2,10 @@ import logging
 import math
 import re
 from time import time
+import gensim
 
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
 
 from event_detection import sphere
@@ -126,7 +128,7 @@ class Summarizer:
         logging.info('Performed sentence clustering in %fs.', time() - t)
 
         t = time()
-        self._precompute_similarities(sentence_vectors)
+        self._precompute_similarities(sentence_vectors, sentences_lemma)
         logging.info('Precomputed similarities in %fs.', time() - t)
 
         del sentence_vectors
@@ -161,17 +163,20 @@ class Summarizer:
         return sentences_forms, sentences_lemma
 
     def _sents2vecs(self, sentences):
-        w2v_model = self.w2v_model
-        sentence_vectors = np.empty(shape=(len(sentences), w2v_model.vector_size), dtype=float)
-
-        for i, sentence in enumerate(sentences):
-            sentence_vector = np.mean(
-                [w2v_model[word] if word in w2v_model else np.zeros(w2v_model.vector_size, dtype=float) for word in
-                 sentence], axis=0)
-            sentence_vectors[i] = sentence_vector
-
-        normalize(sentence_vectors, copy=False)
-        return sentence_vectors
+        # w2v_model = self.w2v_model
+        # sentence_vectors = np.empty(shape=(len(sentences), w2v_model.vector_size), dtype=float)
+        #
+        # for i, sentence in enumerate(sentences):
+        #     sentence_vector = np.mean(
+        #         [w2v_model[word] if word in w2v_model else np.zeros(w2v_model.vector_size, dtype=float) for word in
+        #          sentence], axis=0)
+        #     sentence_vectors[i] = sentence_vector
+        #
+        # normalize(sentence_vectors, copy=False)
+        # return sentence_vectors
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        tfidf = TfidfVectorizer(sublinear_tf=False, analyzer=lambda doc: doc, preprocessor=lambda doc: doc)
+        return tfidf.fit_transform(sentences)
 
     @staticmethod
     def _cluster_sentences(sentence_vectors, k):
@@ -190,12 +195,94 @@ class Summarizer:
 
         return cluster_representation
 
-    def _precompute_similarities(self, sentence_vectors):
-        self.similarity_matrix = sentence_vectors @ sentence_vectors.T
+    def _precompute_similarities(self, sentence_vectors, sentences):
+        # self.similarity_matrix = sentence_vectors @ sentence_vectors.T
 
         # Transform the similarities into from [-1,1] to [0,1].
-        self.similarity_matrix += 1
-        self.similarity_matrix /= 2
+        # self.similarity_matrix += 1
+        # self.similarity_matrix /= 2
+        self.similarity_matrix = cosine_similarity(sentence_vectors, dense_output=True)
+
+        w2v_similarities = self._w2v_similarity(sentences)
+        np.multiply(self.similarity_matrix, w2v_similarities, out=self.similarity_matrix)
+        del w2v_similarities
+
+        # d2v_similarities = self._d2v_similarity(sentences)
+        # np.multiply(self.similarity_matrix, d2v_similarities, out=self.similarity_matrix)
+        # del d2v_similarities
+
+        lsi_similarities = self._lsi_similarity(sentence_vectors)
+        np.multiply(self.similarity_matrix, lsi_similarities, out=self.similarity_matrix)
+        del lsi_similarities
+
+        min_val = np.min(self.similarity_matrix)
+        max_val = np.max(self.similarity_matrix)
+
+        self.similarity_matrix -= min_val
+        self.similarity_matrix /= (max_val - min_val)
+
+    def _w2v_similarity(self, sentences):
+        w2v_model = self.w2v_model
+        sentence_vectors = np.empty(shape=(len(sentences), w2v_model.vector_size), dtype=float)
+
+        for i, sentence in enumerate(sentences):
+            sentence_vector = np.sum(
+                [w2v_model[word] if word in w2v_model else np.zeros(w2v_model.vector_size, dtype=float) for word in
+                 sentence], axis=0)
+            sentence_vectors[i] = sentence_vector
+
+        return cosine_similarity(sentence_vectors, dense_output=True)
+
+    def _d2v_similarity(self, sentences):
+        class Tagger:
+            def __init__(self, sentences_):
+                self.sentences_ = sentences_
+
+            def __iter__(self):
+                for i, sentence_ in enumerate(self.sentences_):
+                    tags = [i]
+                    words = [word for word in sentence_ if len(word) > 1]
+                    tagged_doc = gensim.models.doc2vec.TaggedDocument(words, tags)
+
+                    yield tagged_doc
+
+        tagger = Tagger(sentences)
+        size = 20
+        logging.disable(logging.WARNING)  # Gensim loggers are super chatty.
+        d2v_model = gensim.models.Doc2Vec(tagger, dm=1, dm_concat=0, dm_mean=1, size=size, batch_words=1000)
+        logging.disable(logging.NOTSET)  # Re-enable logging.
+
+        sentence_vectors = np.empty(shape=(len(sentences), size), dtype=float)
+
+        for j, sentence in enumerate(sentences):
+            sentence_vector = d2v_model.docvecs[j]
+            sentence_vectors[j] = sentence_vector
+
+        return cosine_similarity(sentence_vectors, dense_output=True)
+
+    def _wmd_similarity(self, sentences):
+        logging.disable(logging.INFO)  # Gensim loggers are super chatty.
+        n_sentences = len(sentences)
+        w2v_model = self.w2v_model
+        wmd_similarities = np.zeros((n_sentences, n_sentences), dtype=float)
+
+        for i in range(n_sentences):
+            for j in range(n_sentences):
+                if i < j:
+                    wmd_similarities[i, j] = w2v_model.wmdistance(sentences[i], sentences[j])
+
+        wmd_similarities += wmd_similarities.T
+        wmd_similarities += 1.0
+        np.reciprocal(wmd_similarities, out=wmd_similarities)
+
+        logging.disable(logging.NOTSET)  # Re-enable logging.
+        return wmd_similarities
+
+    def _lsi_similarity(self, sentence_vectors):
+        from sklearn.decomposition import TruncatedSVD
+        lsi = TruncatedSVD(n_components=50)
+        lsi_matrix = lsi.fit_transform(sentence_vectors)
+        return cosine_similarity(lsi_matrix, dense_output=True)
 
     def _greedy_summarization(self, constraints, budget):
         n_sentences = self.similarity_matrix.shape[0]
@@ -265,26 +352,3 @@ class Summarizer:
     def __str__(self):
         return 'Summarizer(W2W: {:s}, alpha: {:f}, lambda: {:f}, r: {:f})'.format(str(self.w2v_model), self.a, self.l,
                                                                                   self.r)
-
-
-def main():
-    from event_detection import data_fetchers
-    events = [[(2, 3, [(0, 100), (2, 102), (3, 103)]), (4, 7, [(5, 205), (9, 209), (13, 213)])],
-              [(1, 8, [(1, 301), (4, 304), (2, 302)]), (2, 3, [(0, 400), (2, 402), (3, 403)])],
-              [(3, 6, [(8, 508), (5, 505), (2, 502)])]]
-    new_events = docids2documents(events, data_fetchers.CzechLemmatizedTexts(dataset='dec-jan', fetch_forms=True))
-
-    for i, event in enumerate(new_events):
-        print('Event {:d}'.format(i))
-
-        for burst_start, burst_end, burst_docs in event:
-            print('Burst: ({:d}, {:d})'.format(burst_start, burst_end))
-
-            for doc in burst_docs:
-                print(doc, doc.similarity)
-
-        print()
-
-
-if __name__ == '__main__':
-    main()

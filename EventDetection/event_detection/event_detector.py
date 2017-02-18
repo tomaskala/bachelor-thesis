@@ -636,7 +636,7 @@ def summarize_events(events, events_docids_repr, id2word, doc2vec_model, num_ape
 def summarize_inner(events_docs_repr, events, id2word, doc2vec_model):
     summarizer = annotations.Summarizer(doc2vec_model)
     constraint_type = 'words'
-    budget = 200
+    budget = 100
 
     for i, event in enumerate(events_docs_repr):
         event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
