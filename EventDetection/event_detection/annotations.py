@@ -175,7 +175,7 @@ class Summarizer:
         # normalize(sentence_vectors, copy=False)
         # return sentence_vectors
         from sklearn.feature_extraction.text import TfidfVectorizer
-        tfidf = TfidfVectorizer(sublinear_tf=False, analyzer=lambda doc: doc, preprocessor=lambda doc: doc)
+        tfidf = TfidfVectorizer(sublinear_tf=True, analyzer=lambda doc: doc, preprocessor=lambda doc: doc)
         return tfidf.fit_transform(sentences)
 
     @staticmethod
