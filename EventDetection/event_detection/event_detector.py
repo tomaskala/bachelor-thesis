@@ -493,8 +493,8 @@ def main(cluster_based, use_preclustering):
                 with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='rb') as f:
                     all_docids = pickle.load(f)
 
-                with open(EVENT_DOCS_CLUSTERS_PATH, mode='rb') as f:
-                    all_docs = pickle.load(f)
+                # with open(EVENT_DOCS_CLUSTERS_PATH, mode='rb') as f:
+                #     all_docs = pickle.load(f)
 
                 logging.info('Deserialized event doc IDs and documents.')
             else:
@@ -507,10 +507,10 @@ def main(cluster_based, use_preclustering):
                 with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='wb') as f:
                     pickle.dump(all_docids, f)
 
-                all_docs = annotations.docids2documents(all_docids, keyword_fetcher)
+                # all_docs = annotations.docids2documents(all_docids, keyword_fetcher)
 
-                with open(EVENT_DOCS_CLUSTERS_PATH, mode='wb') as f:
-                    pickle.dump(all_docs, f)
+                # with open(EVENT_DOCS_CLUSTERS_PATH, mode='wb') as f:
+                #     pickle.dump(all_docs, f)
 
                 logging.info('Retrieved and serialized event documents in %fs.', time() - t)
         else:
@@ -520,8 +520,8 @@ def main(cluster_based, use_preclustering):
                 with open(EVENT_DOCIDS_GREEDY_PATH, mode='rb') as f:
                     all_docids = pickle.load(f)
 
-                with open(EVENT_DOCS_GREEDY_PATH, mode='rb') as f:
-                    all_docs = pickle.load(f)
+                # with open(EVENT_DOCS_GREEDY_PATH, mode='rb') as f:
+                #     all_docs = pickle.load(f)
 
                 logging.info('Deserialized event doc IDs and documents.')
             else:
@@ -534,15 +534,15 @@ def main(cluster_based, use_preclustering):
                 with open(EVENT_DOCIDS_GREEDY_PATH, mode='wb') as f:
                     pickle.dump(all_docids, f)
 
-                all_docs = annotations.docids2documents(all_docids, keyword_fetcher)
+                # all_docs = annotations.docids2documents(all_docids, keyword_fetcher)
 
-                with open(EVENT_DOCS_GREEDY_PATH, mode='wb') as f:
-                    pickle.dump(all_docs, f)
+                # with open(EVENT_DOCS_GREEDY_PATH, mode='wb') as f:
+                #     pickle.dump(all_docs, f)
 
                 logging.info('Retrieved and serialized event documents in %fs.', time() - t)
 
-        aperiodic_docs = all_docs[:len(aperiodic_events)]
-        periodic_docs = all_docs[len(aperiodic_events):]
+        # aperiodic_docs = all_docs[:len(aperiodic_events)]
+        # periodic_docs = all_docs[len(aperiodic_events):]
 
         # TODO: Uncomment this
         # plotting.output_events(all_events, all_docids, id2word, doc2vec_model, len(aperiodic_events), aperiodic_path,
@@ -585,7 +585,7 @@ def main(cluster_based, use_preclustering):
 
 
 def summarize_events(events, events_docids_repr, id2word, doc2vec_model, num_aperiodic, cluster_based):
-    full_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_EMBEDDINGS + ('Z', 'X'))
+    summarization_fetcher = data_fetchers.CzechSummarizationTexts(dataset=DATASET)
 
     if cluster_based:
         if os.path.exists(EVENT_SUMM_DOCS_CLUSTERS_PATH):
@@ -599,7 +599,7 @@ def summarize_events(events, events_docids_repr, id2word, doc2vec_model, num_ape
             logging.info('Retrieving full documents.')
             t = time()
 
-            events_docs_repr = annotations.docids2documents(events_docids_repr, full_fetcher)
+            events_docs_repr = annotations.docids2documents(events_docids_repr, summarization_fetcher)
 
             with open(EVENT_SUMM_DOCS_CLUSTERS_PATH, mode='wb') as f:
                 pickle.dump(events_docs_repr, f)
@@ -617,7 +617,7 @@ def summarize_events(events, events_docids_repr, id2word, doc2vec_model, num_ape
             logging.info('Retrieving full documents.')
             t = time()
 
-            events_docs_repr = annotations.docids2documents(events_docids_repr, full_fetcher)
+            events_docs_repr = annotations.docids2documents(events_docids_repr, summarization_fetcher)
 
             with open(EVENT_SUMM_DOCS_GREEDY_PATH, mode='wb') as f:
                 pickle.dump(events_docs_repr, f)
@@ -636,7 +636,7 @@ def summarize_events(events, events_docids_repr, id2word, doc2vec_model, num_ape
 def summarize_inner(events_docs_repr, events, id2word, doc2vec_model):
     summarizer = annotations.Summarizer(doc2vec_model)
     constraint_type = 'words'
-    budget = 100
+    budget = 200
 
     for i, event in enumerate(events_docs_repr):
         event_keywords = [id2word[keyword_id] for keyword_id in events[i]]

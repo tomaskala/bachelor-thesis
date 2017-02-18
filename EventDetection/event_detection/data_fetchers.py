@@ -316,6 +316,97 @@ class CzechLemmatizedTexts:
         return np.repeat(np.arange(self.relative_days.size), self.relative_days)
 
 
+class SummarizationDocument:
+    __slots__ = ['name_forms', 'name_lemma', 'sentences_forms', 'sentences_lemma', 'name_pos', 'sentences_pos']
+
+    def __init__(self):
+        self.name_forms = []
+        self.name_lemma = []
+        self.sentences_forms = []
+        self.sentences_lemma = []
+        self.name_pos = []
+        self.sentences_pos = []
+
+
+class CzechSummarizationTexts:
+    def __init__(self, dataset):
+        if dataset == 'full':
+            self.document_paths = os.listdir(CZECH_TAGGED_TEXTS)
+            raise NotImplementedError('Full lemmatized dataset not yet implemented')
+        elif dataset == 'dec-jan':
+            self.document_paths = CZECH_TAGGED_TEXTS_DEC_JAN
+        else:
+            raise ValueError('Unknown dataset - select either `full` or `dec-jan`.')
+
+    def __iter__(self):
+        in_title = False
+        in_text = False
+        sentence_forms = []
+        sentence_lemma = []
+        sentence_pos = []
+
+        for file in self.document_paths:
+            with open(os.path.join(CZECH_TAGGED_TEXTS, file), 'r', encoding='utf8', errors='ignore') as f:
+                for line in f:
+                    line = line.strip()
+
+                    if line.startswith('#'):
+                        # Control lines
+                        if line == '#docstart':
+                            document = SummarizationDocument()
+                        elif line == '#titlestart':
+                            in_title = True
+                        elif line == '#titleend':
+                            in_title = False
+                        elif line == '#textstart':
+                            in_text = True
+                        elif line == '#textend':
+                            in_text = False
+
+                            # End of the last document sentence.
+                            if len(sentence_forms) > 0 and len(sentence_lemma) > 0 and len(sentence_pos) > 0:
+                                document.sentences_forms.append(sentence_forms)
+                                document.sentences_lemma.append(sentence_lemma)
+                                document.sentences_pos.append(sentence_pos)
+
+                            sentence_forms = []
+                            sentence_lemma = []
+                            sentence_pos = []
+                        elif line == '#docend':
+                            yield document
+                        else:
+                            # Something else, though ignore the '#' sign by itself, as it appears in some documents.
+                            if line.split('\t')[0] == '#':
+                                continue
+
+                            raise ValueError('Invalid control line encountered: {}'.format(line))
+                    elif not line:
+                        # Empty lines mark sentence boundaries.
+                        if len(sentence_forms) > 0 and len(sentence_lemma) > 0 and len(sentence_pos) > 0:
+                            document.sentences_forms.append(sentence_forms)
+                            document.sentences_lemma.append(sentence_lemma)
+                            document.sentences_pos.append(sentence_pos)
+
+                        sentence_forms = []
+                        sentence_lemma = []
+                        sentence_pos = []
+                    else:
+                        # Actual content
+                        split = line.split('\t')
+
+                        if len(split) != 3:
+                            continue
+
+                        if in_title:
+                            document.name_forms.append(split[0].strip())
+                            document.name_lemma.append(split[1].strip())
+                            document.name_pos.append(split[2].strip())
+                        elif in_text:
+                            sentence_forms.append(split[0].strip())
+                            sentence_lemma.append(split[1].strip())
+                            sentence_pos.append(split[2].strip())
+
+
 def fetch_czech_corpus(num_docs):
     """
     Load documents from preprocessed text files.

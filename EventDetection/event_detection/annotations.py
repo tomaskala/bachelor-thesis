@@ -10,16 +10,15 @@ from event_detection import sphere
 
 
 class LemmatizedDocument:
-    __slots__ = ['doc_id', 'name', 'text', 'similarity']
+    __slots__ = ['doc_id', 'document', 'similarity']
 
     def __init__(self, doc_id, original_document, similarity=None):
         self.doc_id = doc_id
-        self.name = original_document.name
-        self.text = original_document.text
+        self.document = original_document
         self.similarity = similarity
 
     def __str__(self):
-        return '{:d}: {:s}'.format(self.doc_id, ' '.join(self.name))
+        return '{:d}: {:s}'.format(self.doc_id, ' '.join(self.document.name_forms))
 
 
 def docids2documents(events, fetcher):
@@ -112,14 +111,14 @@ class Summarizer:
 
     def summarize(self, documents, budget, constraint_type):
         t = time()
-        sentences = self._docs2sents(documents)
+        sentences_forms, sentences_lemma = self._docs2sents(documents)
         logging.info('Created sentences in %fs.', time() - t)
 
-        n = len(sentences)
+        n = len(sentences_forms)
         k = n // 5
 
         t = time()
-        sentence_vectors = self._sents2vecs(sentences)
+        sentence_vectors = self._sents2vecs(sentences_lemma)
         logging.info('Created sentence vectors in %fs.', time() - t)
 
         t = time()
@@ -135,33 +134,40 @@ class Summarizer:
         del cluster_representation
 
         if constraint_type == 'words':
-            constraints = np.fromiter(map(lambda sentence: sum(map(len, sentence)), sentences), dtype=int, count=n)
+            constraints = np.fromiter(map(len, sentences_forms), dtype=int, count=n)
         elif constraint_type == 'sentences':
             constraints = np.ones(shape=n, dtype=int)
         else:
             raise ValueError('Invalid value for `mode`. Use either "words" or "sentences".')
 
         selected_indices = self._greedy_summarization(constraints, budget)
-        return [sentences[index] for index in selected_indices]
+        return [sentences_forms[index] for index in selected_indices]
 
     @staticmethod
     def _docs2sents(documents):
-        # TODO: Do something less idiotic, like recognizing sentence boundaries. Check out the morphological tags for
-        # TODO: some note about a period symbol being a sentence boundary or not.
-        sentences = []
+        used_lemmas = set()
+        sentences_forms = []
+        sentences_lemma = []
 
         for doc in documents:
-            doc_text = doc.text
-            sentences.extend(list(map(str.split, re.split('(?<=[.!?]) +', ' '.join(doc_text)))))
+            for form, lemma in zip(doc.document.sentences_forms, doc.document.sentences_lemma):
+                hashable_lemma = tuple(lemma)
 
-        return sentences
+                if hashable_lemma not in used_lemmas:
+                    used_lemmas.add(hashable_lemma)
+                    sentences_forms.append(form)
+                    sentences_lemma.append(lemma)
+
+        return sentences_forms, sentences_lemma
 
     def _sents2vecs(self, sentences):
         w2v_model = self.w2v_model
         sentence_vectors = np.empty(shape=(len(sentences), w2v_model.vector_size), dtype=float)
 
         for i, sentence in enumerate(sentences):
-            sentence_vector = np.mean([w2v_model[word] if word in w2v_model else np.zeros(100, dtype=float) for word in sentence], axis=0)
+            sentence_vector = np.mean(
+                [w2v_model[word] if word in w2v_model else np.zeros(w2v_model.vector_size, dtype=float) for word in
+                 sentence], axis=0)
             sentence_vectors[i] = sentence_vector
 
         normalize(sentence_vectors, copy=False)
@@ -169,7 +175,9 @@ class Summarizer:
 
     @staticmethod
     def _cluster_sentences(sentence_vectors, k):
-        clusterer = sphere.SphericalKMeans(n_clusters=k, random_state=1)
+        from sklearn.cluster import MiniBatchKMeans
+        # clusterer = sphere.SphericalKMeans(n_clusters=k, random_state=1)
+        clusterer = MiniBatchKMeans(n_clusters=k, random_state=1)
         labels = clusterer.fit_predict(sentence_vectors)
 
         n_sentences = sentence_vectors.shape[0]
@@ -198,7 +206,6 @@ class Summarizer:
         objective_function = 0
 
         while len(remainder) > 0:
-            t = time()
             k, val = self._argmax(summary, remainder, objective_function, constraints)
 
             if cost_so_far + constraints[k] <= budget and val - objective_function >= 0:
@@ -207,7 +214,6 @@ class Summarizer:
                 summary.append(k)
 
             remainder.remove(k)
-            logging.info('Performed greedy optimization iteration in %fs.', time() - t)
 
         singleton_candidates = set(filter(lambda singleton: constraints[singleton] <= budget, range(n_sentences)))
         fake_constraints = np.ones(n_sentences, dtype=int)
@@ -235,9 +241,9 @@ class Summarizer:
                 argmax_ix = sentence_ix
                 max_val = function_gain
 
-            # if i > 0 and i % 100 == 0:
-            #     logging.info('Performed 100 argmax iterations in %fs.', time() - t)
-            #     t = time()
+                # if i > 0 and i % 100 == 0:
+                #     logging.info('Performed 100 argmax iterations in %fs.', time() - t)
+                #     t = time()
 
         return argmax_ix, self._quality(summary + [argmax_ix])
 
