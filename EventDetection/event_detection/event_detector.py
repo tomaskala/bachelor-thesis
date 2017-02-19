@@ -644,7 +644,7 @@ def summarize_inner(events_docs_repr, events, id2word, doc2vec_model):
 
         for burst in event:
             burst_start, burst_end, burst_docs = burst
-            sentences = summarizer.summarize(burst_docs[:25], budget, constraint_type)
+            sentences = summarizer.summarize(event_keywords, burst_docs[:25], budget, constraint_type)
 
             for j, sentence in enumerate(sentences):
                 print('{:02d}: {:s}'.format(j, str(sentence)))
