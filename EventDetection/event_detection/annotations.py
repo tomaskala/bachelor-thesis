@@ -4,9 +4,11 @@ from time import time
 
 import gensim
 import numpy as np
+from sklearn.decomposition import TruncatedSVD
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from event_detection.k_medoids import KMedoids
+from event_detection import k_medoids, sphere
 
 
 class LemmatizedDocument:
@@ -98,8 +100,13 @@ def load_documents(docids, fetcher):
 # TODO: (http://publications.lib.chalmers.se/records/fulltext/174136/174136.pdf)
 # TODO: Title boosting - if a sentence contains a named entity from the title, boost its importance
 
+# TODO: Read something about the parameters `a` (alpha), `l` (lambda) and `r` -- changing the value from l=6.0, r=1.0
+# TODO: to l=4.0, r=0.3 (as used in the original paper) improved the summaries quite a bit.
+
+# TODO: Apart from limiting sentence length, impose a rule that a sentence must contain a Noun and a Verb.
+
 class Summarizer:
-    def __init__(self, w2v_model, min_sent_len=5, a=0.75, l=6.0, r=1.0):
+    def __init__(self, w2v_model, min_sent_len=5, a=0.75, l=4.0, r=0.3):
         self.w2v_model = w2v_model
         self.min_sent_len = min_sent_len
 
@@ -134,7 +141,8 @@ class Summarizer:
         logging.info('Precomputed similarities in %fs.', time() - t)
 
         t = time()
-        cluster_representation = self._cluster_similarities(k)
+        # cluster_representation = self._cluster_similarities(k)
+        cluster_representation = self._cluster_sentences(sentence_vectors, k)
         logging.info('Performed sentence clustering in %fs.', time() - t)
 
         del sentence_vectors
@@ -152,11 +160,12 @@ class Summarizer:
         return [sentences_forms[index] for index in selected_indices]
 
     def _docs2sents(self, documents):
+        min_sent_len = self.min_sent_len
         used_lemmas = set()
+
         sentences_forms = []
         sentences_lemma = []
         sentences_pos = []
-        min_sent_len = self.min_sent_len
 
         for doc in documents:
             for form, lemma, pos in zip(doc.document.sentences_forms, doc.document.sentences_lemma,
@@ -171,27 +180,14 @@ class Summarizer:
 
         return sentences_forms, sentences_lemma, sentences_pos
 
-    def _sents2vecs(self, sentences):
-        # w2v_model = self.w2v_model
-        # sentence_vectors = np.empty(shape=(len(sentences), w2v_model.vector_size), dtype=float)
-        #
-        # for i, sentence in enumerate(sentences):
-        #     sentence_vector = np.mean(
-        #         [w2v_model[word] if word in w2v_model else np.zeros(w2v_model.vector_size, dtype=float) for word in
-        #          sentence], axis=0)
-        #     sentence_vectors[i] = sentence_vector
-        #
-        # normalize(sentence_vectors, copy=False)
-        # return sentence_vectors
-        from sklearn.feature_extraction.text import TfidfVectorizer
+    @staticmethod
+    def _sents2vecs(sentences):
         tfidf = TfidfVectorizer(sublinear_tf=True, analyzer=lambda doc: doc, preprocessor=lambda doc: doc)
         return tfidf.fit_transform(sentences)
 
     @staticmethod
     def _cluster_sentences(sentence_vectors, k):
-        from sklearn.cluster import MiniBatchKMeans
-        # clusterer = sphere.SphericalKMeans(n_clusters=k, random_state=1)
-        clusterer = MiniBatchKMeans(n_clusters=k, random_state=1)
+        clusterer = sphere.SphericalKMeans(n_clusters=k, random_state=1)
         labels = clusterer.fit_predict(sentence_vectors)
 
         n_sentences = sentence_vectors.shape[0]
@@ -209,7 +205,7 @@ class Summarizer:
         np.clip(distance_matrix, 0, 1, out=distance_matrix)
         distance_matrix[np.diag_indices_from(distance_matrix)] = 0.0
 
-        clusterer = KMedoids(n_clusters=k, distance_metric='precomputed')
+        clusterer = k_medoids.KMedoids(n_clusters=k, distance_metric='precomputed')
         labels = clusterer.fit_predict(distance_matrix)
 
         n_sentences = self.similarity_matrix.shape[0]
@@ -223,33 +219,29 @@ class Summarizer:
         return cluster_representation
 
     def _precompute_similarities(self, event_keywords, sentence_vectors, sentences, sentences_pos):
-        # self.similarity_matrix = sentence_vectors @ sentence_vectors.T
-
-        # Transform the similarities into from [-1,1] to [0,1].
-        # self.similarity_matrix += 1
-        # self.similarity_matrix /= 2
         self.similarity_matrix = cosine_similarity(sentence_vectors, dense_output=True)
 
+        # Word2Vec similarity
         w2v_similarities = self._w2v_similarity(sentences)
         np.multiply(self.similarity_matrix, w2v_similarities, out=self.similarity_matrix)
         del w2v_similarities
 
-        # d2v_similarities = self._d2v_similarity(sentences)
-        # np.multiply(self.similarity_matrix, d2v_similarities, out=self.similarity_matrix)
-        # del d2v_similarities
-
+        # LSI similarity
         lsi_similarities = self._lsi_similarity(sentence_vectors, k=50)
         np.multiply(self.similarity_matrix, lsi_similarities, out=self.similarity_matrix)
         del lsi_similarities
 
+        # TextRank similarity
         tr_similarities = self._tr_similarity(sentences, sentences_pos)
         np.multiply(self.similarity_matrix, tr_similarities, out=self.similarity_matrix)
         del tr_similarities
 
+        # KeyWord similarity
         kw_similarities = self._kw_similarity(sentences, event_keywords)
         np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
         del kw_similarities
 
+        # Transform similarities to [0,1]
         min_val = np.min(self.similarity_matrix)
         max_val = np.max(self.similarity_matrix)
 
@@ -295,34 +287,32 @@ class Summarizer:
 
         return cosine_similarity(sentence_vectors, dense_output=True)
 
-    def _wmd_similarity(self, sentences):
+    def _wmd_similarity(self, sentences, sentences_pos):
         logging.disable(logging.INFO)  # Gensim loggers are super chatty.
         n_sentences = len(sentences)
         w2v_model = self.w2v_model
-        wmd_similarities = np.zeros((n_sentences, n_sentences), dtype=float)
+        wmd_similarities = np.eye(n_sentences, dtype=float)
+
+        pos_sentences = [[word for word, pos in zip(sentence, sentence_pos) if pos[0] in 'NVAD'] for
+                         sentence, sentence_pos in zip(sentences, sentences_pos)]
 
         for i in range(n_sentences):
             for j in range(n_sentences):
                 if i < j:
-                    wmd_similarities[i, j] = w2v_model.wmdistance(sentences[i], sentences[j])
-
-        wmd_similarities += wmd_similarities.T
-        wmd_similarities += 1.0
-        np.reciprocal(wmd_similarities, out=wmd_similarities)
+                    wmd_similarities[i, j] = 1.0 / (w2v_model.wmdistance(pos_sentences[i], pos_sentences[j]) + 1.0)
+                    wmd_similarities[j, i] = wmd_similarities[i, j]
 
         logging.disable(logging.NOTSET)  # Re-enable logging.
         return wmd_similarities
 
     @staticmethod
     def _lsi_similarity(sentence_vectors, k):
-        from sklearn.decomposition import TruncatedSVD
         lsi = TruncatedSVD(n_components=k)
         lsi_matrix = lsi.fit_transform(sentence_vectors)
         return cosine_similarity(lsi_matrix, dense_output=True)
 
     @staticmethod
     def _tr_similarity(sentences, sentences_pos):
-        from sklearn.feature_extraction.text import CountVectorizer
         vectorizer = CountVectorizer(binary=True, analyzer=lambda doc: doc, preprocessor=lambda doc: doc, dtype=float)
 
         pos_sentences = [[word for word, pos in zip(sentence, sentence_pos) if pos[0] in 'NV'] for
@@ -337,7 +327,6 @@ class Summarizer:
 
     @staticmethod
     def _kw_similarity(sentences, keywords):
-        from sklearn.feature_extraction.text import TfidfVectorizer
         tfidf = TfidfVectorizer(sublinear_tf=True, analyzer=lambda doc: doc, preprocessor=lambda doc: doc)
         tfidf_matrix = tfidf.fit_transform(sentences)
         kw_indices = [tfidf.vocabulary_[kw] for kw in keywords if kw in tfidf.vocabulary_]
