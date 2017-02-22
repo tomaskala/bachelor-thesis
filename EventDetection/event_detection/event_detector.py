@@ -638,6 +638,8 @@ def summarize_inner(events_docs_repr, events, id2word, doc2vec_model):
     constraint_type = 'words'
     budget = 100
 
+    t = time()
+
     for i, event in enumerate(events_docs_repr):
         event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
         print('Event {:03d}: [{:s}]'.format(i, ', '.join(event_keywords)))
@@ -654,6 +656,7 @@ def summarize_inner(events_docs_repr, events, id2word, doc2vec_model):
         if len(event) > 1:
             print()
 
+    print('Summarized the documents in {:f}s.'.format(time() - t))
 
 if __name__ == '__main__':
     main(cluster_based=True, use_preclustering=False)

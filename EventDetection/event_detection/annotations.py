@@ -2,13 +2,12 @@ import logging
 import math
 from time import time
 
-import gensim
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from event_detection import k_medoids, sphere
+from event_detection.k_medoids import KMedoids
 
 
 class LemmatizedDocument:
@@ -97,62 +96,59 @@ def load_documents(docids, fetcher):
     return dict(zip(docids, documents))
 
 
-# TODO: (http://publications.lib.chalmers.se/records/fulltext/174136/174136.pdf)
-# TODO: Title boosting - if a sentence contains a named entity from the title, boost its importance
-
 # TODO: Read something about the parameters `a` (alpha), `l` (lambda) and `r` -- changing the value from l=6.0, r=1.0
 # TODO: to l=4.0, r=0.3 (as used in the original paper) improved the summaries quite a bit.
 
-# TODO: Apart from limiting sentence length, impose a rule that a sentence must contain a Noun and a Verb.
-
 class Summarizer:
-    def __init__(self, w2v_model, min_sent_len=5, a=0.75, l=4.0, r=0.3):
+    def __init__(self, w2v_model, min_sent_len=5, a=5.0, beta_=0.5, lambda_=4.0, r_=0.3):
         self.w2v_model = w2v_model
         self.min_sent_len = min_sent_len
 
-        assert 0 <= a <= 1, 'The parameter `a` must be in [0,1]'
-        assert l >= 0, 'The parameter `l` must be >= 0'
-        assert r > 0, 'The parameter `r` must be > 0'
+        assert a >= 0, 'The parameter `a` must be >= 0'
+        assert 0 <= beta_ <= 1, 'The parameter `beta` must be in [0,1]'
+        assert lambda_ >= 0, 'The parameter `lambda` must be >= 0'
+        assert r_ > 0, 'The parameter `r` must be > 0'
 
         self.a = a
-        self.l = l
-        self.r = r
-        self.similarity_matrix = None
-        self.cluster_similarity = None
+        self.alpha_ = None  # `alpha` = `a` / `n_sentences`
+        self.beta_ = beta_
+        self.lambda_ = lambda_
+        self.r_ = r_
+
+        self.n_sentences = None
+        self.n_clusters = None  # `n_clusters` = `n_sentences` // `avg_cluster_size`
+        self.avg_cluster_size = 10
+
+        self.similarity_matrix = None  # Aggregates pairwise similarities between sentences.
+        self.kw_similarities = None  # Vector sentence-event_keywords similarities.
+        self.cluster_similarity = None  # Pairwise similarities between sentences and clusters.
 
     def summarize(self, event_keywords, documents, budget, constraint_type):
         t = time()
+
         sentences_forms, sentences_lemma, sentences_pos = self._docs2sents(documents)
         logging.info('Created sentences in %fs.', time() - t)
 
-        n = len(sentences_forms)
-        k = n // 5
+        self.n_sentences = len(sentences_forms)
+        self.n_clusters = self.n_sentences // self.avg_cluster_size
+        self.alpha_ = self.a / self.n_sentences
+        assert 0 <= self.alpha_ <= 1, 'The parameter `alpha` = `a/N` must be in [0,1]'
 
         t = time()
-        sentence_vectors = self._sents2vecs(sentences_lemma)
-        logging.info('Created sentence vectors in %fs.', time() - t)
-
-        # t = time()
-        # cluster_representation = self._cluster_sentences(sentence_vectors, k)
-        # logging.info('Performed sentence clustering in %fs.', time() - t)
-
-        t = time()
-        self._precompute_similarities(event_keywords, sentence_vectors, sentences_lemma, sentences_pos)
+        self._precompute_similarities(event_keywords, sentences_lemma, sentences_pos)
         logging.info('Precomputed similarities in %fs.', time() - t)
 
         t = time()
-        # cluster_representation = self._cluster_similarities(k)
-        cluster_representation = self._cluster_sentences(sentence_vectors, k)
-        logging.info('Performed sentence clustering in %fs.', time() - t)
+        cluster_adjacency = self._cluster_similarities()
+        logging.info('Clustered %d sentences into %d clusters in %fs.', self.n_sentences, self.n_clusters, time() - t)
 
-        del sentence_vectors
-        self.cluster_similarity = self.similarity_matrix @ cluster_representation
-        del cluster_representation
+        self.cluster_similarity = self.similarity_matrix @ cluster_adjacency
+        del cluster_adjacency
 
         if constraint_type == 'words':
-            constraints = np.fromiter(map(len, sentences_forms), dtype=int, count=n)
+            constraints = np.fromiter(map(len, sentences_forms), dtype=int, count=self.n_sentences)
         elif constraint_type == 'sentences':
-            constraints = np.ones(shape=n, dtype=int)
+            constraints = np.ones(shape=self.n_sentences, dtype=int)
         else:
             raise ValueError('Invalid value for `mode`. Use either "words" or "sentences".')
 
@@ -160,6 +156,12 @@ class Summarizer:
         return [sentences_forms[index] for index in selected_indices]
 
     def _docs2sents(self, documents):
+        def is_valid_sentence(sentence_form, sentence_pos):
+            has_noun = any(sent_pos[0] == 'N' for sent_pos in sentence_pos)
+            has_verb = any(sent_pos[0] == 'V' for sent_pos in sentence_pos)
+            long_enough = len(sentence_form) > min_sent_len
+            return has_noun and has_verb and long_enough
+
         min_sent_len = self.min_sent_len
         used_lemmas = set()
 
@@ -172,7 +174,7 @@ class Summarizer:
                                         doc.document.sentences_pos):
                 hashable_lemma = tuple(lemma)
 
-                if len(form) > min_sent_len and hashable_lemma not in used_lemmas:
+                if hashable_lemma not in used_lemmas and is_valid_sentence(form, pos):
                     used_lemmas.add(hashable_lemma)
                     sentences_forms.append(form)
                     sentences_lemma.append(lemma)
@@ -180,49 +182,28 @@ class Summarizer:
 
         return sentences_forms, sentences_lemma, sentences_pos
 
-    @staticmethod
-    def _sents2vecs(sentences):
-        tfidf = TfidfVectorizer(sublinear_tf=True, analyzer=lambda doc: doc, preprocessor=lambda doc: doc)
-        return tfidf.fit_transform(sentences)
-
-    @staticmethod
-    def _cluster_sentences(sentence_vectors, k):
-        clusterer = sphere.SphericalKMeans(n_clusters=k, random_state=1)
-        labels = clusterer.fit_predict(sentence_vectors)
-
-        n_sentences = sentence_vectors.shape[0]
-        observations = np.arange(n_sentences)
-        cluster_representation = np.zeros(shape=(n_sentences, k), dtype=int)
-
-        cluster_representation[observations, labels] = 1
-
-        logging.info('Clustered %d sentences into %d clusters.', n_sentences, k)
-
-        return cluster_representation
-
-    def _cluster_similarities(self, k):
+    def _cluster_similarities(self):
         distance_matrix = 1.0 - self.similarity_matrix
+
+        # To avoid floating point precision errors.
         np.clip(distance_matrix, 0, 1, out=distance_matrix)
         distance_matrix[np.diag_indices_from(distance_matrix)] = 0.0
 
-        clusterer = k_medoids.KMedoids(n_clusters=k, distance_metric='precomputed')
+        clusterer = KMedoids(n_clusters=self.n_clusters, distance_metric='precomputed', random_state=1)
         labels = clusterer.fit_predict(distance_matrix)
 
-        n_sentences = self.similarity_matrix.shape[0]
-        observations = np.arange(n_sentences)
-        cluster_representation = np.zeros(shape=(n_sentences, k), dtype=int)
+        sentence_ids = np.arange(self.n_sentences)
+        cluster_adjacency = np.zeros(shape=(self.n_sentences, self.n_clusters), dtype=int)
+        cluster_adjacency[sentence_ids, labels] = 1
 
-        cluster_representation[observations, labels] = 1
+        return cluster_adjacency
 
-        logging.info('Clustered %d sentences into %d clusters.', n_sentences, k)
-
-        return cluster_representation
-
-    def _precompute_similarities(self, event_keywords, sentence_vectors, sentences, sentences_pos):
+    def _precompute_similarities(self, event_keywords, sentences_lemma, sentences_pos):
+        sentence_vectors = self._sents2vecs(sentences_lemma)
         self.similarity_matrix = cosine_similarity(sentence_vectors, dense_output=True)
 
         # Word2Vec similarity
-        w2v_similarities = self._w2v_similarity(sentences)
+        w2v_similarities = self._w2v_similarity(sentences_lemma)
         np.multiply(self.similarity_matrix, w2v_similarities, out=self.similarity_matrix)
         del w2v_similarities
 
@@ -232,12 +213,12 @@ class Summarizer:
         del lsi_similarities
 
         # TextRank similarity
-        tr_similarities = self._tr_similarity(sentences, sentences_pos)
+        tr_similarities = self._tr_similarity(sentences_lemma, sentences_pos)
         np.multiply(self.similarity_matrix, tr_similarities, out=self.similarity_matrix)
         del tr_similarities
 
         # KeyWord similarity
-        kw_similarities = self._kw_similarity(sentences, event_keywords)
+        kw_similarities = self._kw_similarity(sentences_lemma, event_keywords)
         np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
         del kw_similarities
 
@@ -248,9 +229,14 @@ class Summarizer:
         self.similarity_matrix -= min_val
         self.similarity_matrix /= (max_val - min_val)
 
+    @staticmethod
+    def _sents2vecs(sentences):
+        tfidf = TfidfVectorizer(sublinear_tf=True, analyzer=lambda doc: doc, preprocessor=lambda doc: doc)
+        return tfidf.fit_transform(sentences)
+
     def _w2v_similarity(self, sentences):
         w2v_model = self.w2v_model
-        sentence_vectors = np.empty(shape=(len(sentences), w2v_model.vector_size), dtype=float)
+        sentence_vectors = np.empty(shape=(self.n_sentences, w2v_model.vector_size), dtype=float)
 
         for i, sentence in enumerate(sentences):
             sentence_vector = np.sum(
@@ -258,94 +244,48 @@ class Summarizer:
                  sentence], axis=0)
             sentence_vectors[i] = sentence_vector
 
-        return cosine_similarity(sentence_vectors, dense_output=True)
-
-    def _d2v_similarity(self, sentences):
-        class Tagger:
-            def __init__(self, sentences_):
-                self.sentences_ = sentences_
-
-            def __iter__(self):
-                for i, sentence_ in enumerate(self.sentences_):
-                    tags = [i]
-                    words = [word for word in sentence_ if len(word) > 1]
-                    tagged_doc = gensim.models.doc2vec.TaggedDocument(words, tags)
-
-                    yield tagged_doc
-
-        tagger = Tagger(sentences)
-        size = 20
-        logging.disable(logging.WARNING)  # Gensim loggers are super chatty.
-        d2v_model = gensim.models.Doc2Vec(tagger, dm=1, dm_concat=0, dm_mean=1, size=size, batch_words=1000)
-        logging.disable(logging.NOTSET)  # Re-enable logging.
-
-        sentence_vectors = np.empty(shape=(len(sentences), size), dtype=float)
-
-        for j, sentence in enumerate(sentences):
-            sentence_vector = d2v_model.docvecs[j]
-            sentence_vectors[j] = sentence_vector
-
-        return cosine_similarity(sentence_vectors, dense_output=True)
-
-    def _wmd_similarity(self, sentences, sentences_pos):
-        logging.disable(logging.INFO)  # Gensim loggers are super chatty.
-        n_sentences = len(sentences)
-        w2v_model = self.w2v_model
-        wmd_similarities = np.eye(n_sentences, dtype=float)
-
-        pos_sentences = [[word for word, pos in zip(sentence, sentence_pos) if pos[0] in 'NVAD'] for
-                         sentence, sentence_pos in zip(sentences, sentences_pos)]
-
-        for i in range(n_sentences):
-            for j in range(n_sentences):
-                if i < j:
-                    wmd_similarities[i, j] = 1.0 / (w2v_model.wmdistance(pos_sentences[i], pos_sentences[j]) + 1.0)
-                    wmd_similarities[j, i] = wmd_similarities[i, j]
-
-        logging.disable(logging.NOTSET)  # Re-enable logging.
-        return wmd_similarities
+        return (cosine_similarity(sentence_vectors, dense_output=True) + 1.0) / 2
 
     @staticmethod
     def _lsi_similarity(sentence_vectors, k):
-        lsi = TruncatedSVD(n_components=k)
+        lsi = TruncatedSVD(n_components=k, random_state=1)
         lsi_matrix = lsi.fit_transform(sentence_vectors)
         return cosine_similarity(lsi_matrix, dense_output=True)
 
-    @staticmethod
-    def _tr_similarity(sentences, sentences_pos):
+    def _tr_similarity(self, sentences, sentences_pos):
         vectorizer = CountVectorizer(binary=True, analyzer=lambda doc: doc, preprocessor=lambda doc: doc, dtype=float)
 
         pos_sentences = [[word for word, pos in zip(sentence, sentence_pos) if pos[0] in 'NV'] for
                          sentence, sentence_pos in zip(sentences, sentences_pos)]
 
         bow_matrix = vectorizer.fit_transform(pos_sentences)
-        log_lengths = np.log(np.fromiter(map(len, sentences), dtype=float, count=len(sentences)))
+        log_lengths = np.log(np.fromiter(map(len, sentences), dtype=float, count=self.n_sentences))
 
         sim = (bow_matrix @ bow_matrix.T) / np.add.outer(log_lengths, log_lengths)
-        # np.clip(sim, 0, 1, out=sim)  # TODO: Put this here or not?
         return sim
 
-    @staticmethod
-    def _kw_similarity(sentences, keywords):
+    def _kw_similarity(self, sentences, keywords):
         tfidf = TfidfVectorizer(sublinear_tf=True, analyzer=lambda doc: doc, preprocessor=lambda doc: doc)
         tfidf_matrix = tfidf.fit_transform(sentences)
         kw_indices = [tfidf.vocabulary_[kw] for kw in keywords if kw in tfidf.vocabulary_]
         kw_slice = tfidf_matrix[:, kw_indices]
 
+        self.kw_similarities = np.sum(kw_slice, axis=1)
+
         kw_slice_copy = kw_slice.copy()
         kw_slice_copy.data.fill(1)
 
-        lengths = np.fromiter(map(len, sentences), dtype=float, count=len(sentences))
+        lengths = np.fromiter(map(len, sentences), dtype=float, count=self.n_sentences)
 
         return (kw_slice @ kw_slice_copy.T) / np.add.outer(lengths, lengths)
 
     def _greedy_summarization(self, constraints, budget):
-        n_sentences = self.similarity_matrix.shape[0]
         summary = []
-        remainder = set(range(n_sentences))
+        remainder = set(range(self.n_sentences))
 
         cost_so_far = 0
         objective_function = 0
+        t = time()
 
         while len(remainder) > 0:
             k, val = self._argmax(summary, remainder, objective_function, constraints)
@@ -354,56 +294,56 @@ class Summarizer:
                 cost_so_far += constraints[k]
                 objective_function = val
                 summary.append(k)
+            # else:
+            #     break  # TODO: Break or not?
 
             remainder.remove(k)
 
-        singleton_candidates = set(filter(lambda singleton: constraints[singleton] <= budget, range(n_sentences)))
-        fake_constraints = np.ones(n_sentences, dtype=int)
-        singleton_ix, singleton_val = self._argmax([], singleton_candidates, 0.0, fake_constraints)
+        singleton_candidates = set(filter(lambda singleton: constraints[singleton] <= budget, range(self.n_sentences)))
+        fake_constraints = np.ones(self.n_sentences, dtype=int)
+        singleton_id, singleton_val = self._argmax([], singleton_candidates, 0.0, fake_constraints)
 
         if singleton_val > objective_function:
-            return [singleton_ix]
+            logging.info('Summarized event in %fs while filling %d out of %d budget.', time() - t,
+                         constraints[singleton_id], budget)
+            return [singleton_id]
         else:
+            logging.info('Summarized event in %fs while filling %d out of %d budget.', time() - t, cost_so_far, budget)
             return summary
 
     def _argmax(self, summary, remainder, objective_function_value, constraints):
-        argmax_ix = None
+        argmax_id = None
         max_val = -math.inf
-        r = self.r
+        r = self.r_
 
-        # t = time()
-
-        for i, sentence_ix in enumerate(remainder):
-            new_objective_value = self._quality(summary + [sentence_ix])
-            scaled_constraint = constraints[sentence_ix] ** r
+        for sentence_id in remainder:
+            new_objective_value = self._quality(summary + [sentence_id])
+            scaled_constraint = constraints[sentence_id] ** r
 
             function_gain = (new_objective_value - objective_function_value) / scaled_constraint
 
             if function_gain > max_val:
-                argmax_ix = sentence_ix
+                argmax_id = sentence_id
                 max_val = function_gain
 
-                # if i > 0 and i % 100 == 0:
-                #     logging.info('Performed 100 argmax iterations in %fs.', time() - t)
-                #     t = time()
-
-        return argmax_ix, self._quality(summary + [argmax_ix])
+        return argmax_id, self._quality(summary + [argmax_id])
 
     def _quality(self, summary):
-        return self._similarity(summary) + self.l * self._diversity(summary)
+        # return self._similarity(summary) + self.l * self._diversity(summary)
+        return self._similarity(summary) + self.lambda_ * self._diversity_query(summary)
 
     def _similarity(self, summary):
-        similarity_matrix = self.similarity_matrix
+        inter_similarity = np.sum(self.similarity_matrix[:, summary], axis=1)
+        outer_similarity = np.sum(self.similarity_matrix, axis=1)
 
-        inter_similarity = np.sum(similarity_matrix[:, summary], axis=1)
-        outer_similarity = np.sum(similarity_matrix, axis=1)
+        return np.sum(np.minimum(inter_similarity, self.alpha_ * outer_similarity))
 
-        return np.sum(np.minimum(inter_similarity, self.a * outer_similarity))
-
-    def _diversity(self, summary):
+    def _diversity(self, summary):  # TODO: Which diversity to use?
         cluster_rewards = np.mean(self.cluster_similarity[summary], axis=0)
         return np.sum(np.sqrt(cluster_rewards))
 
-    def __str__(self):
-        return 'Summarizer(W2W: {:s}, alpha: {:f}, lambda: {:f}, r: {:f})'.format(str(self.w2v_model), self.a, self.l,
-                                                                                  self.r)
+    def _diversity_query(self, summary):
+        summary_reward = np.mean(self.cluster_similarity[summary], axis=0)
+        keyword_reward = self.kw_similarities[summary]
+
+        return np.sum(np.sqrt(self.beta_ * summary_reward + (1 - self.beta_) * keyword_reward))
