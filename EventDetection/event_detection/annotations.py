@@ -1,3 +1,4 @@
+import csv
 import logging
 import math
 from time import time
@@ -101,6 +102,8 @@ class Summarizer:
     Based on 'Lin, Bilmes, 2010, Multi-document Summarization via Budgeted Maximization of Submodular Functions'
     and 'Mogren, Kågebäck, Dubhashi, 2015, Extractive Summarization by Aggregating Multiple Similarities'.
     """
+
+    SENTIMENT_WORDS_PATH = './sublex_1_0.csv'
 
     def __init__(self, w2v_model, min_sent_len=5, avg_cluster_size=10, a=5.0, beta_=0.5, lambda_=4.0, r_=0.3):
         """
@@ -267,6 +270,13 @@ class Summarizer:
         np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
         del kw_similarities
 
+        # Sentiment similarity
+        sentiment_similarities = self._sentiment_similarity(sentences_lemma)
+        np.multiply(self.similarity_matrix, sentiment_similarities, out=self.similarity_matrix)
+        del sentiment_similarities
+
+        exit()
+
         # Transform similarities to [0,1]
         min_val = np.min(self.similarity_matrix)
         max_val = np.max(self.similarity_matrix)
@@ -353,6 +363,41 @@ class Summarizer:
         lengths = np.fromiter(map(len, sentences), dtype=float, count=self.n_sentences)
 
         return (kw_slice @ kw_slice_copy.T) / np.add.outer(lengths, lengths)
+
+    def _sentiment_similarity(self, sentences, which):
+        negative_words, positive_words = self._load_sentiment_words()
+
+        negative_similarity = np.zeros((self.n_sentences, self.n_sentences))
+        positive_similarity = np.zeros((self.n_sentences, self.n_sentences))
+
+        if which == 'negative':
+            return negative_similarity
+        elif which == 'positive':
+            return positive_similarity
+
+        return np.multiply(negative_similarity, positive_similarity)
+
+    def _load_sentiment_words(self):
+        negative_words = []
+        positive_words = []
+
+        with open(self.SENTIMENT_WORDS_PATH, 'r', encoding='utf8', newline='') as f:
+            reader = csv.DictReader(f, delimiter='\t', fieldnames=['negation', 'pos', 'lemma', 'orientation', 'source'])
+
+            for row in reader:
+                lemma = row['lemma'].split('_')[0]  # Strip lemma comment.
+
+                if row['negation'] == 'N':  # We don't have negations in the lemmatized files used for input.
+                    lemma = lemma[2:]
+
+                if row['orientation'] == 'POS':
+                    positive_words.append(lemma)
+                elif row['orientation'] == 'NEG':
+                    negative_words.append(lemma)
+                else:
+                    raise ValueError('Invalid orientation: {:s}'.format(str(row)))
+
+        return frozenset(negative_words), frozenset(positive_words)
 
     def _greedy_summarization(self, constraints, budget):
         """
