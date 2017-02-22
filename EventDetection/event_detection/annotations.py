@@ -111,7 +111,7 @@ class Summarizer:
 
         self.a = a
         self.alpha_ = None  # `alpha` = `a` / `n_sentences`
-        self.beta_ = beta_
+        self.beta_ = beta_  # `beta` = 1 <=> diversity does not take the query into account
         self.lambda_ = lambda_
         self.r_ = r_
 
@@ -139,11 +139,8 @@ class Summarizer:
         logging.info('Precomputed similarities in %fs.', time() - t)
 
         t = time()
-        cluster_adjacency = self._cluster_similarities()
+        self._cluster_similarities()
         logging.info('Clustered %d sentences into %d clusters in %fs.', self.n_sentences, self.n_clusters, time() - t)
-
-        self.cluster_similarity = self.similarity_matrix @ cluster_adjacency
-        del cluster_adjacency
 
         if constraint_type == 'words':
             constraints = np.fromiter(map(len, sentences_forms), dtype=int, count=self.n_sentences)
@@ -183,20 +180,20 @@ class Summarizer:
         return sentences_forms, sentences_lemma, sentences_pos
 
     def _cluster_similarities(self):
-        distance_matrix = 1.0 - self.similarity_matrix
+        distance_matrix = 1.0 - self.similarity_matrix  # TODO: 1 / (similarity + 1)?
 
         # To avoid floating point precision errors.
         np.clip(distance_matrix, 0, 1, out=distance_matrix)
         distance_matrix[np.diag_indices_from(distance_matrix)] = 0.0
 
-        clusterer = KMedoids(n_clusters=self.n_clusters, distance_metric='precomputed', random_state=1)
-        labels = clusterer.fit_predict(distance_matrix)
+        k_medoids = KMedoids(n_clusters=self.n_clusters, distance_metric='precomputed', random_state=1)
+        labels = k_medoids.fit_predict(distance_matrix)
 
         sentence_ids = np.arange(self.n_sentences)
         cluster_adjacency = np.zeros(shape=(self.n_sentences, self.n_clusters), dtype=int)
         cluster_adjacency[sentence_ids, labels] = 1
 
-        return cluster_adjacency
+        self.cluster_similarity = self.similarity_matrix @ cluster_adjacency
 
     def _precompute_similarities(self, event_keywords, sentences_lemma, sentences_pos):
         sentence_vectors = self._sents2vecs(sentences_lemma)
@@ -288,20 +285,20 @@ class Summarizer:
         t = time()
 
         while len(remainder) > 0:
-            k, val = self._argmax(summary, remainder, objective_function, constraints)
+            k, val = self._argmax(summary, remainder, objective_function, constraints, cost_so_far, budget)
 
-            if cost_so_far + constraints[k] <= budget and val - objective_function >= 0:
+            if k is not None and cost_so_far + constraints[k] <= budget and val - objective_function >= 0:
                 cost_so_far += constraints[k]
                 objective_function = val
                 summary.append(k)
-            # else:
-            #     break  # TODO: Break or not?
+            else:
+                break
 
             remainder.remove(k)
 
         singleton_candidates = set(filter(lambda singleton: constraints[singleton] <= budget, range(self.n_sentences)))
         fake_constraints = np.ones(self.n_sentences, dtype=int)
-        singleton_id, singleton_val = self._argmax([], singleton_candidates, 0.0, fake_constraints)
+        singleton_id, singleton_val = self._argmax([], singleton_candidates, 0.0, fake_constraints, 0, budget)
 
         if singleton_val > objective_function:
             logging.info('Summarized event in %fs while filling %d out of %d budget.', time() - t,
@@ -311,7 +308,7 @@ class Summarizer:
             logging.info('Summarized event in %fs while filling %d out of %d budget.', time() - t, cost_so_far, budget)
             return summary
 
-    def _argmax(self, summary, remainder, objective_function_value, constraints):
+    def _argmax(self, summary, remainder, objective_function_value, constraints, cost_so_far, budget):
         argmax_id = None
         max_val = -math.inf
         r = self.r_
@@ -322,15 +319,17 @@ class Summarizer:
 
             function_gain = (new_objective_value - objective_function_value) / scaled_constraint
 
-            if function_gain > max_val:
+            if cost_so_far + constraints[sentence_id] <= budget and function_gain > max_val:
                 argmax_id = sentence_id
                 max_val = function_gain
 
-        return argmax_id, self._quality(summary + [argmax_id])
+        if argmax_id is None:
+            return None, 0
+        else:
+            return argmax_id, self._quality(summary + [argmax_id])
 
     def _quality(self, summary):
-        # return self._similarity(summary) + self.l * self._diversity(summary)
-        return self._similarity(summary) + self.lambda_ * self._diversity_query(summary)
+        return self._similarity(summary) + self.lambda_ * self._diversity(summary)
 
     def _similarity(self, summary):
         inter_similarity = np.sum(self.similarity_matrix[:, summary], axis=1)
@@ -338,11 +337,7 @@ class Summarizer:
 
         return np.sum(np.minimum(inter_similarity, self.alpha_ * outer_similarity))
 
-    def _diversity(self, summary):  # TODO: Which diversity to use?
-        cluster_rewards = np.mean(self.cluster_similarity[summary], axis=0)
-        return np.sum(np.sqrt(cluster_rewards))
-
-    def _diversity_query(self, summary):
+    def _diversity(self, summary):
         summary_reward = np.mean(self.cluster_similarity[summary], axis=0)
         keyword_reward = self.kw_similarities[summary]
 
