@@ -178,8 +178,9 @@ class Summarizer:
         else:
             raise ValueError('Invalid value for `mode`. Use either "words" or "sentences".')
 
+        # Sort the indices to obtain the sentences in the same order as they appeared in the document set.
         selected_indices = self._greedy_summarization(constraints, budget)
-        return [sentences_forms[index] for index in selected_indices]
+        return [sentences_forms[index] for index in sorted(selected_indices)]
 
     def _docs2sents(self, documents):
         """
@@ -205,7 +206,8 @@ class Summarizer:
         sentences_lemma = []
         sentences_pos = []
 
-        for doc in documents:
+        # Sort the documents by their ID, obtaining the publication order.
+        for doc in sorted(documents, key=lambda document: document.doc_id):
             for form, lemma, pos in zip(doc.document.sentences_forms, doc.document.sentences_lemma,
                                         doc.document.sentences_pos):
                 hashable_lemma = tuple(lemma)
@@ -265,10 +267,17 @@ class Summarizer:
         np.multiply(self.similarity_matrix, tr_similarities, out=self.similarity_matrix)
         del tr_similarities
 
+        # TODO: Use either KeyWord or Sentiment similarity, but they cancel each other.
+
         # KeyWord similarity
-        kw_similarities = self._kw_similarity(sentences_lemma, event_keywords)
-        np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
-        del kw_similarities
+        # kw_similarities = self._kw_similarity(sentences_lemma, event_keywords)
+        # np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
+        # del kw_similarities
+
+        # Sentiment similarity
+        sentiment_similarities = self._sentiment_similarity(sentences_lemma, sentiment='both')
+        np.multiply(self.similarity_matrix, sentiment_similarities, out=self.similarity_matrix)
+        del sentiment_similarities
 
         # Transform similarities to [0,1].
         min_val = np.min(self.similarity_matrix)
