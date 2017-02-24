@@ -344,9 +344,8 @@ class Summarizer:
 
         bow_matrix = vectorizer.fit_transform(pos_sentences)
         log_lengths = np.log(np.fromiter(map(len, sentences), dtype=float, count=self.n_sentences))
-        sim = (bow_matrix @ bow_matrix.T) / np.add.outer(log_lengths, log_lengths)
 
-        return sim
+        return (bow_matrix @ bow_matrix.T) / np.add.outer(log_lengths, log_lengths)
 
     def _kw_similarity(self, sentences, keywords):
         """
