@@ -270,19 +270,15 @@ class Summarizer:
         np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
         del kw_similarities
 
-        # Sentiment similarity
-        sentiment_similarities = self._sentiment_similarity(sentences_lemma)
-        np.multiply(self.similarity_matrix, sentiment_similarities, out=self.similarity_matrix)
-        del sentiment_similarities
-
-        exit()
-
-        # Transform similarities to [0,1]
+        # Transform similarities to [0,1].
         min_val = np.min(self.similarity_matrix)
         max_val = np.max(self.similarity_matrix)
 
         self.similarity_matrix -= min_val
         self.similarity_matrix /= (max_val - min_val)
+
+        # To avoid floating point precision errors.
+        self.similarity_matrix[np.diag_indices_from(self.similarity_matrix)] = 1.0
 
     @staticmethod
     def _sents2vecs(sentences):
@@ -364,20 +360,40 @@ class Summarizer:
 
         return (kw_slice @ kw_slice_copy.T) / np.add.outer(lengths, lengths)
 
-    def _sentiment_similarity(self, sentences, which):
+    def _sentiment_similarity(self, sentences, sentiment):
+        """
+        Compute Sentiment similarity of the sentences, defined as Sim(i,j) = 1 - |score(i) - score(j)|, where
+        score(i) is the fraction of words from sentence i appearing in negative (or positive) word list, respectively.
+        :param sentences: lemmatized sentences
+        :param sentiment: whether to compute 'negative', 'positive' or 'both' sentiment similarities
+        :return: matrix of Sentiment similarities
+        """
         negative_words, positive_words = self._load_sentiment_words()
+        negative_scores = np.empty(self.n_sentences, dtype=float)
+        positive_scores = np.empty(self.n_sentences, dtype=float)
 
-        negative_similarity = np.zeros((self.n_sentences, self.n_sentences))
-        positive_similarity = np.zeros((self.n_sentences, self.n_sentences))
+        for i, sentence in enumerate(sentences):
+            neg_words = sum(1 for _ in filter(lambda word: word in negative_words, sentence))
+            pos_words = sum(1 for _ in filter(lambda word: word in positive_words, sentence))
 
-        if which == 'negative':
+            negative_scores[i] = neg_words / len(sentence)
+            positive_scores[i] = pos_words / len(sentence)
+
+        negative_similarity = 1.0 - np.abs(np.subtract.outer(positive_scores, positive_scores))
+        positive_similarity = 1.0 - np.abs(np.subtract.outer(negative_scores, negative_scores))
+
+        if sentiment == 'negative':
             return negative_similarity
-        elif which == 'positive':
+        elif sentiment == 'positive':
             return positive_similarity
 
         return np.multiply(negative_similarity, positive_similarity)
 
     def _load_sentiment_words(self):
+        """
+        Load the lists of negative and positive words (already lemmatized) from a file.
+        :return: negative and positive words in frozen sets
+        """
         negative_words = []
         positive_words = []
 
@@ -421,8 +437,8 @@ class Summarizer:
                 objective_function = val
                 summary.append(k)
             else:
-                # Can break, since the argmax selected was also feasible. Otherwise, there could be a sentence with
-                # lower objective function gain satisfying the constraints.
+                # Can break, since the argmax selected was also feasible. Otherwise, some sentence with a lower
+                # objective function gain could still satisfy the constraints.
                 break
 
             remainder.remove(k)
@@ -454,10 +470,11 @@ class Summarizer:
         """
         argmax_id = None
         max_val = -math.inf
+        quality = self._quality
         r = self.r_
 
         for sentence_id in remainder:
-            new_objective_value = self._quality(summary + [sentence_id])
+            new_objective_value = quality(summary + [sentence_id])
             scaled_constraint = constraints[sentence_id] ** r
 
             function_gain = (new_objective_value - value_so_far) / scaled_constraint
@@ -469,12 +486,12 @@ class Summarizer:
         if argmax_id is None:
             return None, 0
 
-        return argmax_id, self._quality(summary + [argmax_id])
+        return argmax_id, quality(summary + [argmax_id])
 
     def _quality(self, summary):
         """
         The objective function being optimized. Measures the similarity of the summary to the whole set of sentences
-        and its diversity.
+        and its diversity. Denoted `F` in the paper.
         :param summary: indices of sentences selected for the summary so far
         :return: objective function value
         """
@@ -482,7 +499,7 @@ class Summarizer:
 
     def _similarity(self, summary):
         """
-        Similarity of the summary to the whole set of sentences.
+        Similarity of the summary to the whole set of sentences. Denoted `L_1` in the paper.
         :param summary: indices of sentences selected for the summary so far
         :return: similarity
         """
@@ -493,11 +510,14 @@ class Summarizer:
 
     def _diversity(self, summary):
         """
-        Diversity of the summary.
+        Diversity of the summary. Denoted `R_1` in the paper.
         :param summary: indices of sentences selected for the summary so far
         :return: diversity
         """
         summary_reward = np.mean(self.sentence_cluster_similarities[summary], axis=0)
-        keyword_reward = self.kw_similarities[summary]
 
+        if self.kw_similarities is None:
+            return np.sum(np.sqrt(summary_reward))
+
+        keyword_reward = self.kw_similarities[summary]
         return np.sum(np.sqrt(self.beta_ * summary_reward + (1 - self.beta_) * keyword_reward))
