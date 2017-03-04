@@ -270,14 +270,14 @@ class Summarizer:
         # TODO: Use either KeyWord or Sentiment similarity, but they cancel each other.
 
         # KeyWord similarity
-        # kw_similarities = self._kw_similarity(sentences_lemma, event_keywords)
-        # np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
-        # del kw_similarities
+        kw_similarities = self._kw_similarity(sentences_lemma, event_keywords)
+        np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
+        del kw_similarities
 
         # Sentiment similarity
-        sentiment_similarities = self._sentiment_similarity(sentences_lemma, sentiment='both')
-        np.multiply(self.similarity_matrix, sentiment_similarities, out=self.similarity_matrix)
-        del sentiment_similarities
+        # sentiment_similarities = self._sentiment_similarity(sentences_lemma, sentiment='both')
+        # np.multiply(self.similarity_matrix, sentiment_similarities, out=self.similarity_matrix)
+        # del sentiment_similarities
 
         # Transform similarities to [0,1].
         min_val = np.min(self.similarity_matrix)

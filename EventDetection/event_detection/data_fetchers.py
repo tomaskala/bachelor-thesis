@@ -238,7 +238,6 @@ class CzechLemmatizedTexts:
         if dataset == 'full':
             self.document_paths = os.listdir(CZECH_TAGGED_TEXTS)
             self.relative_days = FULL_TEXTS
-            raise NotImplementedError('Full lemmatized dataset not yet implemented')
         elif dataset == 'dec-jan':
             self.document_paths = CZECH_TAGGED_TEXTS_DEC_JAN
             self.relative_days = FULL_TEXTS_DEC_JAN

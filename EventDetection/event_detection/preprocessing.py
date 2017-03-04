@@ -10,7 +10,7 @@ from event_detection.sphere import SphericalKMeans
 
 GENSIM_OUT = './gensim'
 DOC2VEC_PATH = os.path.join(GENSIM_OUT, './doc2vec_lemma_avg')
-WORD2VEC_PATH = os.path.join(GENSIM_OUT, './word2vec_lemma')
+WORD2VEC_PATH = os.path.join(GENSIM_OUT, './word2vec_lemma_skipgram')
 
 # Manually taken from the dataset. Some words are malformed due to stemming.
 CZECH_STOPWORDS = frozenset(
@@ -42,7 +42,8 @@ CZECH_STOPWORDS = frozenset(
      'window.sklikarticleinicialized', 'platform.twitter.com/widgets.js', 'js.src', 'fjs.parentnode.insertbefore',
      'sklikdat', 'zoneid', '282', 'sklikreklama', 'd.getelementsbytagname', 'd.createelement', 'js.id', '468', 'idy',
      'js.srciální', 'platform.twitter.com/widgets.js\';fjs.parentnode.insertbefore(js,fjs)', 'd.location',
-     'document.write', 'po.typat', 'd.getelementbyid', 'fb', 'twitter', 'vara'])
+     'document.write', 'po.typat', 'd.getelementbyid', 'fb', 'twitter', 'vara', 'ální', 'ící', 'adalší', 'j.srciální',
+     'po.type', 'dsq.type', 'Palm', 'requiréd', 'sklikDe'])
 
 
 class DocumentTagger:
@@ -111,6 +112,32 @@ class LemmaPreprocessor:
         for doc in self.documents:
             yield [word for word in doc.text if
                    word.lower() not in CZECH_STOPWORDS and min_length <= len(word) <= max_length]
+
+
+def perform_word2vec_lemma(fetcher, min_length=3, max_length=15):
+    class Corpus:
+        def __init__(self, documents):
+            self.documents = documents
+
+        def __iter__(self):
+            for doc in self.documents:
+                yield [word for word in doc.text if
+                       word.lower() not in CZECH_STOPWORDS and min_length <= len(word) <= max_length]
+
+    t = time()
+
+    if os.path.exists(WORD2VEC_PATH):
+        logging.info('Loading Word2Vec')
+        word2vec_model = gensim.models.Word2Vec.load(WORD2VEC_PATH)
+        logging.info('Loaded Word2Vec in %fs.', time() - t)
+    else:
+        logging.info('Training Word2Vec')
+        corpus = Corpus(fetcher)
+        word2vec_model = gensim.models.Word2Vec(corpus, size=100, window=5, min_count=10, iter=5, sg=1)
+        word2vec_model.save(WORD2VEC_PATH)
+        logging.info('Created and saved Word2Vec in %fs.', time() - t)
+
+    return word2vec_model
 
 
 def perform_doc2vec_lemma(fetcher, min_length=3, max_length=15):

@@ -10,6 +10,7 @@ from hdbscan import HDBSCAN
 from scipy.signal import periodogram
 from scipy.stats import entropy
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics import silhouette_score
 
 from event_detection import annotations, data_fetchers, plotting, postprocessing, preprocessing
 
@@ -234,6 +235,7 @@ def event_detection_cluster_based(global_indices, doc2vec_model, feature_traject
     logging.info('Detecting events using the clustering approach.')
     logging.info('Examining %d features.', n_features)
     t = time()
+    from scipy.spatial import distance
 
     distance_matrix = np.zeros((n_features, n_features), dtype=float)
 
@@ -242,9 +244,11 @@ def event_detection_cluster_based(global_indices, doc2vec_model, feature_traject
             if i > j:
                 word1 = id2word[global_indices[i]]
                 word2 = id2word[global_indices[j]]
-                similarity = doc2vec_model.similarity(word1, word2)
+                vec1 = doc2vec_model[word1]
+                vec2 = doc2vec_model[word2]
+                dist = distance.euclidean(vec1, vec2)
                 trajectory_divergence = jsd(feature_trajectories[i], feature_trajectories[j])
-                distance_matrix[i, j] = trajectory_divergence / math.exp(similarity)
+                distance_matrix[i, j] = trajectory_divergence * dist
                 distance_matrix[j, i] = distance_matrix[i, j]
 
     logging.info('Precomputed word similarities in %fs.', time() - t)
@@ -259,12 +263,14 @@ def event_detection_cluster_based(global_indices, doc2vec_model, feature_traject
 
     events = [[] for _ in range(n_clusters)]
 
-    for feature_ix, label in np.ndenumerate(labels):
+    for feature_ix, label in enumerate(labels):
         if label >= 0:  # Filter out the noisy samples.
-            events[label].append(global_indices[feature_ix[0]])
+            events[label].append(global_indices[feature_ix])
 
     logging.info('Detected %d events in %fs.', len(events), time() - t)
     logging.info('Covered %d word features out of %d.', sum(len(event) for event in events), n_features)
+    logging.info('Silhouette score: %f.', silhouette_score(distance_matrix, labels, metric='precomputed'))
+    logging.info('Cluster sizes: %s.', str([len(event) for event in events]))
     return events
 
 
@@ -410,16 +416,15 @@ def main(cluster_based, use_preclustering):
         if not os.path.exists(PICKLE_PATH):
             os.makedirs(PICKLE_PATH)
 
-        t = time()
         relative_days = keyword_fetcher.fetch_relative_days()
         documents = preprocessing.LemmaPreprocessor(keyword_fetcher)
 
         stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
-        logging.info('Read input in %fs.', time() - t)
         logging.info('Stream length: %d', stream_length)
 
         t = time()
-        vectorizer = CountVectorizer(min_df=10, binary=True, tokenizer=lambda doc: doc, preprocessor=lambda doc: doc)
+        vectorizer = CountVectorizer(min_df=10, max_df=0.9, binary=True, tokenizer=lambda doc: doc,
+                                     preprocessor=lambda doc: doc, stop_words=preprocessing.CZECH_STOPWORDS)
         bow_matrix = vectorizer.fit_transform(documents)
         id2word = {v: k for k, v in vectorizer.vocabulary_.items()}
 
@@ -437,7 +442,8 @@ def main(cluster_based, use_preclustering):
                      bow_matrix.getnnz())
 
     num_docs = bow_matrix.shape[0]
-    doc2vec_model = preprocessing.perform_doc2vec_lemma(embedding_fetcher)
+    # doc2vec_model = preprocessing.perform_doc2vec_lemma(embedding_fetcher)
+    doc2vec_model = preprocessing.perform_word2vec_lemma(embedding_fetcher)
 
     if use_preclustering:
         if cluster_based:
@@ -482,6 +488,8 @@ def main(cluster_based, use_preclustering):
                                              cluster_based=cluster_based))
         plotting.plot_events(trajectories, periodic_events, id2word, dps, dp, dirname=periodic_path)
         logging.info('Periodic done')
+
+        exit()  # TODO: Don't exit.
 
         dtd = construct_doc_to_day_matrix(num_docs, relative_days)
         all_events = aperiodic_events + periodic_events
@@ -549,7 +557,6 @@ def main(cluster_based, use_preclustering):
         #                        periodic_path, cluster_based)
 
         summarize_events(all_events, all_docids, id2word, doc2vec_model, len(aperiodic_events), cluster_based)
-
 
         exit()  # TODO: Don't exit
 
@@ -639,6 +646,7 @@ def summarize_inner(events_docs_repr, events, id2word, doc2vec_model):
     budget = 100
 
     t = time()
+    logging.disable(logging.WARNING)
 
     for i, event in enumerate(events_docs_repr):
         event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
@@ -657,6 +665,7 @@ def summarize_inner(events_docs_repr, events, id2word, doc2vec_model):
             print()
 
     print('Summarized the documents in {:f}s.'.format(time() - t))
+
 
 if __name__ == '__main__':
     main(cluster_based=True, use_preclustering=False)
