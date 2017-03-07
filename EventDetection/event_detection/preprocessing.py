@@ -3,113 +3,51 @@ import os
 from time import time
 
 import gensim
-import numpy as np
-from sklearn.preprocessing import normalize
-
-from event_detection.sphere import SphericalKMeans
 
 GENSIM_OUT = './gensim'
-DOC2VEC_PATH = os.path.join(GENSIM_OUT, './doc2vec_lemma_avg')
 WORD2VEC_PATH = os.path.join(GENSIM_OUT, './word2vec_lemma_skipgram')
 
-# Manually taken from the dataset. Some words are malformed due to stemming.
+# Manually taken from the dataset. Some words are malformed due to stemming or lemmatization.
 CZECH_STOPWORDS = frozenset(
-    ['adsbygoogl', 'adsbygoogle', 'advide', 'aftershar', 'although', 'api', 'appendchild', 'arrayd',
-     'async', 'bbcod', 'befor', 'before', 'btn', 'callback', 'choosen', 'clankyodjinud',
-     'clankyvideoportal', 'click', 'com', 'comments', 'config', 'configuration', 'copypast', 'count',
-     'createelement', 'cs', 'css2', 'defaults', 'description', 'disqus', 'document', 'donation',
-     'dropdown', 'dsq', 'dynamiccallback', 'echo24cz', 'edit', 'edita', 'elm', 'enabl', 'enabled',
-     'escap', 'escape', 'exampl', 'example', 'fals', 'false', 'fbs', 'fbs_click', 'fjs', 'format', 'formatb',
-     'formatovan', 'formatovat', 'formhtml', 'forum', 'function', 'functions', 'galid', 'gallerycarousel',
-     'galurl', 'gatrackevents', 'gatracksocialinteractions', 'gcfg', 'getelementbyid',
-     'getelementsbytagnam', 'getjson', 'getpocket', 'getstats', 'head', 'height', 'href', 'html', 'http',
-     'https', 'i18n', 'iconk', 'id', 'ida', 'if', 'ihnedcz', 'initcallback', 'insertbefor',
-     'insertbefore', 'into', 'itemloadcallback', 'javascript', 'js', 'json', 'lang', 'left', 'link',
-     'links', 'local', 'location', 'mainl', 'method', 'mobileoverla', 'mous', 'navigation', 'null',
-     'onafteranimation', 'onbeforeanimation', 'parentnod', 'parentnode', 'pasting', 'php', 'platform',
-     'pleas', 'plugins', 'pocket', 'pos', 'position', 'powered', 'ppc', 'ppc_', 'preddefin',
-     'publisherke', 'push', 'pwidget', 'queu', 'readmor', 'replac', 'replace', 'required', 'restserver',
-     'return', 'rhhar0uejt6tohi9', 'sablon', 'sashec', 'script', 'scriptum', 'search', 'secondtracker',
-     'sharepopups', 'sharequot', 'sharer', 'shortnam', 'shortname', 'showerror', 'size',
-     'sklikarticleinicialized', 'sklikd', 'sklikdata', 'sklikreklam', 'sklikreklama_', 'src',
-     'stretching', 'success', 'tagu', 'text', 'the', 'titl', 'title', 'toolbar', 'trackingobject',
-     'transitioncarousel', 'translated', 'translation', 'true', 'type', 'u00edc', 'url', 'urls', 'var',
-     'variables', 'view', 'wallpaper', 'webpag', 'webpage', 'widget', 'widgets', 'width', 'window', 'with', 'wjs',
-     'writ', 'write', 'wsj', 'www', 'xmlad', 'your', 'zoneid', 'queue.push',
-     'https://widgets.getpocket.com/v1/j/btn.js?v=1', 'd.body.appendchild', 'j.src', 'j.id', 'dsq.typat',
-     'document.createelement', 'document.getelementsbytagname', 's.parentnode.insertbefore', 'window.adsbygoogle',
-     'inc', 'webpage', 'appendchild', 'before', 'variable', 'into', 'configuration', 'editbety', '45924',
-     'window.sklikarticleinicialized', 'platform.twitter.com/widgets.js', 'js.src', 'fjs.parentnode.insertbefore',
-     'sklikdat', 'zoneid', '282', 'sklikreklama', 'd.getelementsbytagname', 'd.createelement', 'js.id', '468', 'idy',
-     'js.srciální', 'platform.twitter.com/widgets.js\';fjs.parentnode.insertbefore(js,fjs)', 'd.location',
-     'document.write', 'po.typat', 'd.getelementbyid', 'fb', 'twitter', 'vara', 'ální', 'ící', 'adalší', 'j.srciální',
-     'po.type', 'dsq.type', 'Palm', 'requiréd', 'sklikDe',
-     'adblock', 'blesk.cz.auto', 'css', 'disqus.nejnov', 'follow', 'functions.pole', 'functions.zelna',
-     'functions.najet', 'hawaj.cz', 'navigation.zde', 'networking.zde', 'profimedia.cz', 'rss', 'sablona.step',
-     'sablona', 'search.pokud', 'sport.cz', 'tn.cz', 'aftershare', 'apod.step', 'arrayde', 'comment', 'default',
-     'diskuse.pleas', 'document.titel', 'dotazy.step', 'embedcode', 'enable', 'facebook.com', 'formatba',
-     'gatrackevent', 'googlefillslot', 'i18n.readmore', 'informace.step', 'jquer', 'locale', 'localisation',
-     'location.href', 'mobileoverlej', 'nanoflowcell.ag', 'neplatila.step', 'publisherkey', 's.async', 's.src',
-     's.type', 'share.tweet.kl', 'sja', 'tag', 'this', 'tip.although', 'titel', 'ulékař', 'vlajku.step', 'ácí',
-     'áhnout', 'ání', 'átor', 'áva', 'ávě', 'éra', 'ílat', 'íčový', 'čka', 'čnost', 'čný', 'čít', 'ění', 'ětý', 'ětšit',
-     'řit', 'šit', 'šný', 'ště', 'ždý', 'žský', 'bbcode', 'blesk.cz', 'formatovani', 'translate', 'tel', 'uzivatel',
-     'ihned.cz', 'zvyraznit', 'allows', 'alway', 'anchory', 'apod', 'appenda', 'content', 'controls', 'copyright',
-     'div', 'forum.valka.cz', 'from', 'isport.cz', 'iconka', 'kliknutí', 'mainly', 'over', 'override', 'page', 'pick',
-     'played', 'po.src', 'saved', 'see', 'setup.authory', 'shortnamat', 'stanice.port', 'switch', 'translate', 'user',
-     'using', 'valka.cz', 'whe', 'whole', 'will'])
-
-
-class DocumentTagger:
-    def __init__(self, documents, min_length=3, max_length=15):
-        self.documents = documents
-        self.min_length = min_length
-        self.max_length = max_length
-
-    def __iter__(self):
-        min_length = self.min_length
-        max_length = self.max_length
-
-        for i, doc in enumerate(self.documents):
-            tags = [i]
-            words = [word for word in gensim.utils.simple_preprocess(doc.text, min_len=min_length, max_len=max_length)
-                     if word not in CZECH_STOPWORDS]
-            tagged_doc = gensim.models.doc2vec.TaggedDocument(words, tags)
-
-            yield tagged_doc
-
-
-class LemmatizedDocumentTagger:
-    def __init__(self, documents, min_length=3, max_length=15):
-        self.documents = documents
-        self.min_length = min_length
-        self.max_length = max_length
-
-    def __iter__(self):
-        min_length = self.min_length
-        max_length = self.max_length
-
-        for i, doc in enumerate(self.documents):
-            tags = [i]
-            words = [word for word in doc.text if
-                     word.lower() not in CZECH_STOPWORDS and min_length <= len(word) <= max_length]
-            tagged_doc = gensim.models.doc2vec.TaggedDocument(words, tags)
-
-            yield tagged_doc
-
-
-class Preprocessor:
-    def __init__(self, documents, min_length=3, max_length=15):
-        self.documents = documents
-        self.min_length = min_length
-        self.max_length = max_length
-
-    def __iter__(self):
-        min_length = self.min_length
-        max_length = self.max_length
-
-        for doc in self.documents:
-            yield [word for word in gensim.utils.simple_preprocess(doc.text, min_len=min_length, max_len=max_length) if
-                   word not in CZECH_STOPWORDS]
+    ['282', '45924', '468', 'adalší', 'adblock', 'adsbygoogl', 'adsbygoogle', 'advide', 'aftershar', 'aftershare',
+     'allows', 'although', 'alway', 'anchory', 'api', 'apod', 'apod.step', 'appenda', 'appendchild', 'arrayd',
+     'arrayde', 'async', 'bbcod', 'bbcode', 'befor', 'before', 'blesk.cz', 'blesk.cz.auto', 'btn', 'callback',
+     'choosen', 'clankyodjinud', 'clankyvideoportal', 'click', 'com', 'comment', 'comments', 'config', 'configuration',
+     'content', 'controls', 'copypast', 'copyright', 'count', 'createelement', 'cs', 'css', 'css2',
+     'd.body.appendchild', 'd.createelement', 'd.getelementbyid', 'd.getelementsbytagname', 'd.location', 'default',
+     'defaults', 'description', 'diskuse.pleas', 'disqus', 'disqus.nejnov', 'div', 'document', 'document.createelement',
+     'document.getelementsbytagname', 'document.titel', 'document.write', 'donation', 'dotazy.step', 'dropdown', 'dsq',
+     'dsq.typat', 'dsq.type', 'dynamiccallback', 'echo24cz', 'edit', 'edita', 'editbety', 'elm', 'embedcode', 'enabl',
+     'enable', 'enabled', 'escap', 'escape', 'exampl', 'example', 'facebook.com', 'fals', 'false', 'fb', 'fbs',
+     'fbs_click', 'fjs', 'fjs.parentnode.insertbefore', 'follow', 'format', 'formatb', 'formatba', 'formatovan',
+     'formatovani', 'formatovat', 'formhtml', 'forum', 'forum.valka.cz', 'from', 'function', 'functions',
+     'functions.najet', 'functions.pole', 'functions.zelna', 'galid', 'gallerycarousel', 'galurl', 'gatrackevent',
+     'gatrackevents', 'gatracksocialinteractions', 'gcfg', 'getelementbyid', 'getelementsbytagnam', 'getjson',
+     'getpocket', 'getstats', 'googlefillslot', 'hawaj.cz', 'head', 'height', 'href', 'html', 'http', 'https',
+     'https://widgets.getpocket.com/v1/j/btn.js?v=1', 'i18n', 'i18n.readmore', 'iconk', 'iconka', 'id', 'ida', 'idy',
+     'if', 'ihned.cz', 'ihnedcz', 'inc', 'informace.step', 'initcallback', 'insertbefor', 'insertbefore', 'into',
+     'isport.cz', 'itemloadcallback', 'j.id', 'j.src', 'j.srciální', 'javascript', 'jquer', 'js', 'js.id', 'js.src',
+     'js.srciální', 'json', 'kliknutí', 'lang', 'left', 'link', 'links', 'local', 'locale', 'localisation', 'location',
+     'location.href', 'mainl', 'mainly', 'method', 'mobileoverla', 'mobileoverlej', 'mous', 'nanoflowcell.ag',
+     'navigation', 'navigation.zde', 'neplatila.step', 'networking.zde', 'null', 'onafteranimation',
+     'onbeforeanimation', 'over', 'override', 'page', 'palm', 'parentnod', 'parentnode', 'pasting', 'php', 'pick',
+     'platform', 'platform.twitter.com/widgets.js',
+     "platform.twitter.com/widgets.js';fjs.parentnode.insertbefore(js,fjs)", 'played', 'pleas', 'plugins', 'po.src',
+     'po.typat', 'po.type', 'pocket', 'pos', 'position', 'powered', 'ppc', 'ppc_', 'preddefin', 'profimedia.cz',
+     'publisherke', 'publisherkey', 'push', 'pwidget', 'queu', 'queue.push', 'readmor', 'replac', 'replace', 'required',
+     'requiréd', 'restserver', 'return', 'rhhar0uejt6tohi9', 'rss', 's.async', 's.parentnode.insertbefore', 's.src',
+     's.type', 'sablon', 'sablona', 'sablona.step', 'sashec', 'saved', 'script', 'scriptum', 'search', 'search.pokud',
+     'secondtracker', 'see', 'setup.authory', 'share.tweet.kl', 'sharepopups', 'sharequot', 'sharer', 'shortnam',
+     'shortnamat', 'shortname', 'showerror', 'size', 'sja', 'sklikarticleinicialized', 'sklikd', 'sklikdat',
+     'sklikdata', 'sklikde', 'sklikreklam', 'sklikreklama', 'sklikreklama_', 'sport.cz', 'src', 'stanice.port',
+     'stretching', 'success', 'switch', 'tag', 'tagu', 'tel', 'text', 'the', 'this', 'tip.although', 'titel', 'titl',
+     'title', 'tn.cz', 'toolbar', 'trackingobject', 'transitioncarousel', 'translate', 'translated', 'translation',
+     'true', 'twitter', 'type', 'u00edc', 'ulékař', 'url', 'urls', 'user', 'using', 'uzivatel', 'valka.cz', 'var',
+     'vara', 'variable', 'variables', 'view', 'vlajku.step', 'wallpaper', 'webpag', 'webpage', 'whe', 'whole', 'widget',
+     'widgets', 'width', 'will', 'window', 'window.adsbygoogle', 'window.sklikarticleinicialized', 'with', 'wjs',
+     'writ', 'write', 'wsj', 'www', 'xmlad', 'your', 'zoneid', 'zvyraznit', 'ácí', 'áhnout', 'ální', 'ání', 'átor',
+     'áva', 'ávě', 'éra', 'ící', 'ílat', 'íčový', 'čka', 'čnost', 'čný', 'čít', 'ění', 'ětý', 'ětšit', 'řit', 'šit',
+     'šný', 'ště', 'ždý', 'žský'])
 
 
 class LemmaPreprocessor:
@@ -127,16 +65,7 @@ class LemmaPreprocessor:
                    word.lower() not in CZECH_STOPWORDS and min_length <= len(word) <= max_length]
 
 
-def perform_word2vec_lemma(fetcher, min_length=3, max_length=15):
-    class Corpus:
-        def __init__(self, documents):
-            self.documents = documents
-
-        def __iter__(self):
-            for doc in self.documents:
-                yield [word for word in doc.text if
-                       word.lower() not in CZECH_STOPWORDS and min_length <= len(word) <= max_length]
-
+def perform_word2vec(fetcher, min_length=3, max_length=15):
     t = time()
 
     if os.path.exists(WORD2VEC_PATH):
@@ -145,68 +74,9 @@ def perform_word2vec_lemma(fetcher, min_length=3, max_length=15):
         logging.info('Loaded Word2Vec in %fs.', time() - t)
     else:
         logging.info('Training Word2Vec')
-        corpus = Corpus(fetcher)
+        corpus = LemmaPreprocessor(fetcher, min_length, max_length)
         word2vec_model = gensim.models.Word2Vec(corpus, size=100, window=5, min_count=10, iter=5, sg=1)
         word2vec_model.save(WORD2VEC_PATH)
         logging.info('Created and saved Word2Vec in %fs.', time() - t)
 
     return word2vec_model
-
-
-def perform_doc2vec_lemma(fetcher, min_length=3, max_length=15):
-    doc_tagger = LemmatizedDocumentTagger(fetcher, min_length, max_length)
-    t = time()
-
-    if os.path.exists(DOC2VEC_PATH):
-        logging.info('Loading Doc2Vec')
-        doc2vec_model = gensim.models.Doc2Vec.load(DOC2VEC_PATH)
-        logging.info('Loaded Doc2Vec in %fs.', time() - t)
-    else:
-        logging.info('Training Doc2Vec')
-        doc2vec_model = gensim.models.Doc2Vec(doc_tagger, dm=1, dm_mean=1, dm_concat=0, size=100, min_count=10,
-                                              window=5, iter=5)
-        # doc2vec_model = gensim.models.Doc2Vec(doc_tagger, dm=0, dbow_words=1, size=100)
-        doc2vec_model.save(DOC2VEC_PATH)
-        logging.info('Created and saved Doc2Vec in %fs.', time() - t)
-
-    return doc2vec_model
-
-
-def perform_doc2vec(fetcher):
-    doc_tagger = DocumentTagger(fetcher)
-    t = time()
-
-    if os.path.exists(DOC2VEC_PATH):
-        logging.info('Loading Doc2Vec')
-        doc2vec_model = gensim.models.Doc2Vec.load(DOC2VEC_PATH)
-        logging.info('Loaded Doc2Vec in %fs.', time() - t)
-    else:
-        logging.info('Training Doc2Vec')
-        doc2vec_model = gensim.models.Doc2Vec(doc_tagger, dm=1, dm_concat=1, size=100, negative=5, hs=0, min_count=5,
-                                              window=5, iter=5)
-        doc2vec_model.save(DOC2VEC_PATH)
-        logging.info('Created and saved Doc2Vec in %fs.', time() - t)
-
-    return doc2vec_model
-
-
-# TODO: Try spherical K-Means.
-def cluster_documents(documents, n_clusters=15):
-    t = time()
-
-    normalize(documents, norm='l2', copy=False)
-    # clusterer = MiniBatchKMeans(n_clusters=n_clusters, n_init=10, random_state=1)
-    clusterer = SphericalKMeans(n_clusters=n_clusters)
-    labels = clusterer.fit_predict(documents)
-
-    logging.info('Performed clustering into %d clusters in %fs.', n_clusters, time() - t)
-
-    clusters = [[] for _ in range(n_clusters)]
-
-    for document_ix, label in np.ndenumerate(labels):
-        clusters[label].append(document_ix[0])
-
-    for i, c in enumerate(clusters):
-        logging.info('Cluster #%d of %d documents', i, len(c))
-
-    return clusters
