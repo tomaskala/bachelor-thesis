@@ -350,6 +350,12 @@ def process_cluster(cluster, doc2vec_model, bow_matrix, relative_days, id2word, 
 # TODO: the highest similarity being < THRESHOLD (there was an event with the highest similarity being negative
 # TODO: described by nonsensical words).
 
+# TODO: ----- Optimization -----
+# TODO: Replace pickle with cpickle
+# TODO: Normalize (and, effectively, freeze) the trained W2V model
+# TODO: del everything once it is no longer needed (or split into different functions)
+# TODO: log every 10K ? documents read from disk
+
 # Doc2Vec settings:
 # 1) Concat ... Greedy OK, clusters tragic (WMD somewhat improves greedy and solves the poor cluster quality)
 # 2) Mean ... Greedy OK, clusters awesome (WMD greedy are shit, but keeps the cluster quality)
