@@ -43,7 +43,20 @@ CZECH_STOPWORDS = frozenset(
      'sklikdat', 'zoneid', '282', 'sklikreklama', 'd.getelementsbytagname', 'd.createelement', 'js.id', '468', 'idy',
      'js.srciální', 'platform.twitter.com/widgets.js\';fjs.parentnode.insertbefore(js,fjs)', 'd.location',
      'document.write', 'po.typat', 'd.getelementbyid', 'fb', 'twitter', 'vara', 'ální', 'ící', 'adalší', 'j.srciální',
-     'po.type', 'dsq.type', 'Palm', 'requiréd', 'sklikDe'])
+     'po.type', 'dsq.type', 'Palm', 'requiréd', 'sklikDe',
+     'adblock', 'blesk.cz.auto', 'css', 'disqus.nejnov', 'follow', 'functions.pole', 'functions.zelna',
+     'functions.najet', 'hawaj.cz', 'navigation.zde', 'networking.zde', 'profimedia.cz', 'rss', 'sablona.step',
+     'sablona', 'search.pokud', 'sport.cz', 'tn.cz', 'aftershare', 'apod.step', 'arrayde', 'comment', 'default',
+     'diskuse.pleas', 'document.titel', 'dotazy.step', 'embedcode', 'enable', 'facebook.com', 'formatba',
+     'gatrackevent', 'googlefillslot', 'i18n.readmore', 'informace.step', 'jquer', 'locale', 'localisation',
+     'location.href', 'mobileoverlej', 'nanoflowcell.ag', 'neplatila.step', 'publisherkey', 's.async', 's.src',
+     's.type', 'share.tweet.kl', 'sja', 'tag', 'this', 'tip.although', 'titel', 'ulékař', 'vlajku.step', 'ácí',
+     'áhnout', 'ání', 'átor', 'áva', 'ávě', 'éra', 'ílat', 'íčový', 'čka', 'čnost', 'čný', 'čít', 'ění', 'ětý', 'ětšit',
+     'řit', 'šit', 'šný', 'ště', 'ždý', 'žský', 'bbcode', 'blesk.cz', 'formatovani', 'translate', 'tel', 'uzivatel',
+     'ihned.cz', 'zvyraznit', 'allows', 'alway', 'anchory', 'apod', 'appenda', 'content', 'controls', 'copyright',
+     'div', 'forum.valka.cz', 'from', 'isport.cz', 'iconka', 'kliknutí', 'mainly', 'over', 'override', 'page', 'pick',
+     'played', 'po.src', 'saved', 'see', 'setup.authory', 'shortnamat', 'stanice.port', 'switch', 'translate', 'user',
+     'using', 'valka.cz', 'whe', 'whole', 'will'])
 
 
 class DocumentTagger:
