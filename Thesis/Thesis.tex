@@ -24,6 +24,7 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{mathtools}
+\usepackage{interval}
 
 \usepackage{color}
 
@@ -82,6 +83,8 @@
 \DeclarePairedDelimiterX{\trajdist}[2]{\text{Dist}(}{)}{#1, #2}  % Trajectory distance
 \DeclarePairedDelimiterX{\semsim}[2]{\text{Sim}(}{)}{#1, #2}  % Semantic similarity
 \DeclarePairedDelimiterX{\distfunc}[2]{\text{d}(}{)}{#1, #2}  % Distance function
+\DeclarePairedDelimiterX{\kw}[1]{\text{KW}(}{)}{#1}  % Keywords representation
+\DeclarePairedDelimiterX{\doc}[1]{\text{Doc}(}{)}{#1}  % Documents representation
 
 
 
@@ -129,8 +132,11 @@ These are my acknowledgements.
 \chapter{Event detection algorithms}
 \input{tex/chapters/event_detection}
 
-\chapter{Event examination}
-\input{tex/chapters/event_examination}
+\chapter{Document retrieval}
+\input{tex/chapters/document_retrieval}
+
+\chapter{Event annotation}
+\input{tex/chapters/event_annotation}
 
 \chapter{Conclusion}
 %\addcontentsline{toc}{chapter}{Conclusion}

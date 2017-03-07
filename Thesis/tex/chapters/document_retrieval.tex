@@ -1,0 +1,111 @@
+As our goal is to obtain a human-readable event description, we will need to move on from keyword representation to document representation, i.e. for each event, retrieve a number of documents concerning the particular event.
+
+We can use each event's temporal and semantic information to query the document collection. The former is trivial -- simply select the documents published within an event's bursty period. The latter will prove more complicated, and we will need to employ some more information retrieval techniques to obtain semantically similar documents.
+
+As of now, an event $e$ is described by a set of its keywords, $\kw{e}$. The goal is to convert this keyword representation to a document representation, $\doc{e}$ of documents related to $e$.
+
+\section{Event burst detection}
+First, we need to detect the period where the particular event occurred, so that we can retrieve the documents published around that time. We do this in four steps:
+
+\begin{enumerate}
+	\item Construct the event trajectory
+	\item Clean the trajectory
+	\item Fit a probability density function
+	\item Take the region(s) with the highest density as the bursty period(s)
+\end{enumerate}
+
+
+\subsection{Event trajectory construction}
+
+We will first need to construct an \textit{event trajectory} out of its \textit{keyword trajectories}. We do this by computing a weighted average of the event's keyword trajectories, with weights being the keyword DPS. This ensures that less important words with slightly different time characteristic will not shift the trajectory away from the actual burst.
+
+\begin{equation}
+	\vect{\traj_{e}} \coloneqq \frac{1}{\sum_{k \in \kw{e}}{\text{DPS}_{k}}} \sum_{k \in \kw{e}}{\text{DPS}_{k} \cdot \vect{\traj}_{k}}
+\end{equation}
+
+
+\subsection{Trajectory filtering}
+
+Now, a typical event (shown in {\color{red} TODO: Put a pretty picture here}) will usually have some number of dominant bursts corresponding to the period(s) when the event actually occurred. Additionally, there will be some milder, noisy bursts due to the keywords appearing elsewhere, independently of that particular event. We are only interested in the main burst(s), and so we will need to filter out the noise.
+
+We do this by computing a cutoff value for each event trajectory and discarding the sectors falling under this threshold. This procedure is adopted from \cite{online-search-queries}. The algorithm is as follows:
+
+\begin{algorithm}[H]
+\begin{algorithmic}[1]
+\caption{Burst filtering}
+\Input $\text{window-length} \ w,\ \text{event trajectory} \ \vect{\traj_{e}}$
+
+\State $\vect{MA}_{w} = \text{Moving Average of length} ~ w ~ \text{for} ~ \vect{\traj}_{e} = \left[ \traj_{e}(1), \traj_{e}(2), \dots, \traj_{e}(\streamlen) \right]$
+
+\State $\mathit{cutoff} = \text{mean} \left( \vect{MA}_{w} \right) + \text{std} \left( \vect{MA}_{w} \right)$
+
+\State $\vect{bursts}_{e} = \left[ \traj_{e}(t) \mid \traj_{e}(t) > \mathit{cutoff} \right]$
+
+\Output $\vect{bursts}_{e}$
+\end{algorithmic}
+\end{algorithm}
+
+{\color{red} TODO: In the paper, they use $\vect{MA}(t)_{w} > \mathit{cutoff}$, try that. Also, why did I miss that? :(}
+
+We further normalize the filtered trajectories to have unit sums, so they can be interpreted as probability distribution over the stream. An element $\traj_{e}(i)$ of the trajectory will denote a probability of that event occurring on day $i$. This allows us to fit a probability density function to them. \cite{event-detection} adapted a similar approach, though only for feature trajectories rather than event trajectories.
+
+\subsection{Density fitting}
+We describe aperiodic and periodic events separately, as different probability distributions must be used in case of a single burst than in case of multiple bursts.
+
+\begin{enumerate}
+
+\item \textbf{Aperiodic features}
+
+An aperiodic feature trajectory $\traj_{f}$ is modeled by a Gaussian distribution. We fit the Gaussian function
+
+\begin{equation*}
+	f(x) = \frac{1}{\sigma \sqrt{2 \pi}} \exp(-\frac{\left( x - \mu \right)^{2}}{2 \sigma^{2}})
+\end{equation*}
+
+to the trajectory $y_{f}$. The parameters $\mu$ and $\sigma$ are estimated using non-linear least squares method. Unlike \cite{event-detection} who use the EM algorithm, least squares proved to be less prone to outliers, yielding a shape more resembling the actual trajectory.
+
+\item \textbf{Periodic features}
+
+A periodic feature trajectory $\traj_{f}$ is modeled using a mixture of $K = \floor{\streamlen / \text{DP}_{f}}$ Cauchy distributions (as many mixture components as there are periods), as in \cite{health-events}:
+
+\begin{equation*}
+	f(x) = \sum_{k = 1}^{K}{\alpha_{k} \frac{1}{\pi} \left( \frac{\gamma_{k}}{\left( x - \mu_{k} \right)^{2} + \gamma_{k}^{2}} \right)}
+\end{equation*}
+
+The mixing parameters $\alpha_{k},\ \sum_{k = 1}^{K}{\alpha_{k}} = 1$, location parameters $\mu_{k}$ and scale parameters $\gamma_{k}$ are estimated using the EM algorithm.
+
+The Cauchy distribution has a narrower peak and thicker tails than the Gaussian distribution, which models the periodic bursts more closely. The individual bursts of a periodic feature tend to be quite short, but even between two consecutive bursts, the frequency remains at a non-negligible level, which makes the Cauchy distribution a somewhat better choice.
+
+
+\subsection{Burst detection}
+The bursty period of an aperiodic event is now defined as $\interval{\mu - \sigma}{\mu + \sigma}$. For a periodic event, there are $K = \floor{\streamlen / \text{DP}_{f}}$ bursty periods, each defined as $\interval{\mu_{k} - \gamma_{k}}{\mu_{k} + \gamma_{k}}$.
+
+
+
+\section{Document retrieval}
+We only describe the process for aperiodic events. The method is similar for periodic events, except applied on each burst individually.
+
+Intuitively, we need to select some number of documents best representing an event $e$ out of all documents published within the event's bursty period. The only measure of semantics for an event we have is the event's keyword set $\kw{e}$. If we interpret $\kw{e}$ as a keyword query for the document collection, we arrive at the classical task of information retrieval.
+
+In the original method by \cite{event-detection}, the task was simple due to the cost function used. In the paper, the only measure of semantic related-ness used was the degree of document overlaps. That way, there was always at least one document in which all of the event's keywords appeared. This is not the case in our method, and we will need to measure the semantic similarity in a more sophisticated way.
+
+There are a number of approaches we could take, such as project all documents and queries to a TFIDF space \cite{information-retrieval} and sort the documents by their cosine similarity to the query. This simple approach does not go beyond a simple keyword occurrence. We could enrich it using Latent Semantic Indexing \cite{lsi} to also take the document topics into account. This would however require us to ``train'' yet another model for this task only, which would be computationally and memory-intensive.
+
+Instead, we decided to further utilize the trained Word2Vec model and use the recently introduced Word Mover's Distance \cite{wmd}.
+
+The Word Mover's Distance (WMD) is a novel measure of document similarity based on Word2Vec embeddings of the document words. The similarity of two documents is measured as the minimum distance the word vectors of one document need to ``travel'' to reach the word vectors of the second document.
+
+The WMD discards word order, which makes it suitable for our keyword queries. As the authors note, it achieves best results for short documents, in part due to the method being computationally expensive for larger pieces of text. Therefore, we apply the WMD on document headlines only.
+
+\begin{algorithm}[H]
+\begin{algorithmic}[1]
+\caption{Document representation}
+\Input $\text{Event}\ e,\ \text{number of documents}\ n$
+
+\State $\text{TODO}$
+
+\Output $\{ d_{1}, \dots, d_{n} \}$
+\end{algorithmic}
+\end{algorithm}
+
+\end{enumerate}
