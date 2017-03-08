@@ -97,14 +97,28 @@ The Word Mover's Distance (WMD) is a novel measure of document similarity based 
 
 The WMD discards word order, which makes it suitable for our keyword queries. As the authors note, it achieves best results for short documents, in part due to the method being computationally expensive for larger pieces of text. Therefore, we apply the WMD on document headlines only.
 
+Since the WMD is a measure of distance, we use the WMD similarity instead, defined as
+
+\begin{equation}
+	\wmdsim{d_{i}}{d_{j}} \coloneqq \frac{1}{1 + \wmd{d_{i}}{d_{j}}}
+\end{equation}
+
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
-\caption{Document representation}
-\Input $\text{Event}\ e,\ \text{number of documents}\ n$
+\caption{Document representation of an event}
+\Input $\text{Event}\ e,\ \text{number of documents}\ n,\ \text{document stream}\ D$
 
-\State $\text{TODO}$
+\State $\mathit{burst\_docs} = \emptyset$
 
-\Output $\{ d_{1}, \dots, d_{n} \}$
+\ForEach{$\mathit{doc} \in D$}
+	\If{$\mathit{doc.publication\_date} \in \mathit{e.burst}$}
+		\State $\text{Compute}\ \wmdsim{\kw{e}}{\mathit{doc.headline}}$
+		\State $\mathit{burst\_docs} = \mathit{burst\_docs} \cup \mathit{doc}$
+	\EndIf
+\EndFor
+
+\State $\text{Sort}\ \mathit{burst\_docs}\ \text{by the computed}\ \text{Sim}_{\text{WMD}} \ \text{in descending order}$
+\Output $\text{First}\ n\ \text{elements of}\ \mathit{burst\_docs}$
 \end{algorithmic}
 \end{algorithm}
 

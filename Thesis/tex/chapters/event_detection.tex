@@ -30,11 +30,11 @@ where $\vect{\bar{\traj}}_{\featset}$ is the mean of all trajectories of feature
 
 
 \subsection{Measuring semantic similarity}
-Most of the astounding results of the word2vec model come from semantic relations between words being preserved under vector arithmetic, with words concerning the same topic forming clusters. However, as the topic space is high-dimensional, traditional Euclidean distance would vary greatly between different words. Therefore, we use cosine similarity instead, which is bounded in $[-1, 1]$ and independent on the vector lengths. The cosine similarity is a measure often used in information retrieval: \cite{cosine-similarity-i, cosine-similarity-ii}.
+Most of the astounding results of the word2vec model arise from linguistic relations between words preserved under vector arithmetic \cite{linguistic-regularities}. Semantically similar words form clusters and are close to each other in terms of cosine similarity, which is a standard measure used in information retrieval \cite{information-retrieval, cosine-similarity}.
 
-Note that we use cosine \textit{similarity} rather than \textit{distance}, which is simply a mean to respect the structure proposed by \cite{event-detection}, who used a simpler measure of document overlap, and the cost function will be constructed accordingly.
+We take advantage of these properties obtain a more fine-grained measure of semantic similarity than \cite{event-detection}. The original method measured the similarity of two words only in terms of their document overlap -- number of documents both words both appear in, which eventually led to events represented by only a handful of keywords.
 
-Given a set of word features $\featset$ and another feature $f$, the semantic similarity of $f$ and $\featset$ is
+Given a set of word features $\featset$ and another feature $f \notin \featset$, the semantic similarity of $f$ and $\featset$ is
 
 \begin{equation}
 	\semsim{\featset}{f} \coloneqq \frac{\inp[\big]{\bar{\embed}_{\featset}}{\embed_{j}}}{\| \bar{\embed}_{\featset} \| \cdot \| \embed_{j} \|},
@@ -95,15 +95,17 @@ To perform the event detection itself, we mostly adapt the \textit{Unsupervised 
 This approach uses a clustering algorithm to create clusters out of word features directly, instead of explicitly minimizing a cost function. To achieve this, we need to define a proper distance function, and choose the right clustering algorithm.
 
 \subsection{Distance function}
-The distance function used is similar to the cost function in the previous algorithm, except that it is defined pairwise. Since the KL-divergence is not symmetric, we use the Jensen-Shannon divergence instead to measure trajectory distance. The semantic similarity remains unchanged in the form of cosine similarity.
+The distance function conveys similar information as the cost function used in the previous algorithm, but it is defined pairwise between words.
+
+Since the KL-divergence is not symmetric, we use the Jensen-Shannon divergence instead to measure trajectory distance. Here, we replace the cosine similarity by standard Euclidean distance to make the points spread farther apart, which helps to obtain better clustering.
 
 The distance between two word features $f_{i}$,\ $f_{j}$ with trajectories $\vect{\traj}_{i},\ \vect{\traj}_{j}$ and embeddings $\embed_{i},\ \embed_{j}$ is therefore defined as
 
 \begin{equation}
-	\distfunc{f_{i}}{f_{j}} \coloneqq \frac{\jsd{\vect{\traj}_{i}}{\vect{\traj}_{j}}}{\exp(\semsim{\embed_{i}}{\embed_{j}})},
+	\distfunc{f_{i}}{f_{j}} \coloneqq \jsd{\vect{\traj}_{i}}{\vect{\traj}_{j}} \cdot \| \embed_{i} - \embed_{j}\|_{2},
 \end{equation}
 
-with $\jsd{\vect{p}}{\vect{q}} = \frac{1}{2} \left( \kl{\vect{p}}{\vect{m}} + \kl{\vect{q}}{\vect{m}} \right) ,\ \vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$.
+with $\jsd{\vect{p}}{\vect{q}} = \frac{1}{2} \left( \kl{\vect{p}}{\vect{m}} + \kl{\vect{q}}{\vect{m}} \right) ,\ \vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$. As we replace the semantic ``similarity'' by ``distance'', we multiply the two components rather than divide them.
 
 
 \subsection{Clustering algorithm}
