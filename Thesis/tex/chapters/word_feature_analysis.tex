@@ -1,14 +1,25 @@
-In this section, we will analyze the document collection, focusing on individual words. The goal is to uncover representative keywords which could possibly relate to actual real world events. The analysis aims to find words with frequency high enough to be considered meaningful, but not that high to be considered stopwords. Furthemore, these words are categorized into periodic and aperiodic ones.
+This is the first phase of the event detection algorithm, focused on obtaining a set of candidate word features for event representation. We do not yet perform the actual event detection, which will be addressed in the next chapter, but merely extract a subset of words carrying enough information to be considered representative.
 
-Once we have found these words, we will perform the actual event detection by grouping words into clusters correlated both in the time domain and in the semantic domain. Afterwards, we will move on from word representation to document representation to further examine the events detected.
+Here we work with the assumption that an event can be detected by observing the frequencies of individual words over time and grouping together those words which appear in similar documents during similar time periods \cite{event-detection, parameter-free}. This corresponds to an event being often mentioned in the text stream, be it a formal news stream or a stream of social network comments, around the period when it actually occurred. Of course, not all words are representative of an event, so we will have to impose a criterion of a ``word eventness''. Furthermore, there are some words appearing periodically during the duration of the text stream, such as words related to sport matches or weather forecasts reported every week. While they may be of interest, we will aim to distinguish them from words appearing only once during the observed period.
 
-The core of this algorithm is taken from \cite{event-detection}.
+{\color{red} TODO: Pretty graphs of aperiodic vs. periodic trajectory}
+
+At first, we will construct a trajectory of each word --- a measure of word frequency over time. We will then apply signal processing techniques to determine both eventness and periodicity of each word, and categorize the words accordingly into eventful-periodic and eventful-aperiodic, discarding the rest.
+
+These trajectories will then be examined for so called ``bursts'' in frequency, where a word would suddenly appear in a large number of documents. Should a higher number of words appear in similar documents with overlapping bursts, it may be an indicator that an event worthy of attention occurred.
+
+One thing to note is that the frequency of a word is, by itself, not a good indicator of a word importance.
+Stopwords appearing in most documents, such as conjunctions, prepositions, etc. do not carry any information and should be ignored. Therefore, we will utilize the parts of speech tagging performed earlier and limit our analysis to Nouns, Verbs, Adjectives and Adverbs only.
+
+{\color{red} TODO: Pretty graphs of eventful word vs. stopword trajectory}
+
+This chapter focuses entirely on word analysis while ignoring the documents. Once we have assembled the words into events, we will return to document representation. The core of this algorithm is taken from \cite{event-detection}.
 
 
 \section{Binary bag of words model}
-Apart from word embeddings, we will use yet another vector representation of the word features. This time, the vectors will represent trajectories of word frequency in time. Each word feature $f$ will in the end be represented by two vectors; $\vect{\traj}_{f}$ being its time trajectory, and $\embed_{f}$ being its semantic word embedding.
+To construct the word trajectories, we first need to know which words appear in which documents, as we are interested in the document frequency of each word. We will create a binary bag of words model, which is represented by a binary matrix denoting the incidence of documents and words. This model completely ignores word order, which is not necessary for this analysis, and was considered previously in word embeddings.
 
-We first adapt the binary form of the standard bag of words model to obtain a term-document matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \times \featcount}$, where $\featcount$ is the total vocabulary size. The document collection can then be interpreted as a set of $\doccount$ observations, each consisting of $\featcount$ binary features. The matrix $\bowmat$ is defined as
+We define a term-document matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \times \featcount}$, where $\doccount$ is the number of documents and $\featcount$ is the total vocabulary size. The document collection can then be interpreted as a set of $\doccount$ observations, each consisting of $\featcount$ binary features. The matrix $\bowmat$ is defined as
 
 \begin{equation} \label{eq:bow-matrix}
 	\bowmat_{ij} \coloneqq
@@ -20,13 +31,11 @@ We first adapt the binary form of the standard bag of words model to obtain a te
 
 {\color{red} TODO: Figure out the min\_freq and max\_freq of words to keep.}
 
-To limit the feature space, we trim the words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\bowmat$ reasonably sized.
-
-From now on, we focus our analysis on the individual word features rather than whole documents.
+To further limit the feature space, we discard words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies or typos. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\bowmat$ reasonably sized.
 
 
 \section{Computing feature trajectories}
-The time trajectory of a feature $f$ is a vector $\vect{\traj}_f = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$ with each element $\traj_{f}(t)$ representing the relative frequency of $f$ at time $t$. This frequency is defined using the DFIDF score:
+The time trajectory of a word feature $f$ is a vector $\vect{\traj}_{f} = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$ with each element $\traj_{f}(t)$ being the relative frequency of $f$ at time $t$. This frequency is defined using the DFIDF score:
 
 \begin{equation}
 	\traj_{f}(t) \coloneqq \underbrace{\frac{\text{\df}_{f}(t)}{\text{\doccount}(t)}}_{\text{DF}} \cdot \underbrace{\log{\frac{\doccount}{\text{\df}_{f}}}}_{\text{IDF}},
@@ -59,27 +68,25 @@ Using these matrices and vectors, we can compute $\trajmat$ as follows:
 		\cdot \text{diag} \left( \frac{1}{\vect{\doccount}_{t}} \right)}_{\text{DF}}
 \end{equation}
 
+Now, every word feature $f$ is represented by two vectors --- $\vect{\traj}_{f}$ being its time trajectory, and $\embed_{f}$ being its word embedding. We obtained temporal and semantic representation of the words, both of which will be utilized for event detection in the next chapter.
+
 
 \section{Spectral analysis}
-In this section, we interpret each feature trajectory as a time signal, which allows us to employ spectral analysis techniques to discover periodicities and estimate signal power of the features. Results from this section are then used to extract only a fraction of features with high overall frequency and to distinguish between periodic and aperiodic features.
+Having constructed the word trajectories, we still need to decide which words are eventful enough, and also categorize them into periodic and aperiodic. We interpret the trajectories as time signals, which allows us to employ spectral analysis techniques to discover periodicities and estimate signal power. The words with high enough signal power will then be deemed as eventful.
 
-We apply the discrete Fourier transform to each feature trajectory, which represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
+We apply the discrete Fourier transform to each trajectory to represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
 
 \begin{equation*}
 	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \exp(- \frac{2 \pi \mi}{\streamlen} (k - 1) t}), ~ k = 1, 2, \dots, \streamlen.
 \end{equation*}
 
-The absolute value of the Fourier coefficient $X_{k}$ denotes the amplitude of the complex sinusoid at frequency $\frac{k}{\streamlen}$.
-
-Having moved from the time domain to the frequency domain, we can now analyze the signal power and dominant periodicity of each feature.
-
-We observe peaks in the power spectrum of the transformed data and obtain the signal power and periodicity from those. The power spectrum is estimated using the periodogram estimator
+Having moved from the time domain to the frequency domain, we can now analyze the signal power and dominant periodicity of each word. They will be obtained from the power spectrum of the transformed trajectories, which is estimated using the periodogram estimator
 
 \begin{equation*}
 	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
 \end{equation*}
 
-To measure the overall signal power, we define the dominant power spectrum of the feature $f$ as the value of the highest peak in the power spectrum, that is
+To measure the overall signal power, we define the dominant power spectrum of the word feature $f$ as the value of the highest peak in the power spectrum, that is
 
 \begin{equation}
 	\text{DPS}_{f} \coloneqq \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
@@ -91,16 +98,18 @@ The dominant period is then defined as the inverse of the frequency correspondin
 	\text{DP}_{f} \coloneqq \frac{\streamlen}{\argmax\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}},
 \end{equation}
 
+{\color{red} TODO: Plot graphs of periodic and aperiodic word showing both time trajectory and its Fourier transform}
+
 When applied to rows of the matrix $\trajmat$, this method yields two vectors $\vect{DPS},\ \vect{DP} \in \R^{\featcount}$, containing the dominant power spectra and dominant periods, respectively.
 
 
 \section{Feature categorization}
-Based on the dominant power spectra and dominant periods, we divide the features into \underline{H}igh power-\underline{H}igh period and \underline{H}igh power-\underline{L}ow period categories \footnote{\cite{event-detection} actually define \textit{five} such categories; however, our method uses only the two sets of the most powerful features.}:
+Based on the dominant power spectra and dominant periods, we divide the word features into \underline{E}ventful-\underline{A}periodic and \underline{E}ventful-\underline{P}eriodic categories \footnote{\cite{event-detection} actually define \textit{five} such categories; however, our method uses only the two sets of the most powerful features.}:
 
 \begin{equation}
 \begin{split}
-	\text{HH} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound},\ \text{DP}_{f} > \ceil{\streamlen / 2} \right\}, \\
-	\text{HL} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound},\ \text{DP}_{f} \leq \ceil{\streamlen / 2} \right\}.
+	\text{EA} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound},\ \text{DP}_{f} > \ceil{\streamlen / 2} \right\}, \\
+	\text{EP} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound},\ \text{DP}_{f} \leq \ceil{\streamlen / 2} \right\}.
 \end{split}
 \end{equation}
 

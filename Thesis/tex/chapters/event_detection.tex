@@ -61,7 +61,7 @@ To perform the event detection itself, we mostly adapt the \textit{Unsupervised 
 \begin{algorithm}[H] \label{alg:greedy-event-detection}
 \begin{algorithmic}[1]
 \caption{Unsupervised greedy event detection}
-\Input $\text{Feature set} ~ F = \text{HH or HL}$
+\Input $\text{Feature set} ~ F = \text{EA or EP}$
 
 \State $\text{Sort the features in ascending DPS order: } DPS_{f_{1}} \leq \dots \leq DPS_{f_{\left\vert F \right\vert}}$
 
@@ -124,7 +124,7 @@ The input and output of the event detection algorithm remains the same as in \re
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
 \caption{Cluster-based event detection}
-\Input $\text{Feature set} ~ F = \text{HH or HL}$
+\Input $\text{Feature set} ~ F = \text{EA or EP}$
 
 \State Precompute a distance matrix $\distmat \in \R^{\left\vert F \right\vert \times \left\vert F \right\vert}$ with $\distmat_{ij} = \distfunc{f_{i}}{f_{j}}$
 
