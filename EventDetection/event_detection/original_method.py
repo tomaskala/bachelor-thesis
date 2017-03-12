@@ -14,7 +14,8 @@ from scipy.stats import cauchy, entropy, norm
 from sklearn.feature_extraction.text import CountVectorizer
 
 from event_detection import data_fetchers, plotting
-from event_detection.event_detector import construct_feature_trajectories, spectral_analysis
+from event_detection.event_detector import construct_feature_trajectories
+from event_detection.postprocessing import spectral_analysis
 from event_detection.preprocessing import CZECH_STOPWORDS
 
 WINDOW = 7
@@ -341,12 +342,12 @@ def main():
 
     # Aperiodic events
     aperiodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=True)
-    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dp, dirname='../aperiodic')
+    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname='../aperiodic')
     logging.info('Aperiodic done')
 
     # Periodic events
     periodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=False)
-    plotting.plot_events(trajectories, periodic_events, id2word, dps, dp, dirname='../periodic')
+    plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname='../periodic')
     logging.info('Periodic done')
 
     logging.info('All done in %fs.', time() - total_time)

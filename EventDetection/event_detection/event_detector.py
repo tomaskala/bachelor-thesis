@@ -6,8 +6,6 @@ from time import time
 
 import numpy as np
 import scipy.sparse as sp
-from hdbscan import HDBSCAN
-from scipy.signal import periodogram
 from scipy.stats import entropy
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import silhouette_score
@@ -15,11 +13,12 @@ from sklearn.metrics import silhouette_score
 from event_detection import annotations, data_fetchers, plotting, postprocessing, preprocessing
 
 
-def construct_doc_to_day_matrix(num_docs, days):
+def construct_doc_to_day_matrix(num_docs, days, names_separately=False):
     """
     Construct a sparse binary matrix of shape (docs, days), where dtd[i, j] = 1 iff document i was published on day j.
     :param num_docs: number of documents being processed
     :param days: list of days of publication of documents, with positions corresponding to the docs list
+    :param names_separately: whether the documents in BOW matrix are in pairs (document_headline, document_body)
     :return: a sparse matrix mapping documents to their publication days
     """
     doc_indices = np.arange(num_docs)
@@ -90,34 +89,6 @@ def construct_feature_trajectories(bow, doc_days):
     logging.info('DFIDF: %s, %s', str(dfidf.shape), str(dfidf.dtype))
 
     return dfidf.toarray()
-
-
-def spectral_analysis(feature_trajectories):
-    """
-    Compute the periodogram, dominant power spectra (DPS) and dominant periods (DP) of the given feature trajectories.
-    :param feature_trajectories: matrix of feature trajectories
-    :return: DPS, DP
-    """
-    t = time()
-    n_features, n_days = feature_trajectories.shape
-    freqs, pgram = periodogram(feature_trajectories)
-
-    with np.errstate(divide='ignore'):
-        periods = np.tile(1 / freqs, (n_features, 1))
-
-    dps_indices = np.argmax(pgram, axis=1)
-    feature_indices = np.arange(n_features)
-
-    dps = pgram[feature_indices, dps_indices]
-    dp = periods[feature_indices, dps_indices]
-
-    logging.info('Performed spectral analysis of the trajectories in %fs.', time() - t)
-    logging.info('Frequencies: %s, %s', str(freqs.shape), str(freqs.dtype))
-    logging.info('Periodogram: %s, %s', str(pgram.shape), str(pgram.dtype))
-    logging.info('DPS: %s, %s', str(dps.shape), str(dps.dtype))
-    logging.info('DP: %s, %s', str(dp.shape), str(dp.dtype))
-
-    return dps, dp
 
 
 def heuristic_stopwords_detection(feature_trajectories, dps, seed_sw_indices):
@@ -235,7 +206,6 @@ def event_detection_cluster_based(global_indices, w2v_model, feature_trajectorie
     logging.info('Detecting events using the clustering approach.')
     logging.info('Examining %d features.', n_features)
     t = time()
-    from scipy.spatial import distance
 
     distance_matrix = np.zeros((n_features, n_features), dtype=float)
 
@@ -246,14 +216,16 @@ def event_detection_cluster_based(global_indices, w2v_model, feature_trajectorie
                 word2 = id2word[global_indices[j]]
                 vec1 = w2v_model[word1]
                 vec2 = w2v_model[word2]
-                dist = distance.euclidean(vec1, vec2)
+                dist = np.linalg.norm(vec1 - vec2)
                 trajectory_divergence = jsd(feature_trajectories[i], feature_trajectories[j])
                 distance_matrix[i, j] = trajectory_divergence * dist
                 distance_matrix[j, i] = distance_matrix[i, j]
 
     logging.info('Precomputed word similarities in %fs.', time() - t)
 
-    clusterer = HDBSCAN(metric='precomputed', min_samples=2, min_cluster_size=3)
+    # clusterer = HDBSCAN(metric='precomputed', min_samples=2, min_cluster_size=3)
+    from sklearn.cluster import DBSCAN
+    clusterer = DBSCAN(metric='precomputed', min_samples=2)
     labels = clusterer.fit_predict(distance_matrix)
     n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
 
@@ -272,6 +244,35 @@ def event_detection_cluster_based(global_indices, w2v_model, feature_trajectorie
     logging.info('Silhouette score: %f.', silhouette_score(distance_matrix, labels, metric='precomputed'))
     logging.info('Cluster sizes: %s.', str([len(event) for event in events]))
     return events
+
+
+def rolling_window(array, window):
+    """
+    Calculate a rolling window of the given array along the -1st axis, similar to convolving each row with
+    `np.ones(window) / window`, but implemented more efficiently.
+    :param array: the array along whose rows to compute the rolling window
+    :param window: rolling window size
+    :return: array of row rolling windows of the given array
+    """
+    shape = array.shape[:-1] + (array.shape[-1] - window + 1, window)
+    strides = array.strides + (array.strides[-1],)
+    return np.lib.stride_tricks.as_strided(array, shape=shape, strides=strides)
+
+
+def calculate_trajectory_cutoff(trajectories, window):
+    """
+    Calculate a vector of cutoff values, one for each given trajectory. Trajectory elements falling under each cutoff
+    can be safely ignored as they are most likely caused by noise and do not contribute to any major event.
+    :param trajectories: matrix of trajectories
+    :param window: window size for moving average
+    :return: vector of cutoff values whose size is the number of trajectories
+    """
+    ma = np.mean(rolling_window(trajectories, window), -1)
+    ma_mean = np.mean(ma, axis=1)
+    ma_std = np.std(ma, axis=1)
+    cutoff = ma_mean + ma_std
+
+    return cutoff.reshape(-1, 1)
 
 
 def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, aperiodic, cluster_based):
@@ -297,9 +298,36 @@ def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, aperiodic, 
         logging.warning('No features to detect events from.')
         return []
 
+    if cluster_based:
+        # Greedy approach performs poorly when noise is trimmed, but clusters thrive.
+        cutoff = calculate_trajectory_cutoff(feature_trajectories, WINDOW)
+        feature_trajectories[feature_trajectories <= cutoff] = 0.0
+
     logging.info('Detecting %s events from %d features.', 'aperiodic' if aperiodic else 'periodic',
                  len(feature_indices))
 
+    trajectories_slice = feature_trajectories[feature_indices, :]
+    dps_slice = dps[feature_indices]
+
+    if cluster_based:
+        return event_detection_cluster_based(feature_indices, w2v_model, trajectories_slice, id2word)
+    else:
+        return event_detection_greedy(feature_indices, w2v_model, trajectories_slice, dps_slice, id2word)
+
+
+def detect_events_all_at_once(w2v_model, feature_trajectories, dps, id2word, cluster_based):
+    feature_indices = np.where(dps > DPS_BOUNDARY)[0]
+
+    if len(feature_indices) == 0:
+        logging.warning('No features to detect events from.')
+        return []
+
+    if cluster_based:
+        # Greedy approach performs poorly when noise is trimmed, but clusters thrive.
+        cutoff = calculate_trajectory_cutoff(feature_trajectories, WINDOW)
+        feature_trajectories[feature_trajectories <= cutoff] = 0.0
+
+    logging.info('Detecting events from %d features', len(feature_indices))
     trajectories_slice = feature_trajectories[feature_indices, :]
     dps_slice = dps[feature_indices]
 
@@ -315,35 +343,26 @@ def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, aperiodic, 
 # TODO: Putting a threshold on trajectory variation (take only std > DPS_BOUNDARY * 1.5) improves cluster based
 # TODO: detection quite a bit. Do this only for the greedy approach, clusters are fine?
 
-# TODO: Once retrieved the event documents, use Doc2Vec to put a threshold on event quality - throw away events with
-# TODO: the highest similarity being < THRESHOLD (there was an event with the highest similarity being negative
-# TODO: described by nonsensical words).
-
 # TODO: Try detecting from all features at the same time (aperiodic and periodic) -- DPS > DPS_BOUNDARY, no condition
 # TODO: on DP -- there is some overlap in the full dataset.
 
 # TODO: ----- Optimization -----
 # TODO: Normalize (and, effectively, freeze) the trained W2V model
 # TODO: del everything once it is no longer needed (or split into different functions)
-# TODO: log every 10K ? documents read from disk
-
-# Doc2Vec settings:
-# 1) Concat ... Greedy OK, clusters tragic (WMD somewhat improves greedy and solves the poor cluster quality)
-# 2) Mean ... Greedy OK, clusters awesome (WMD greedy are shit, but keeps the cluster quality)
-# 3) Sum ... Greedy not much, clusters awesome (WMD greedy are not much, but keeps the cluster quality)
-# 4) D-BOW + words ... Greedy OK, clusters tragic (WMD somewhat improves greedy and solves the poor cluster quality)
 
 # DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
 DPS_BOUNDARY = 0.05  # Dominant power spectrum boundary between high and low power features.
-DATASET = 'dec-jan'  # Dataset is shared across all document fetchers.
+DATASET = 'full'  # Dataset is shared across all document fetchers.
 # Embeddings generally need all POS tags, this removes only punctuation (Z) and unknowns (X).
 POS_EMBEDDINGS = ('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T')
 POS_KEYWORDS = ('N', 'V', 'A', 'D')  # Allowed POS tags for keyword extraction.
+NAMES_SEPARATELY = True  # Whether the documents are pairs (document_headline, document_body) for each real document.
+WINDOW = 7  # Window size for moving average.
 
 PICKLE_PATH = '../event_detection/pickle'
-ID2WORD_PATH = os.path.join(PICKLE_PATH, 'id2word_dec_jan.pickle')
-BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document_dec_jan.pickle')
-RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days_dec_jan.pickle')
+ID2WORD_PATH = os.path.join(PICKLE_PATH, 'id2word.pickle')
+BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document.npz')
+RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days.pickle')
 
 # [[(burst_start, burst_end, [(doc_id, doc_sim)] ... event_bursts] ... events] (load this to save memory)
 EVENT_DOCIDS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_docids_dec_jan_greedy.pickle')
@@ -367,8 +386,6 @@ def main(cluster_based):
     embedding_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_EMBEDDINGS)
     keyword_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_KEYWORDS)
 
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-
     if os.path.exists(ID2WORD_PATH) and os.path.exists(BOW_MATRIX_PATH) and os.path.exists(RELATIVE_DAYS_PATH):
         t = time()
         logging.info('Deserializing id2word, bag of words matrix and relative days.')
@@ -376,8 +393,7 @@ def main(cluster_based):
         with open(ID2WORD_PATH, mode='rb') as f:
             id2word = pickle.load(f)
 
-        with open(BOW_MATRIX_PATH, mode='rb') as f:
-            bow_matrix = pickle.load(f)
+        bow_matrix = data_fetchers.load_sparse_csr(BOW_MATRIX_PATH)
 
         with open(RELATIVE_DAYS_PATH, mode='rb') as f:
             relative_days = pickle.load(f)
@@ -396,7 +412,7 @@ def main(cluster_based):
             os.makedirs(PICKLE_PATH)
 
         relative_days = keyword_fetcher.fetch_relative_days()
-        documents = preprocessing.LemmaPreprocessor(keyword_fetcher)
+        documents = preprocessing.LemmaPreprocessor(keyword_fetcher, include_names=NAMES_SEPARATELY)
 
         stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
         logging.info('Stream length: %d', stream_length)
@@ -409,8 +425,7 @@ def main(cluster_based):
         with open(ID2WORD_PATH, mode='wb') as f:
             pickle.dump(id2word, f)
 
-        with open(BOW_MATRIX_PATH, mode='wb') as f:
-            pickle.dump(bow_matrix, f)
+        data_fetchers.save_sparse_csr(BOW_MATRIX_PATH, bow_matrix)
 
         with open(RELATIVE_DAYS_PATH, mode='wb') as f:
             pickle.dump(relative_days, f)
@@ -419,11 +434,14 @@ def main(cluster_based):
         logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
                      bow_matrix.getnnz())
 
+    if NAMES_SEPARATELY:
+        relative_days = np.repeat(relative_days, 2)
+
     num_docs = bow_matrix.shape[0]
-    w2v_model = preprocessing.perform_word2vec(embedding_fetcher)
+    w2v_model = preprocessing.perform_word2vec(embedding_fetcher, NAMES_SEPARATELY)
 
     trajectories = construct_feature_trajectories(bow_matrix, relative_days)
-    dps, dp = spectral_analysis(trajectories)
+    dps, dp = postprocessing.spectral_analysis(trajectories)
 
     if cluster_based:
         aperiodic_path = './aperiodic_clusters'
@@ -432,16 +450,22 @@ def main(cluster_based):
         aperiodic_path = './aperiodic'
         periodic_path = './periodic'
 
+    # All events
+    events = list(detect_events_all_at_once(w2v_model, trajectories, dps, id2word, cluster_based=cluster_based))
+    plotting.plot_events(trajectories, events, id2word, dps, dirname='./events_all')
+
+    exit()  # TODO: Don't exit.
+
     # Aperiodic events
     aperiodic_events = list(detect_events(w2v_model, trajectories, dps, dp, id2word, aperiodic=True,
                                           cluster_based=cluster_based))
-    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dp, dirname=aperiodic_path)
+    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname=aperiodic_path)
     logging.info('Aperiodic done')
 
     # Periodic events
     periodic_events = list(detect_events(w2v_model, trajectories, dps, dp, id2word, aperiodic=False,
                                          cluster_based=cluster_based))
-    plotting.plot_events(trajectories, periodic_events, id2word, dps, dp, dirname=periodic_path)
+    plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname=periodic_path)
     logging.info('Periodic done')
 
     exit()  # TODO: Don't exit.
@@ -464,7 +488,7 @@ def main(cluster_based):
             logging.info('Retrieving event documents.')
             t = time()
 
-            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, all_events, trajectories, dps, dp, dtd,
+            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, all_events, trajectories, dps, dtd,
                                                             w2v_model, id2word)
 
             with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='wb') as f:
@@ -491,7 +515,7 @@ def main(cluster_based):
             logging.info('Retrieving event documents.')
             t = time()
 
-            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, all_events, trajectories, dps, dp, dtd,
+            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, all_events, trajectories, dps, dtd,
                                                             w2v_model, id2word)
 
             with open(EVENT_DOCIDS_GREEDY_PATH, mode='wb') as f:
@@ -623,4 +647,13 @@ def summarize_inner(events_docs_repr, events, id2word, w2v_model):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
+    # logger = logging.getLogger()
+    # handler = logging.FileHandler('./bow_matrix_log.log')
+    # formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    # handler.setFormatter(formatter)
+    # logger.addHandler(handler)
+    # logger.setLevel(logging.INFO)
+
     main(cluster_based=True)

@@ -51,21 +51,27 @@ CZECH_STOPWORDS = frozenset(
 
 
 class LemmaPreprocessor:
-    def __init__(self, documents, min_length=3, max_length=15):
+    def __init__(self, documents, include_names, min_length=3, max_length=15):
         self.documents = documents
+        self.include_names = include_names
         self.min_length = min_length
         self.max_length = max_length
 
     def __iter__(self):
+        include_names = self.include_names
         min_length = self.min_length
         max_length = self.max_length
 
         for doc in self.documents:
+            if include_names:
+                yield [word for word in doc.name if
+                       word.lower() not in CZECH_STOPWORDS and min_length <= len(word) <= max_length]
+
             yield [word for word in doc.text if
                    word.lower() not in CZECH_STOPWORDS and min_length <= len(word) <= max_length]
 
 
-def perform_word2vec(fetcher, min_length=3, max_length=15):
+def perform_word2vec(fetcher, include_names, min_length=3, max_length=15):
     t = time()
 
     if os.path.exists(WORD2VEC_PATH):
@@ -74,7 +80,7 @@ def perform_word2vec(fetcher, min_length=3, max_length=15):
         logging.info('Loaded Word2Vec in %fs.', time() - t)
     else:
         logging.info('Training Word2Vec')
-        corpus = LemmaPreprocessor(fetcher, min_length, max_length)
+        corpus = LemmaPreprocessor(fetcher, include_names, min_length, max_length)
         word2vec_model = gensim.models.Word2Vec(corpus, size=100, window=5, min_count=10, iter=5, sg=1)
         word2vec_model.save(WORD2VEC_PATH)
         logging.info('Created and saved Word2Vec in %fs.', time() - t)

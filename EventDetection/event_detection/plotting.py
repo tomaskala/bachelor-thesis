@@ -124,7 +124,7 @@ def output_events_inner(events_docs_repr, events, id2word, doc2vec_model, dirnam
                 print(file=f)
 
 
-def plot_events(feature_trajectories, events, id2word, dps, dp, dirname='../events'):
+def plot_events(feature_trajectories, events, id2word, dps, dirname='../events'):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
@@ -152,7 +152,7 @@ def plot_events(feature_trajectories, events, id2word, dps, dp, dirname='../even
         plt.xlim(0.0, n_days)
         plt.grid(True)
 
-        event_trajectory, event_period = post.create_event_trajectory(event, feature_trajectories, dps, dp)
+        event_trajectory, event_period = post.create_event_trajectory(event, feature_trajectories, dps)
         plt.plot(days, event_trajectory, label='Period: {:d}'.format(event_period), color='red', linewidth=1.5)
 
         if event_period == n_days:

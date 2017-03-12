@@ -1,6 +1,8 @@
+import logging
 import os
 
 import numpy as np
+import scipy.sparse as sp
 
 CZECH_LEMMATIZED_TEXTS = '../../lemmatized_docs'
 CZECH_LEMMATIZED_TEXTS_DEC_JAN = ['2014-12-01.txt.tagged', '2014-12-02.txt.tagged', '2014-12-03.txt.tagged',
@@ -114,6 +116,8 @@ class CzechLemmatizedTexts:
         pos = self.pos
         names_only = self.names_only
 
+        docs_loaded = 0
+
         for file in self.document_paths:
             with open(os.path.join(CZECH_LEMMATIZED_TEXTS, file), 'r', encoding='utf8', errors='ignore') as f:
                 for line in f:
@@ -132,7 +136,11 @@ class CzechLemmatizedTexts:
                         elif line == '#textend':
                             in_text = False
                         elif line == '#docend':
+                            if docs_loaded % 50000 == 0 and docs_loaded > 0:
+                                logging.info('Loaded %d documents.', docs_loaded)
+
                             yield document
+                            docs_loaded += 1
                         else:
                             # Something else, though ignore the '#' sign by itself, as it appears in some documents.
                             if line.split('\t')[0] == '#':
@@ -273,3 +281,22 @@ class CzechSummarizationTexts:
                             sentence_forms.append(split[0].strip())
                             sentence_lemma.append(split[1].strip())
                             sentence_pos.append(split[2].strip())
+
+
+def save_sparse_csr(filename, array):
+    """
+    Save the given sparse matrix in CSR format, preserving its structure. Counterpart to the `load_sparse_csr` function.
+    :param filename: file to save the matrix to
+    :param array: sparse matrix in CSR format to save
+    """
+    np.savez(filename, data=array.data, indices=array.indices, indptr=array.indptr, shape=array.shape)
+
+
+def load_sparse_csr(filename):
+    """
+    Load a sparse matrix in CSR format from the given path. Counterpart to the `save_sparse_csr` function.
+    :param filename: file to load the matrix from
+    :return: the loaded CSR matrix
+    """
+    loader = np.load(filename)
+    return sp.csr_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])

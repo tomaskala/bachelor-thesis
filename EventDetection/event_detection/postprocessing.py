@@ -6,6 +6,7 @@ import gensim
 import numpy as np
 import sklearn.mixture as gmm
 from scipy.optimize import curve_fit
+from scipy.signal import periodogram
 from scipy.stats import norm
 
 WINDOW = 7  # Length of the window to use when computing the moving average.
@@ -20,6 +21,34 @@ def _moving_average(vector, window):
     """
     weights = np.ones(window) / window
     return np.convolve(vector, weights, 'valid')
+
+
+def spectral_analysis(vectors):
+    """
+    Compute the periodogram, dominant power spectra (DPS) and dominant periods (DP) of the given feature trajectories.
+    :param vectors: matrix whose rows to analyze
+    :return: DPS, DP
+    """
+    t = time()
+    n_features, n_days = vectors.shape
+    freqs, pgram = periodogram(vectors)
+
+    with np.errstate(divide='ignore'):
+        periods = np.tile(1 / freqs, (n_features, 1))
+
+    dps_indices = np.argmax(pgram, axis=1)
+    feature_indices = np.arange(n_features)
+
+    dps = pgram[feature_indices, dps_indices]
+    dp = periods[feature_indices, dps_indices].astype(int)
+
+    logging.info('Performed spectral analysis of the trajectories in %fs.', time() - t)
+    logging.info('Frequencies: %s, %s', str(freqs.shape), str(freqs.dtype))
+    logging.info('Periodogram: %s, %s', str(pgram.shape), str(pgram.dtype))
+    logging.info('DPS: %s, %s', str(dps.shape), str(dps.dtype))
+    logging.info('DP: %s, %s', str(dp.shape), str(dp.dtype))
+
+    return dps, dp
 
 
 def estimate_distribution_aperiodic(event_trajectory):
@@ -92,7 +121,7 @@ def estimate_distribution_periodic(event_trajectory, event_period):
     return e_parameters
 
 
-def create_event_trajectory(event, feature_trajectories, dps, dp):
+def create_event_trajectory(event, feature_trajectories, dps):
     """
     Create a trajectory of the given event as the sum of trajectories of its features weighted by their DPS.
     Also return the dominant period of the event, which is the most common dominant period of its features,
@@ -100,18 +129,17 @@ def create_event_trajectory(event, feature_trajectories, dps, dp):
     :param event: detected event (array of its feature indices)
     :param feature_trajectories: matrix of feature trajectories as row vectors
     :param dps: dominant power spectra of the processed features
-    :param dp: dominant periods of the processed features
     :return: trajectory of the given event and its dominant period
     """
     e_feature_trajectories = feature_trajectories[event]
     e_power_spectra = dps[event]
-    e_dominant_period = np.bincount(dp[event].astype(int)).argmax()
     e_trajectory = (e_feature_trajectories.T @ e_power_spectra) / np.sum(e_power_spectra)
+    _, e_dominant_period = spectral_analysis(np.array([e_trajectory]))
 
-    return e_trajectory, e_dominant_period
+    return e_trajectory, e_dominant_period[0]
 
 
-def keywords2docids_simple(events, feature_trajectories, dps, dp, dtd_matrix, bow_matrix):
+def keywords2docids_simple(events, feature_trajectories, dps, dtd_matrix, bow_matrix):
     """
     Convert the keyword representation of events to document representation. Do this in a simple manner by using all
     documents published in an event bursty period containing all its keywords. Although this punishes having too many
@@ -120,7 +148,6 @@ def keywords2docids_simple(events, feature_trajectories, dps, dp, dtd_matrix, bo
     :param events: list of events which in turn are lists of their keyword indices
     :param feature_trajectories:
     :param dps: dominant power spectra of the processed features
-    :param dp: dominant periods of the processed features
     :param dtd_matrix: document-to-day matrix
     :param bow_matrix: bag-of-words matrix
     :return: list of tuples (burst_start, burst_end, burst_documents) for all bursts of each event (that is, each inner
@@ -153,7 +180,7 @@ def keywords2docids_simple(events, feature_trajectories, dps, dp, dtd_matrix, bo
     documents = []
 
     for i, event in enumerate(events):
-        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
+        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps)
         is_aperiodic = event_period == n_days
 
         if is_aperiodic:
@@ -177,7 +204,7 @@ def keywords2docids_simple(events, feature_trajectories, dps, dp, dtd_matrix, bo
     return documents
 
 
-def keywords2docids_wmd(doc_fetcher, events, feature_trajectories, dps, dp, dtd_matrix, w2v_model, id2word, k=None):
+def keywords2docids_wmd(doc_fetcher, events, feature_trajectories, dps, dtd_matrix, w2v_model, id2word, k=None):
     """
     Convert the keyword representation of events to document representation. Do this by retrieving the documents within
     each event's bursty period(s) and then querying them using the event keywords as a query. For each event, take `k`
@@ -186,7 +213,6 @@ def keywords2docids_wmd(doc_fetcher, events, feature_trajectories, dps, dp, dtd_
     :param events: list of events which in turn are lists of their keyword indices
     :param feature_trajectories: matrix of feature trajectories
     :param dps: dominant power spectra of the processed features
-    :param dp: dominant periods of the processed features
     :param dtd_matrix: document-to-day matrix
     :param w2v_model: trained Word2Vec model (or Doc2Vec model with learned word embeddings)
     :param id2word: mapping of word IDs to the actual words
@@ -204,7 +230,7 @@ def keywords2docids_wmd(doc_fetcher, events, feature_trajectories, dps, dp, dtd_
     t = time()
     logging.info('Assembling documents of all bursty periods.')
 
-    event_bursts_docids = _describe_event_bursts(events, feature_trajectories, dps, dp, dtd_matrix)
+    event_bursts_docids = _describe_event_bursts(events, feature_trajectories, dps, dtd_matrix)
 
     logging.info('Documents assembled in %fs.', time() - t)
 
@@ -250,7 +276,7 @@ def _get_burst_docids(dtd_matrix, burst_loc, burst_scale):
     return burst_start, burst_end, burst_docs
 
 
-def _describe_event_bursts(events, feature_trajectories, dps, dp, dtd_matrix):
+def _describe_event_bursts(events, feature_trajectories, dps, dtd_matrix):
     """
     Retrieve the burst information of the given events. Each event will be represented by a list of its burst
     descriptions (1 burst for an aperiodic events, `stream_length / periodicity` bursts for a periodic event).
@@ -258,7 +284,6 @@ def _describe_event_bursts(events, feature_trajectories, dps, dp, dtd_matrix):
     :param events: list of events which in turn are lists of their keyword indices
     :param feature_trajectories: matrix of feature trajectories
     :param dps: dominant power spectra of the processed features
-    :param dp: dominant periods of the processed features
     :param dtd_matrix: document-to-day matrix
     :return: burst description of the events
     """
@@ -266,7 +291,7 @@ def _describe_event_bursts(events, feature_trajectories, dps, dp, dtd_matrix):
     events_out = []
 
     for i, event in enumerate(events):
-        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps, dp)
+        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps)
 
         if event_period == n_days:
             # Aperiodic event
