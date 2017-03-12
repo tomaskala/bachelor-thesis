@@ -130,8 +130,9 @@ def plot_events(feature_trajectories, events, id2word, dps, dirname='../events')
 
     n_days = feature_trajectories.shape[1]
     days = np.arange(feature_trajectories.shape[1])
+    event_trajectories, event_periods = post.create_events_trajectories(events, feature_trajectories, dps)
 
-    for i, event in enumerate(events):
+    for i, (event, event_trajectory, event_period) in enumerate(zip(events, event_trajectories, event_periods)):
         fig = plt.figure()
 
         plt.subplot(2, 1, 1)
@@ -151,8 +152,6 @@ def plot_events(feature_trajectories, events, id2word, dps, dirname='../events')
         plt.title('Event trajectory')
         plt.xlim(0.0, n_days)
         plt.grid(True)
-
-        event_trajectory, event_period = post.create_event_trajectory(event, feature_trajectories, dps)
         plt.plot(days, event_trajectory, label='Period: {:d}'.format(event_period), color='red', linewidth=1.5)
 
         if event_period == n_days:

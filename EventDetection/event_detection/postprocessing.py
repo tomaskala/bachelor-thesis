@@ -42,7 +42,7 @@ def spectral_analysis(vectors):
     dps = pgram[feature_indices, dps_indices]
     dp = periods[feature_indices, dps_indices].astype(int)
 
-    logging.info('Performed spectral analysis of the trajectories in %fs.', time() - t)
+    logging.info('Performed spectral analysis of %d trajectories in %fs.', n_features, time() - t)
     logging.info('Frequencies: %s, %s', str(freqs.shape), str(freqs.dtype))
     logging.info('Periodogram: %s, %s', str(pgram.shape), str(pgram.dtype))
     logging.info('DPS: %s, %s', str(dps.shape), str(dps.dtype))
@@ -121,22 +121,26 @@ def estimate_distribution_periodic(event_trajectory, event_period):
     return e_parameters
 
 
-def create_event_trajectory(event, feature_trajectories, dps):
+def create_events_trajectories(events, feature_trajectories, dps):
     """
-    Create a trajectory of the given event as the sum of trajectories of its features weighted by their DPS.
-    Also return the dominant period of the event, which is the most common dominant period of its features,
-    since not all of them have necessarily the same periodicity.
-    :param event: detected event (array of its feature indices)
+    Create a trajectory for each given event as the average of trajectories of its features weighted by their DPS.
+    Also return the dominant period of the event, calculated using spectral analysis.
+    :param events: detected events (list of arrays of their feature indices)
     :param feature_trajectories: matrix of feature trajectories as row vectors
     :param dps: dominant power spectra of the processed features
-    :return: trajectory of the given event and its dominant period
+    :return: trajectories of the given events and their dominant periods
     """
-    e_feature_trajectories = feature_trajectories[event]
-    e_power_spectra = dps[event]
-    e_trajectory = (e_feature_trajectories.T @ e_power_spectra) / np.sum(e_power_spectra)
-    _, e_dominant_period = spectral_analysis(np.array([e_trajectory]))
+    event_trajectories = np.empty((len(events), feature_trajectories.shape[1]), dtype=float)
 
-    return e_trajectory, e_dominant_period[0]
+    for i, event in enumerate(events):
+        e_feature_trajectories = feature_trajectories[event]
+        e_power_spectra = dps[event]
+        e_trajectory = (e_feature_trajectories.T @ e_power_spectra) / np.sum(e_power_spectra)
+        event_trajectories[i] = e_trajectory
+
+    _, event_dominant_periods = spectral_analysis(event_trajectories)
+
+    return event_trajectories, event_dominant_periods
 
 
 def keywords2docids_simple(events, feature_trajectories, dps, dtd_matrix, bow_matrix):
@@ -178,9 +182,9 @@ def keywords2docids_simple(events, feature_trajectories, dps, dtd_matrix, bow_ma
 
     n_days = feature_trajectories.shape[1]
     documents = []
+    event_trajectories, event_periods = create_events_trajectories(events, feature_trajectories, dps)
 
-    for i, event in enumerate(events):
-        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps)
+    for i, (event, event_trajectory, event_period) in enumerate(zip(events, event_trajectories, event_periods)):
         is_aperiodic = event_period == n_days
 
         if is_aperiodic:
@@ -289,10 +293,9 @@ def _describe_event_bursts(events, feature_trajectories, dps, dtd_matrix):
     """
     n_days = feature_trajectories.shape[1]
     events_out = []
+    event_trajectories, event_periods = create_events_trajectories(events, feature_trajectories, dps)
 
-    for i, event in enumerate(events):
-        event_trajectory, event_period = create_event_trajectory(event, feature_trajectories, dps)
-
+    for i, (event, event_trajectory, event_period) in enumerate(zip(events, event_trajectories, event_periods)):
         if event_period == n_days:
             # Aperiodic event
             burst_loc, burst_scale = estimate_distribution_aperiodic(event_trajectory)

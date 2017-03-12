@@ -223,7 +223,6 @@ def event_detection_cluster_based(global_indices, w2v_model, feature_trajectorie
 
     logging.info('Precomputed word similarities in %fs.', time() - t)
 
-    # clusterer = HDBSCAN(metric='precomputed', min_samples=2, min_cluster_size=3)
     from sklearn.cluster import DBSCAN
     clusterer = DBSCAN(metric='precomputed', min_samples=2)
     labels = clusterer.fit_predict(distance_matrix)
