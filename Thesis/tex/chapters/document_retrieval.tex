@@ -10,6 +10,7 @@ First, we need to detect the period where the particular event occurred, so that
 \begin{enumerate}
 	\item Construct the event trajectory
 	\item Clean the trajectory
+	\item Determine the event's periodicity
 	\item Fit a probability density function
 	\item Take the region(s) with the highest density as the bursty period(s)
 \end{enumerate}
@@ -26,47 +27,39 @@ We will first need to construct an \textit{event trajectory} out of its \textit{
 
 \subsection{Trajectory filtering}
 
-Now, a typical event (shown in {\color{red} TODO: Put a pretty picture here}) will usually have some number of dominant bursts corresponding to the period(s) when the event actually occurred. Additionally, there will be some milder, noisy bursts due to the keywords appearing elsewhere, independently of that particular event. We are only interested in the main burst(s), and so we will need to filter out the noise.
+Now, a typical event (shown in {\color{red} TODO: Put a pretty picture here}) will usually have some number of dominant bursts corresponding to the period(s) when the event actually occurred. Additionally, there will be some milder, noisy bursts due to the keywords appearing elsewhere, independently of that particular event.
 
-We do this by computing a cutoff value for each event trajectory and discarding the sectors falling under this threshold. This procedure is adopted from \cite{online-search-queries}. The algorithm is as follows:
+We aim to fit a probability density function to the event trajectory. However, the process would pointlessly try to fit the density to the noisy parts as well as to the bursts. Once again, we apply the Burst filtering algorithm described in \autoref{chap:event-detection} to filter out noise, this time from the event trajectories.
 
-\begin{algorithm}[H]
-\begin{algorithmic}[1]
-\caption{Burst filtering}
-\Input $\text{window-length} \ w,\ \text{event trajectory} \ \vect{\traj_{e}}$
+\subsection{Event periodicity}
+We apply the signal processing techniques described in \autoref{chap:word-analysis} once again, this time to determine the dominant period $\text{DP}_{e}$ of each event $e$. After obtaining the periodogram, the dominant period is defined as the inverse of the frequency corresponding to the highest peak in the event trajectory:
 
-\State $\vect{MA}_{w} = \text{Moving Average of length} ~ w ~ \text{for} ~ \vect{\traj}_{e} = \left[ \traj_{e}(1), \traj_{e}(2), \dots, \traj_{e}(\streamlen) \right]$
+\begin{equation}
+	\text{DP}_{e} \coloneqq \frac{\streamlen}{\argmax\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}}.
+\end{equation}
 
-\State $\mathit{cutoff} = \text{mean} \left( \vect{MA}_{w} \right) + \text{std} \left( \vect{MA}_{w} \right)$
-
-\State $\vect{bursts}_{e} = \left[ \traj_{e}(t) \mid \traj_{e}(t) > \mathit{cutoff} \right]$
-
-\Output $\vect{bursts}_{e}$
-\end{algorithmic}
-\end{algorithm}
-
-{\color{red} TODO: In the paper, they use $\vect{MA}(t)_{w} > \mathit{cutoff}$, try that. Also, why did I miss that? :(}
-
-We further normalize the filtered trajectories to have unit sums, so they can be interpreted as probability distribution over the stream. An element $\traj_{e}(i)$ of the trajectory will denote a probability of that event occurring on day $i$. This allows us to fit a probability density function to them. \cite{event-detection} adapted a similar approach, though only for feature trajectories rather than event trajectories.
+{\color{red} TODO: Graphs here}
 
 \subsection{Density fitting}
+We normalize the event trajectories to have unit sums, so they can be interpreted as probability distribution over the stream. An element $\traj_{e}(i)$ of the trajectory will denote a probability of that event occurring on day $i$. This allows us to fit a probability density function to them. \cite{event-detection} adapted a similar approach, though only for feature trajectories rather than event trajectories.
+
 We describe aperiodic and periodic events separately, as different probability distributions must be used in case of a single burst than in case of multiple bursts.
 
 \begin{enumerate}
 
-\item \textbf{Aperiodic features}
+\item \textbf{Aperiodic events}
 
-An aperiodic feature trajectory $\traj_{f}$ is modeled by a Gaussian distribution. We fit the Gaussian function
+An aperiodic event trajectory $\traj_{e}$ is modeled by a Gaussian distribution. We fit the Gaussian function
 
 \begin{equation*}
 	f(x) = \frac{1}{\sigma \sqrt{2 \pi}} \exp(-\frac{\left( x - \mu \right)^{2}}{2 \sigma^{2}})
 \end{equation*}
 
-to the trajectory $y_{f}$. The parameters $\mu$ and $\sigma$ are estimated using non-linear least squares method. Unlike \cite{event-detection} who use the EM algorithm, least squares proved to be less prone to outliers, yielding a shape more resembling the actual trajectory.
+to the trajectory $y_{e}$. The parameters $\mu$ and $\sigma$ are estimated using non-linear least squares method. Unlike \cite{event-detection} who use the EM algorithm, least squares proved to be less prone to outliers, yielding a shape more resembling the actual trajectory.
 
-\item \textbf{Periodic features}
+\item \textbf{Periodic events}
 
-A periodic feature trajectory $\traj_{f}$ is modeled using a mixture of $K = \floor{\streamlen / \text{DP}_{f}}$ Cauchy distributions (as many mixture components as there are periods), as in \cite{health-events}:
+A periodic event trajectory $\traj_{e}$ is modeled using a mixture of $K = \floor{\streamlen / \text{DP}_{e}}$ Cauchy distributions (as many mixture components as there are periods), as in \cite{health-events}:
 
 \begin{equation*}
 	f(x) = \sum_{k = 1}^{K}{\alpha_{k} \frac{1}{\pi} \left( \frac{\gamma_{k}}{\left( x - \mu_{k} \right)^{2} + \gamma_{k}^{2}} \right)}
@@ -74,11 +67,11 @@ A periodic feature trajectory $\traj_{f}$ is modeled using a mixture of $K = \fl
 
 The mixing parameters $\alpha_{k},\ \sum_{k = 1}^{K}{\alpha_{k}} = 1$, location parameters $\mu_{k}$ and scale parameters $\gamma_{k}$ are estimated using the EM algorithm.
 
-The Cauchy distribution has a narrower peak and thicker tails than the Gaussian distribution, which models the periodic bursts more closely. The individual bursts of a periodic feature tend to be quite short, but even between two consecutive bursts, the frequency remains at a non-negligible level, which makes the Cauchy distribution a somewhat better choice.
+The Cauchy distribution has a narrower peak and thicker tails than the Gaussian distribution, which models the periodic bursts more closely. The individual bursts of a periodic event tend to be quite short, but even between two consecutive bursts, the frequency remains at a non-negligible level, which makes the Cauchy distribution a somewhat better choice.
 
 
 \subsection{Burst detection}
-The bursty period of an aperiodic event is now defined as $\interval{\mu - \sigma}{\mu + \sigma}$. For a periodic event, there are $K = \floor{\streamlen / \text{DP}_{f}}$ bursty periods, each defined as $\interval{\mu_{k} - \gamma_{k}}{\mu_{k} + \gamma_{k}}$.
+The bursty period of an aperiodic event is now defined as $\interval{\mu - \sigma}{\mu + \sigma}$. For a periodic event, there are $K = \floor{\streamlen / \text{DP}_{e}}$ bursty periods, each defined as $\interval{\mu_{k} - \gamma_{k}}{\mu_{k} + \gamma_{k}}$.
 
 
 

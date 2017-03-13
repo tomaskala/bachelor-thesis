@@ -61,7 +61,7 @@ To perform the event detection itself, we mostly adapt the \textit{Unsupervised 
 \begin{algorithm}[H] \label{alg:greedy-event-detection}
 \begin{algorithmic}[1]
 \caption{Unsupervised greedy event detection}
-\Input $\text{Feature set} ~ F = \text{EA or EP}$
+\Input $\text{Word feature set} ~ F$
 
 \State $\text{Sort the features in ascending DPS order: } DPS_{f_{1}} \leq \dots \leq DPS_{f_{\left\vert F \right\vert}}$
 
@@ -94,6 +94,31 @@ To perform the event detection itself, we mostly adapt the \textit{Unsupervised 
 \section{Cluster-based approach}
 This approach uses a clustering algorithm to create clusters out of word features directly, instead of explicitly minimizing a cost function. To achieve this, we need to define a proper distance function, and choose the right clustering algorithm.
 
+\subsection{Noise filtering}
+Before we proceed to the clustering, we will filter out the noisy parts from the word trajectories. Most words are at some level reported all the time, though only a fraction of their trajectories belongs to some notable event. Unlike the greedy optimization described previously, clustering is prone to such noise, and would yield clusters of poor quality, often with trajectories being put together only due to their noisy parts being similar.
+
+{\color{red} TODO: Graphs of awesome vs. poor clusterings}
+
+We want to keep only those trajectory parts exceeding a certain frequency level, distinguishing notable bursts from the general noise. We do this by computing a cutoff value for each event trajectory and discarding the sectors falling under this cutoff. This procedure is adopted from \cite{online-search-queries}. The algorithm is as follows:
+
+\begin{algorithm}[H]
+\begin{algorithmic}[1]
+\caption{Burst filtering}
+\Input $\text{window-length} \ w,\ \text{event trajectory} \ \vect{\traj_{e}}$
+
+\State $\vect{MA}_{w} = \text{Moving Average of length} ~ w ~ \text{for} ~ \vect{\traj}_{e} = \left[ \traj_{e}(1), \traj_{e}(2), \dots, \traj_{e}(\streamlen) \right]$
+
+\State $\mathit{cutoff} = \text{mean} \left( \vect{MA}_{w} \right) + \text{std} \left( \vect{MA}_{w} \right)$
+
+\State $\vect{bursts}_{e} = \left[ \traj_{e}(t) \mid \traj_{e}(t) > \mathit{cutoff} \right]$
+
+\Output $\vect{bursts}_{e}$
+\end{algorithmic}
+\end{algorithm}
+
+{\color{red} TODO: In the paper, they use $\vect{MA}(t)_{w} > \mathit{cutoff}$, try that. Also, why did I miss that? :(}
+
+
 \subsection{Distance function}
 The distance function conveys similar information as the cost function used in the previous algorithm, but it is defined pairwise between words.
 
@@ -124,7 +149,7 @@ The input and output of the event detection algorithm remains the same as in \re
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
 \caption{Cluster-based event detection}
-\Input $\text{Feature set} ~ F = \text{EA or EP}$
+\Input $\text{Word feature set} ~ F$
 
 \State Precompute a distance matrix $\distmat \in \R^{\left\vert F \right\vert \times \left\vert F \right\vert}$ with $\distmat_{ij} = \distfunc{f_{i}}{f_{j}}$
 

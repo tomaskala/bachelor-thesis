@@ -1,10 +1,12 @@
 This is the first phase of the event detection algorithm, focused on obtaining a set of candidate word features for event representation. We do not yet perform the actual event detection, which will be addressed in the next chapter, but merely extract a subset of words carrying enough information to be considered representative.
 
-Here we work with the assumption that an event can be detected by observing the frequencies of individual words over time and grouping together those words which appear in similar documents during similar time periods \cite{event-detection, parameter-free}. This corresponds to an event being often mentioned in the text stream, be it a formal news stream or a stream of social network comments, around the period when it actually occurred. Of course, not all words are representative of an event, so we will have to impose a criterion of a ``word eventness''. Furthermore, there are some words appearing periodically during the duration of the text stream, such as words related to sport matches or weather forecasts reported every week. While they may be of interest, we will aim to distinguish them from words appearing only once during the observed period.
+Here we work with the assumption that an event can be detected by observing the frequencies of individual words over time and grouping together those words which appear in similar documents during similar time periods \cite{event-detection, parameter-free}. This corresponds to an event being often mentioned in the text stream, be it a formal news stream or a stream of social network comments, around the period when it actually occurred. Of course, not all words are representative of an event, so we will have to impose a criterion of a ``word eventness''.
 
-{\color{red} TODO: Pretty graphs of aperiodic vs. periodic trajectory}
+\cite{event-detection} also distinguished between periodic and aperiodic words, where periodic words appear in bursts with a certain period (these words are related for example to sport matches played every weekend, weather forecasts reported every week, etc.) They divided the words into two groups by their periodicity, and detect events from each group separately. During our evaluation, some words were misclassified, which would split an event into several parts due to keywords for that event appearing in both categories. Therefore, we detect events from all ``eventful'' words at once, and examine the periodicities of the events later on.
 
-At first, we will construct a trajectory of each word --- a measure of word frequency over time. We will then apply signal processing techniques to determine both eventness and periodicity of each word, and categorize the words accordingly into eventful-periodic and eventful-aperiodic, discarding the rest.
+{\color{red} TODO: Some example of a misclassified word}
+
+At first, we will construct a trajectory of each word --- a measure of word frequency over time. Then, we will introduce signal processing techniques which will be used to determine eventness of each word by its trajectory. We will then extract eventful words and discard the rest. The same technique will later be used to determine event periodicity.
 
 These trajectories will then be examined for so called ``bursts'' in frequency, where a word would suddenly appear in a large number of documents. Should a higher number of words appear in similar documents with overlapping bursts, it may be an indicator that an event worthy of attention occurred.
 
@@ -28,8 +30,6 @@ We define a term-document matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \
 		0, & \text{otherwise.}
 	\end{cases}
 \end{equation}
-
-{\color{red} TODO: Figure out the min\_freq and max\_freq of words to keep.}
 
 To further limit the feature space, we discard words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies or typos. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\bowmat$ reasonably sized.
 
@@ -72,7 +72,7 @@ Now, every word feature $f$ is represented by two vectors --- $\vect{\traj}_{f}$
 
 
 \section{Spectral analysis}
-Having constructed the word trajectories, we still need to decide which words are eventful enough, and also categorize them into periodic and aperiodic. We interpret the trajectories as time signals, which allows us to employ spectral analysis techniques to discover periodicities and estimate signal power. The words with high enough signal power will then be deemed as eventful.
+Having constructed the word trajectories, we still need to decide which words are eventful enough. We will interpret the word trajectories as signals, which allows us to analyze them using signal processing techniques. Here, we will analyze only the signal power to measure the eventness, but the same technique will be used in \autoref{chap:document-retrieval} to discover event periodicity.
 
 We apply the discrete Fourier transform to each trajectory to represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
 
@@ -80,7 +80,7 @@ We apply the discrete Fourier transform to each trajectory to represents the tim
 	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \exp(- \frac{2 \pi \mi}{\streamlen} (k - 1) t}), ~ k = 1, 2, \dots, \streamlen.
 \end{equation*}
 
-Having moved from the time domain to the frequency domain, we can now analyze the signal power and dominant periodicity of each word. They will be obtained from the power spectrum of the transformed trajectories, which is estimated using the periodogram estimator
+Having moved from the time domain to the frequency domain, we can now analyze the signal power of each word. They will be retrieved from the power spectra of the transformed trajectories, which are estimated using the periodogram estimator
 
 \begin{equation*}
 	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
@@ -92,25 +92,14 @@ To measure the overall signal power, we define the dominant power spectrum of th
 	\text{DPS}_{f} \coloneqq \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
-The dominant period is then defined as the inverse of the frequency corresponding to the highest peak:
-
-\begin{equation}
-	\text{DP}_{f} \coloneqq \frac{\streamlen}{\argmax\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}},
-\end{equation}
-
 {\color{red} TODO: Plot graphs of periodic and aperiodic word showing both time trajectory and its Fourier transform}
 
-When applied to rows of the matrix $\trajmat$, this method yields two vectors $\vect{DPS},\ \vect{DP} \in \R^{\featcount}$, containing the dominant power spectra and dominant periods, respectively.
+When applied to rows of the matrix $\trajmat$, this method yields a vector $\vect{DPS} \in \R^{\featcount}$ containing the dominant power spectra.
 
-
-\section{Feature categorization}
-Based on the dominant power spectra and dominant periods, we divide the word features into \underline{E}ventful-\underline{A}periodic and \underline{E}ventful-\underline{P}eriodic categories \footnote{\cite{event-detection} actually define \textit{five} such categories; however, our method uses only the two sets of the most powerful features.}:
+We finally define the set of all eventful words as those whose trajectory signal is powerful enough, that is, they appear in a large number of documents in a noiseless pattern:
 
 \begin{equation}
-\begin{split}
-	\text{EA} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound},\ \text{DP}_{f} > \ceil{\streamlen / 2} \right\}, \\
-	\text{EP} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound},\ \text{DP}_{f} \leq \ceil{\streamlen / 2} \right\}.
-\end{split}
+	\text{EW} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound} \right\}.
 \end{equation}
 
 {\color{red}TODO: Define dps-bound!}
