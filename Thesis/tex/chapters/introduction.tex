@@ -1,11 +1,28 @@
-This is my introduction.
-
 \section{Event detection}
+(just some notes)
+
+Event detection arose as a subfield of Information retrieval and Topic detection and tracking.
+
+Given a stream of text documents published over a certain time period, the task is to analyze them and output a collection of events that happened in the world during the period. An event is loosely defined as a thing happening at a certain place during a certain time (add source, it's in one of the papers in related work).
+
+Some approaches output the events as clusters of documents, others represent them by keywords. Also, difference between online (also called First story detection) and offline event detection.
+
+The detected events could be used to quickly make some sense about what happened during a period the user was off the news, to quickly examine a vast number of text documents whether one needs to go through them in more detail, etc.
+
+Some methods are supervised and classify the documents into given topical classes. Some are query based in a way that the user issues a query about a type of event he is interested in and the system outputs the matching events.
+
+Our focus is on unsupervised event detection such that it does not need any annotated data whatsoever, and, preferrably, does not require a large number of parameters fit to the given document collection. The system should also be reasonably fast, so that it is comfortably usable to browse a document collection.
+
+We apply the recent advances in word embeddings (word2vec) to enrich the existing methods by a more fine-grained metric of word similarity.
+
+To make the system more usable, we do not end with events described just by keywords, but move on to extracting relevant documents and extract short annotations, so the user can paint a picture what the events are about, and whether he wants to examine them further and actually read the documents.
 
 \section{Related work}
 \begin{enumerate}
 \item \cite{event-detection}
 \item \cite{parameter-free}
 \item \cite{retrospective-online-study}
+\item Add Blei's method
+\item ...
 
 \end{enumerate}
