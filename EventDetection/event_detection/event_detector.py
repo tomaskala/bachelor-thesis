@@ -7,23 +7,30 @@ from time import time
 import numpy as np
 import scipy.sparse as sp
 from scipy.stats import entropy
+from sklearn.cluster import DBSCAN
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import silhouette_score
 
 from event_detection import annotations, data_fetchers, plotting, postprocessing, preprocessing
 
 
-def construct_doc_to_day_matrix(num_docs, days, names_separately=False):
+def construct_doc_to_day_matrix(n_docs, relative_days, names_separately=False):
     """
     Construct a sparse binary matrix of shape (docs, days), where dtd[i, j] = 1 iff document i was published on day j.
-    :param num_docs: number of documents being processed
-    :param days: list of days of publication of documents, with positions corresponding to the docs list
-    :param names_separately: whether the documents in BOW matrix are in pairs (document_headline, document_body)
+    :param n_docs: number of documents being processed
+    :param relative_days: list of days of publication of documents, with positions corresponding to the docs list
+    :param names_separately: whether the documents in BOW matrix are in pairs (document_headline, document_body) and we
+        only want indices of real documents with respect to the document collection, not these 'pseudo-documents' which
+        the real documents are divided into as names and bodies
     :return: a sparse matrix mapping documents to their publication days
     """
-    doc_indices = np.arange(num_docs)
-    day_indices = np.array(days)
-    incidence = np.full(num_docs, 1, dtype=int)
+    if names_separately:
+        n_docs //= 2
+        relative_days = relative_days[::2]
+
+    doc_indices = np.arange(n_docs)
+    day_indices = np.array(relative_days)
+    incidence = np.full(n_docs, 1, dtype=int)
 
     return sp.csc_matrix((incidence, (doc_indices, day_indices)))
 
@@ -133,7 +140,7 @@ def event_detection_greedy(global_indices, w2v_model, feature_trajectories, dps,
     :param feature_trajectories: matrix of feature trajectories
     :param dps: vector of dominant power spectra
     :param id2word: mapping from IDs to words to be used in Word2Vec
-    :return: yield the detected events as lists of keyword indices
+    :return: the detected events as a list of arrays of keyword indices
     """
 
     def cost_function(old_indices, new_index):
@@ -167,7 +174,7 @@ def event_detection_greedy(global_indices, w2v_model, feature_trajectories, dps,
     indices = list(sorted(range(len(feature_trajectories)), key=lambda i: dps[i]))
 
     t = time()
-    found_events = 0
+    events = []
 
     while len(indices) > 0:
         feature = indices.pop(0)
@@ -184,21 +191,23 @@ def event_detection_greedy(global_indices, w2v_model, feature_trajectories, dps,
             else:
                 break
 
-        yield global_indices[event]
-        found_events += 1
+        events.append(global_indices[event])
 
-    logging.info('Detected %d events in %fs.', found_events, time() - t)
+    logging.info('Detected %d events in %fs.', len(events), time() - t)
+    return events
 
 
 def event_detection_cluster_based(global_indices, w2v_model, feature_trajectories, id2word):
+    """
+    The main event detection method with clustering.
+    :param global_indices: mapping of word indices from local with respect to the examined set to global
+    :param w2v_model: trained Word2Vec model
+    :param feature_trajectories: matrix of feature trajectories
+    :param id2word: mapping from IDs to words to be used in Word2Vec
+    :return: the detected events as a list of arrays of keyword indices
+    """
+
     def jsd(p, q):
-        """
-        Compute the Jensen-Shannon divergence between the two probability distributions. Jensen-Shannon divergence is
-        symmetric (in contrast to Kullback-Leibler divergence) and its square root is a proper metric.
-        :param p: the true probability distribution
-        :param q: the theoretical probability distribution
-        :return: Jensen-Shannon divergence between the two probability distributions
-        """
         m = 0.5 * (p + q)
         return 0.5 * entropy(p, m, base=2) + 0.5 * entropy(q, m, base=2)
 
@@ -223,7 +232,6 @@ def event_detection_cluster_based(global_indices, w2v_model, feature_trajectorie
 
     logging.info('Precomputed word similarities in %fs.', time() - t)
 
-    from sklearn.cluster import DBSCAN
     clusterer = DBSCAN(metric='precomputed', min_samples=2)
     labels = clusterer.fit_predict(distance_matrix)
     n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
@@ -274,7 +282,7 @@ def calculate_trajectory_cutoff(trajectories, window):
     return cutoff.reshape(-1, 1)
 
 
-def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, aperiodic, cluster_based):
+def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, which, cluster_based):
     """
     Perform event detection.
     :param w2v_model: trained Word2Vec model
@@ -282,16 +290,18 @@ def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, aperiodic, 
     :param dps: vector of dominant power spectra
     :param dp: vector of dominant periods
     :param id2word: mapping from IDs to words to be used in Word2Vec
-    :param aperiodic: whether to detect aperiodic or periodic events
+    :param which: whether to detect 'aperiodic', 'periodic' or 'all' events
     :param cluster_based: whether to use the cluster-based algorithm or the one with explicit minimization
     :return: iterable of events as lists of keyword indices
     """
     n_days = feature_trajectories.shape[1]
 
-    if aperiodic:
+    if which == 'aperiodic':
         feature_indices = np.where((dps > DPS_BOUNDARY) & (dp > math.floor(n_days / 2)))[0]
-    else:
+    elif which == 'periodic':
         feature_indices = np.where((dps > DPS_BOUNDARY) & (dp <= math.floor(n_days / 2)))[0]
+    else:
+        feature_indices = np.where(dps > DPS_BOUNDARY)[0]
 
     if len(feature_indices) == 0:
         logging.warning('No features to detect events from.')
@@ -302,10 +312,9 @@ def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, aperiodic, 
         cutoff = calculate_trajectory_cutoff(feature_trajectories, WINDOW)
         feature_trajectories[feature_trajectories <= cutoff] = 0.0
 
-    logging.info('Detecting %s events from %d features.', 'aperiodic' if aperiodic else 'periodic',
-                 len(feature_indices))
+    logging.info('Detecting %s events from %d features.', which, len(feature_indices))
 
-    trajectories_slice = feature_trajectories[feature_indices, :]
+    trajectories_slice = feature_trajectories[feature_indices]
     dps_slice = dps[feature_indices]
 
     if cluster_based:
@@ -313,41 +322,6 @@ def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, aperiodic, 
     else:
         return event_detection_greedy(feature_indices, w2v_model, trajectories_slice, dps_slice, id2word)
 
-
-def detect_events_all_at_once(w2v_model, feature_trajectories, dps, id2word, cluster_based):
-    feature_indices = np.where(dps > DPS_BOUNDARY)[0]
-
-    if len(feature_indices) == 0:
-        logging.warning('No features to detect events from.')
-        return []
-
-    if cluster_based:
-        # Greedy approach performs poorly when noise is trimmed, but clusters thrive.
-        cutoff = calculate_trajectory_cutoff(feature_trajectories, WINDOW)
-        feature_trajectories[feature_trajectories <= cutoff] = 0.0
-
-    logging.info('Detecting events from %d features', len(feature_indices))
-    trajectories_slice = feature_trajectories[feature_indices, :]
-    dps_slice = dps[feature_indices]
-
-    if cluster_based:
-        return event_detection_cluster_based(feature_indices, w2v_model, trajectories_slice, id2word)
-    else:
-        return event_detection_greedy(feature_indices, w2v_model, trajectories_slice, dps_slice, id2word)
-
-
-# TODO: Once computed periodic events, split each event into several events whose keywords share the same periodicity.
-# TODO: Or, penalize different periodicity heavily in the cost function (multiply by exp(abs(dp_difference)))?
-
-# TODO: Putting a threshold on trajectory variation (take only std > DPS_BOUNDARY * 1.5) improves cluster based
-# TODO: detection quite a bit. Do this only for the greedy approach, clusters are fine?
-
-# TODO: Try detecting from all features at the same time (aperiodic and periodic) -- DPS > DPS_BOUNDARY, no condition
-# TODO: on DP -- there is some overlap in the full dataset.
-
-# TODO: ----- Optimization -----
-# TODO: Normalize (and, effectively, freeze) the trained W2V model
-# TODO: del everything once it is no longer needed (or split into different functions)
 
 # DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
 DPS_BOUNDARY = 0.05  # Dominant power spectrum boundary between high and low power features.
@@ -364,26 +338,21 @@ BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document.npz')
 RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days.pickle')
 
 # [[(burst_start, burst_end, [(doc_id, doc_sim)] ... event_bursts] ... events] (load this to save memory)
-EVENT_DOCIDS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_docids_dec_jan_greedy.pickle')
-EVENT_DOCIDS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_docids_dec_jan_clusters.pickle')
+EVENT_DOCIDS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_docids_greedy.pickle')
+EVENT_DOCIDS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_docids_clusters.pickle')
 
 # [[(burst_start, burst_end, [annotations.LemmatizedDocument] ... event_bursts] ... events]
-EVENT_DOCS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_docs_dec_jan_greedy.pickle')
-EVENT_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_docs_dec_jan_clusters.pickle')
-
-# [[(burst_start, burst_end, [annotations.LemmatizedDocument] ... event_bursts] ... events]
-EVENT_FULL_DOCS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_full_docs_dec_jan_greedy.pickle')
-EVENT_FULL_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_full_docs_dec_jan_clusters.pickle')
-
-# [[(burst_start, burst_end, [annotations.LemmatizedDocument] ... event_bursts] ... events]
-EVENT_SUMM_DOCS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_dec_jan_greedy.pickle')
-EVENT_SUMM_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_dec_jan_clusters.pickle')
+EVENT_SUMM_DOCS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_greedy.pickle')
+EVENT_SUMM_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_clusters.pickle')
 
 
 def main(cluster_based):
     total_time = time()
     embedding_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_EMBEDDINGS)
     keyword_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_KEYWORDS)
+
+    # Step 1: Construct and analyze feature trajectories.
+    # ---------------------------------------------------
 
     if os.path.exists(ID2WORD_PATH) and os.path.exists(BOW_MATRIX_PATH) and os.path.exists(RELATIVE_DAYS_PATH):
         t = time()
@@ -410,21 +379,21 @@ def main(cluster_based):
         if not os.path.exists(PICKLE_PATH):
             os.makedirs(PICKLE_PATH)
 
-        relative_days = keyword_fetcher.fetch_relative_days()
         documents = preprocessing.LemmaPreprocessor(keyword_fetcher, include_names=NAMES_SEPARATELY)
-
-        stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
-        logging.info('Stream length: %d', stream_length)
-
         vectorizer = CountVectorizer(min_df=30, max_df=0.9, binary=True, tokenizer=lambda doc: doc,
                                      preprocessor=lambda doc: doc, stop_words=preprocessing.CZECH_STOPWORDS)
+
         bow_matrix = vectorizer.fit_transform(documents)
+        data_fetchers.save_sparse_csr(BOW_MATRIX_PATH, bow_matrix)
+
         id2word = {v: k for k, v in vectorizer.vocabulary_.items()}
 
         with open(ID2WORD_PATH, mode='wb') as f:
             pickle.dump(id2word, f)
 
-        data_fetchers.save_sparse_csr(BOW_MATRIX_PATH, bow_matrix)
+        relative_days = keyword_fetcher.fetch_relative_days()
+        stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
+        logging.info('Stream length: %d', stream_length)
 
         with open(RELATIVE_DAYS_PATH, mode='wb') as f:
             pickle.dump(relative_days, f)
@@ -436,136 +405,77 @@ def main(cluster_based):
     if NAMES_SEPARATELY:
         relative_days = np.repeat(relative_days, 2)
 
-    num_docs = bow_matrix.shape[0]
+    n_docs = bow_matrix.shape[0]
+    trajectories = construct_feature_trajectories(bow_matrix, relative_days)
+
+    # Bag of Words matrix is no longer needed -> delete it to free some memory.
+    del bow_matrix
+
+    dps, dp = postprocessing.spectral_analysis(trajectories)
     w2v_model = preprocessing.perform_word2vec(embedding_fetcher, NAMES_SEPARATELY)
 
-    trajectories = construct_feature_trajectories(bow_matrix, relative_days)
-    dps, dp = postprocessing.spectral_analysis(trajectories)
-
-    if cluster_based:
-        aperiodic_path = './aperiodic_clusters'
-        periodic_path = './periodic_clusters'
-    else:
-        aperiodic_path = './aperiodic'
-        periodic_path = './periodic'
+    # Step 2: Detect events
+    # ---------------------
 
     # All events
-    events = list(detect_events_all_at_once(w2v_model, trajectories, dps, id2word, cluster_based=cluster_based))
-    plotting.plot_events(trajectories, events, id2word, dps, dirname='./events_all')
+    events = detect_events(w2v_model, trajectories, dps, dp, id2word, which='all', cluster_based=cluster_based)
+    plotting.plot_events(trajectories, events, id2word, dps,
+                         dirname='./events_clusters' if cluster_based else './events_greedy')
+    logging.info('Events detected')
 
     exit()  # TODO: Don't exit.
 
-    # Aperiodic events
-    aperiodic_events = list(detect_events(w2v_model, trajectories, dps, dp, id2word, aperiodic=True,
-                                          cluster_based=cluster_based))
-    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname=aperiodic_path)
-    logging.info('Aperiodic done')
+    # Step 3: Obtain IDs of documents related to each event.
+    # ------------------------------------------------------
 
-    # Periodic events
-    periodic_events = list(detect_events(w2v_model, trajectories, dps, dp, id2word, aperiodic=False,
-                                         cluster_based=cluster_based))
-    plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname=periodic_path)
-    logging.info('Periodic done')
+    dtd = construct_doc_to_day_matrix(n_docs, relative_days, names_separately=NAMES_SEPARATELY)
 
-    exit()  # TODO: Don't exit.
-
-    dtd = construct_doc_to_day_matrix(num_docs, relative_days)
-    all_events = aperiodic_events + periodic_events
+    # Relative days are no longer needed -> delete them to free some memory.
+    del relative_days
 
     if cluster_based:
-        if os.path.exists(EVENT_DOCIDS_CLUSTERS_PATH) and os.path.exists(EVENT_DOCS_CLUSTERS_PATH):
-            logging.info('Deserializing event doc IDs and documents.')
+        if os.path.exists(EVENT_DOCIDS_CLUSTERS_PATH):
+            logging.info('Deserializing event doc IDs.')
 
             with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='rb') as f:
                 all_docids = pickle.load(f)
 
-            # with open(EVENT_DOCS_CLUSTERS_PATH, mode='rb') as f:
-            #     all_docs = pickle.load(f)
-
-            logging.info('Deserialized event doc IDs and documents.')
+            logging.info('Deserialized event doc IDs.')
         else:
-            logging.info('Retrieving event documents.')
+            logging.info('Retrieving event doc IDs.')
             t = time()
 
-            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, all_events, trajectories, dps, dtd,
+            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
                                                             w2v_model, id2word)
 
             with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='wb') as f:
                 pickle.dump(all_docids, f)
 
-            # all_docs = annotations.docids2documents(all_docids, keyword_fetcher)
-
-            # with open(EVENT_DOCS_CLUSTERS_PATH, mode='wb') as f:
-            #     pickle.dump(all_docs, f)
-
-            logging.info('Retrieved and serialized event documents in %fs.', time() - t)
+            logging.info('Retrieved and serialized event doc IDs in %fs.', time() - t)
     else:
-        if os.path.exists(EVENT_DOCIDS_GREEDY_PATH) and os.path.exists(EVENT_DOCS_GREEDY_PATH):
-            logging.info('Deserializing event doc IDs and documents.')
+        if os.path.exists(EVENT_DOCIDS_GREEDY_PATH):
+            logging.info('Deserializing event doc IDs.')
 
             with open(EVENT_DOCIDS_GREEDY_PATH, mode='rb') as f:
                 all_docids = pickle.load(f)
 
-            # with open(EVENT_DOCS_GREEDY_PATH, mode='rb') as f:
-            #     all_docs = pickle.load(f)
-
-            logging.info('Deserialized event doc IDs and documents.')
+            logging.info('Deserialized event doc IDs.')
         else:
-            logging.info('Retrieving event documents.')
+            logging.info('Retrieving event doc IDs.')
             t = time()
 
-            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, all_events, trajectories, dps, dtd,
+            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
                                                             w2v_model, id2word)
 
             with open(EVENT_DOCIDS_GREEDY_PATH, mode='wb') as f:
                 pickle.dump(all_docids, f)
 
-            # all_docs = annotations.docids2documents(all_docids, keyword_fetcher)
+            logging.info('Retrieved and serialized event doc IDs in %fs.', time() - t)
 
-            # with open(EVENT_DOCS_GREEDY_PATH, mode='wb') as f:
-            #     pickle.dump(all_docs, f)
+    # Step 4: Summarize the events.
+    # -----------------------------
 
-            logging.info('Retrieved and serialized event documents in %fs.', time() - t)
-
-    # aperiodic_docs = all_docs[:len(aperiodic_events)]
-    # periodic_docs = all_docs[len(aperiodic_events):]
-
-    # TODO: Uncomment this
-    # plotting.output_events(all_events, all_docids, id2word, w2v_model, len(aperiodic_events), aperiodic_path,
-    #                        periodic_path, cluster_based)
-
-    summarize_events(all_events, all_docids, id2word, w2v_model, len(aperiodic_events), cluster_based)
-
-    exit()  # TODO: Don't exit
-
-    print('Aperiodic events:', len(aperiodic_docs))
-
-    for i, aperiodic_event in enumerate(aperiodic_docs):
-        event_keywords = [id2word[keyword_ix] for keyword_ix in aperiodic_events[i]]
-        print('Aperiodic event {}: [{}]'.format(i, ', '.join(event_keywords)))
-
-        for burst in aperiodic_event:
-            burst_start, burst_end, burst_docs = burst
-            print('Burst ({} - {}): {} docs'.format(burst_start, burst_end, len(burst_docs)))
-            print('Most similar:', burst_docs[0], burst_docs[0].similarity)
-            print('Least similar', burst_docs[-1], burst_docs[-1].similarity)
-
-        print()
-
-    print('Periodic events:', len(periodic_docs))
-
-    for i, periodic_event in enumerate(periodic_docs):
-        event_keywords = [id2word[keyword_ix] for keyword_ix in periodic_events[i]]
-        print('Periodic event {}: [{}]'.format(i, ', '.join(event_keywords)))
-
-        for burst in periodic_event:
-            burst_start, burst_end, burst_docs = burst
-            print('Burst ({} - {}): {} docs'.format(burst_start, burst_end, len(burst_docs)))
-            print('Most similar:', burst_docs[0], burst_docs[0].similarity)
-            print('Least similar', burst_docs[-1], burst_docs[-1].similarity)
-
-        print()
-
+    summarize_events(events, all_docids, id2word, w2v_model, len(aperiodic_events), cluster_based)
     logging.info('All done in %fs.', time() - total_time)
 
 
@@ -655,4 +565,4 @@ if __name__ == '__main__':
     # logger.addHandler(handler)
     # logger.setLevel(logging.INFO)
 
-    main(cluster_based=True)
+    main(cluster_based=False)

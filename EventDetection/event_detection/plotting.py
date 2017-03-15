@@ -45,11 +45,15 @@ def output_events(events, events_docids_repr, id2word, doc2vec_model, num_aperio
     full_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=event_detector.DATASET, fetch_forms=True,
                                                       pos=event_detector.POS_EMBEDDINGS + ('Z', 'X'))
 
+    # [[(burst_start, burst_end, [annotations.LemmatizedDocument] ... event_bursts] ... events]
+    EVENT_FULL_DOCS_GREEDY_PATH = os.path.join(event_detector.PICKLE_PATH, 'event_full_docs_greedy.pickle')
+    EVENT_FULL_DOCS_CLUSTERS_PATH = os.path.join(event_detector.PICKLE_PATH, 'event_full_docs_clusters.pickle')
+
     if cluster_based:
-        if os.path.exists(event_detector.EVENT_FULL_DOCS_CLUSTERS_PATH):
+        if os.path.exists(EVENT_FULL_DOCS_CLUSTERS_PATH):
             logging.info('Deserializing full documents.')
 
-            with open(event_detector.EVENT_FULL_DOCS_CLUSTERS_PATH, mode='rb') as f:
+            with open(EVENT_FULL_DOCS_CLUSTERS_PATH, mode='rb') as f:
                 events_docs_repr = pickle.load(f)
 
             logging.info('Deserialized full documents.')
@@ -59,15 +63,15 @@ def output_events(events, events_docids_repr, id2word, doc2vec_model, num_aperio
 
             events_docs_repr = annotations.docids2documents(events_docids_repr, full_fetcher)
 
-            with open(event_detector.EVENT_FULL_DOCS_CLUSTERS_PATH, mode='wb') as f:
+            with open(EVENT_FULL_DOCS_CLUSTERS_PATH, mode='wb') as f:
                 pickle.dump(events_docs_repr, f)
 
             logging.info('Retrieved and serialized full documents in %fs.', time() - t)
     else:
-        if os.path.exists(event_detector.EVENT_FULL_DOCS_GREEDY_PATH):
+        if os.path.exists(EVENT_FULL_DOCS_GREEDY_PATH):
             logging.info('Deserializing full documents.')
 
-            with open(event_detector.EVENT_FULL_DOCS_GREEDY_PATH, mode='rb') as f:
+            with open(EVENT_FULL_DOCS_GREEDY_PATH, mode='rb') as f:
                 events_docs_repr = pickle.load(f)
 
             logging.info('Deserialized full documents.')
@@ -77,7 +81,7 @@ def output_events(events, events_docids_repr, id2word, doc2vec_model, num_aperio
 
             events_docs_repr = annotations.docids2documents(events_docids_repr, full_fetcher)
 
-            with open(event_detector.EVENT_FULL_DOCS_GREEDY_PATH, mode='wb') as f:
+            with open(EVENT_FULL_DOCS_GREEDY_PATH, mode='wb') as f:
                 pickle.dump(events_docs_repr, f)
 
             logging.info('Retrieved and serialized full documents in %fs.', time() - t)
