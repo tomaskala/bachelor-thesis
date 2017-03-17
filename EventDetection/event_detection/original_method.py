@@ -10,16 +10,12 @@ from time import time
 import numpy as np
 import sklearn.mixture as gmm
 from scipy.optimize import curve_fit
-from scipy.stats import cauchy, entropy, norm
+from scipy.stats import entropy, norm
 from sklearn.feature_extraction.text import CountVectorizer
 
-from event_detection import data_fetchers, plotting
+from event_detection import data_fetchers, plotting, preprocessing
 from event_detection.event_detector import construct_feature_trajectories
 from event_detection.postprocessing import spectral_analysis
-from event_detection.preprocessing import CZECH_STOPWORDS
-
-WINDOW = 7
-DPS_BOUNDARY = 0.05
 
 
 def moving_average(vector, window):
@@ -31,18 +27,6 @@ def moving_average(vector, window):
     """
     weights = np.ones(window) / window
     return np.convolve(vector, weights, 'valid')
-
-
-def jensen_shannon_divergence(p, q):
-    """
-    Compute the Jensen-Shannon divergence between the two probability distributions. Jensen-Shannon divergence is
-    symmetric (in contrast to Kullback-Leibler divergence) and its square root is a proper metric.
-    :param p: the true probability distribution
-    :param q: the theoretical probability distribution
-    :return: Jensen-Shannon divergence between the two probability distributions
-    """
-    m = 0.5 * (p + q)
-    return 0.5 * entropy(p, m, base=2) + 0.5 * entropy(q, m, base=2)
 
 
 def precompute_divergences(feature_trajectories, dominant_periods):
@@ -122,8 +106,7 @@ def precompute_divergences(feature_trajectories, dominant_periods):
         g.fit(observations)
 
         components = np.squeeze(np.array(
-            [cauchy.pdf(days, mean[0], np.sqrt(2 * np.log(2)) * np.sqrt(cov[0])) for mean, cov in
-             zip(g.means_, g.covariances_)]))
+            [norm.pdf(days, mean[0], np.sqrt(cov[0])) for mean, cov in zip(g.means_, g.covariances_)]))
 
         # TODO: Temporary fix.
         if len(g.weights_) == 1:
@@ -144,7 +127,7 @@ def precompute_divergences(feature_trajectories, dominant_periods):
     for i, f1 in enumerate(distributions):
         for j, f2 in enumerate(distributions):
             if i < j:
-                similarities[i, j] = jensen_shannon_divergence(f1, f2)
+                similarities[i, j] = max(entropy(f1, f2, base=2), entropy(f2, f1, base=2))
                 similarities[j, i] = similarities[i, j]
 
     return similarities
@@ -196,7 +179,7 @@ def unsupervised_greedy_event_detection(global_indices, bow_matrix, feature_traj
     :param feature_trajectories: matrix of feature trajectories as row vectors
     :param dps: dominant power spectra of the processed features
     :param dp: dominant periods of the processed features
-    :return: yield the found events as numpy arrays of feature indices
+    :return: the found events as a list of numpy arrays of feature indices
     """
 
     def cost_function(feature_indices):
@@ -231,7 +214,7 @@ def unsupervised_greedy_event_detection(global_indices, bow_matrix, feature_traj
     logging.info('Precomputed document overlaps in %fs.', time() - t)
 
     t = time()
-    found_events = 0
+    events = []
 
     while len(indices) > 0:
         feature = indices.pop(0)
@@ -248,10 +231,10 @@ def unsupervised_greedy_event_detection(global_indices, bow_matrix, feature_traj
             else:
                 break
 
-        yield global_indices[event]
-        found_events += 1
+        events.append(global_indices[event])
 
-    logging.info('Detected %d events in %fs.', found_events, time() - t)
+    logging.info('Detected %d events in %fs.', len(events), time() - t)
+    return events
 
 
 def detect_events(bow_matrix, feature_trajectories, dps, dp, aperiodic):
@@ -280,55 +263,69 @@ def detect_events(bow_matrix, feature_trajectories, dps, dp, aperiodic):
     dps_slice = dps[feature_indices]
     dp_slice = dp[feature_indices]
 
-    return unsupervised_greedy_event_detection(feature_indices, bow_slice, trajectories_slice, dps_slice, dp_slice)
+    return list(filter(lambda event: len(event) > 1,
+                       unsupervised_greedy_event_detection(feature_indices, bow_slice, trajectories_slice, dps_slice,
+                                                           dp_slice)))
+
+
+DPS_BOUNDARY = 0.05
+WINDOW = 7
+
+DATASET = 'full'  # Dataset is shared across all document fetchers.
+POS_KEYWORDS = ('N', 'V', 'A', 'D')  # Allowed POS tags for keyword extraction.
+NAMES_SEPARATELY = True  # Whether the documents are pairs (document_headline, document_body) for each real document.
+
+PICKLE_PATH = '../event_detection/pickle'
+ID2WORD_PATH = os.path.join(PICKLE_PATH, 'id2word.pickle')
+BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document.npz')
+RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days.pickle')
 
 
 def main():
     total_time = time()
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-
-    PICKLE_PATH = './pickle'
-    ID2WORD_PATH = os.path.join(PICKLE_PATH, 'vectorizer_dec_jan_lemma_nvad.pickle')
-    BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document_dec_jan_lemma_nvad.pickle')
-    RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days_dec_jan_lemma_nvad.pickle')
+    keyword_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_KEYWORDS)
 
     if os.path.exists(ID2WORD_PATH) and os.path.exists(BOW_MATRIX_PATH) and os.path.exists(RELATIVE_DAYS_PATH):
+        t = time()
+        logging.info('Deserializing id2word, bag of words matrix and relative days.')
+
         with open(ID2WORD_PATH, mode='rb') as f:
             id2word = pickle.load(f)
 
-        with open(BOW_MATRIX_PATH, mode='rb') as f:
-            bow_matrix = pickle.load(f)
+        bow_matrix = data_fetchers.load_sparse_csr(BOW_MATRIX_PATH)
 
         with open(RELATIVE_DAYS_PATH, mode='rb') as f:
             relative_days = pickle.load(f)
 
         stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
 
-        logging.info('Deserialized id2word, bag of words matrix and relative days')
+        logging.info('Deserialized id2word, bag of words matrix and relative days in %fs.', time() - t)
         logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
                      bow_matrix.getnnz())
         logging.info('Stream length: %d', stream_length)
     else:
+        t = time()
+        logging.info('Creating id2word, bag of words matrix and relative days.')
+
         if not os.path.exists(PICKLE_PATH):
             os.makedirs(PICKLE_PATH)
 
-        t = time()
-        documents, relative_days = data_fetchers.fetch_czech_corpus_dec_jan()
-        relative_days = np.array(relative_days)
+        documents = preprocessing.LemmaPreprocessor(keyword_fetcher, include_names=NAMES_SEPARATELY)
+        vectorizer = CountVectorizer(min_df=30, max_df=0.9, binary=True, tokenizer=lambda doc: doc,
+                                     preprocessor=lambda doc: doc, stop_words=preprocessing.CZECH_STOPWORDS)
 
-        stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
-        logging.info('Read input in %fs.', time() - t)
-        logging.info('Stream length: %d', stream_length)
-
-        vectorizer = CountVectorizer(min_df=30, max_df=0.9, binary=True, stop_words=CZECH_STOPWORDS)
         bow_matrix = vectorizer.fit_transform(documents)
+        data_fetchers.save_sparse_csr(BOW_MATRIX_PATH, bow_matrix)
+
         id2word = {v: k for k, v in vectorizer.vocabulary_.items()}
 
         with open(ID2WORD_PATH, mode='wb') as f:
             pickle.dump(id2word, f)
 
-        with open(BOW_MATRIX_PATH, mode='wb') as f:
-            pickle.dump(bow_matrix, f)
+        relative_days = keyword_fetcher.fetch_relative_days()
+        stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
+        logging.info('Stream length: %d', stream_length)
 
         with open(RELATIVE_DAYS_PATH, mode='wb') as f:
             pickle.dump(relative_days, f)
@@ -337,17 +334,20 @@ def main():
         logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
                      bow_matrix.getnnz())
 
+    if NAMES_SEPARATELY:
+        relative_days = np.repeat(relative_days, 2)
+
     trajectories = construct_feature_trajectories(bow_matrix, relative_days)
     dps, dp = spectral_analysis(trajectories)
 
     # Aperiodic events
     aperiodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=True)
-    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname='../aperiodic')
+    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname='./original_aperiodic')
     logging.info('Aperiodic done')
 
     # Periodic events
     periodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=False)
-    plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname='../periodic')
+    plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname='./original_periodic')
     logging.info('Periodic done')
 
     logging.info('All done in %fs.', time() - total_time)

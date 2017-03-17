@@ -320,7 +320,8 @@ def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, which, clus
     if cluster_based:
         return event_detection_cluster_based(feature_indices, w2v_model, trajectories_slice, id2word)
     else:
-        return event_detection_greedy(feature_indices, w2v_model, trajectories_slice, dps_slice, id2word)
+        return list(filter(lambda event: len(event) > 2,
+                           event_detection_greedy(feature_indices, w2v_model, trajectories_slice, dps_slice, id2word)))
 
 
 # DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
@@ -565,4 +566,4 @@ if __name__ == '__main__':
     # logger.addHandler(handler)
     # logger.setLevel(logging.INFO)
 
-    main(cluster_based=False)
+    main(cluster_based=True)
