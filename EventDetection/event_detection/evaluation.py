@@ -150,6 +150,7 @@ EVENTS_PRF = [
                           (148, -1), (149, -1), (150, 30), (151, -1), (152, -1), (153, -1), (154, -1), (155, -1),
                           (156, 13), (157, -1), (158, 35)])]
 
+# Events grouped by relatedness.
 EVENTS_REDUNDANCY = [
     ('clusters', 0.05, [[0, 2, 7, 19], [1, 17], [3], [4], [5], [6], [8, 25], [9], [10], [11], [12], [13], [14], [15, 26],
      [16, 18], [20], [21, 27], [22], [23], [24], [28]]),
@@ -179,6 +180,22 @@ EVENTS_REDUNDANCY = [
                         [132], [138], [141, 142], [149], [152]])
 ]
 
+# Events grouped into (noisy, real).
+EVENTS_NOISINESS = [
+    ('clusters', 0.01, ([18, 21, 27, 30, 32, 49, 50, 51, 53, 58, 60, 67, 70, 72, 74],
+                        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 22, 23, 24, 25, 26, 28,
+                         29, 31, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 52, 54, 55, 56, 57, 59,
+                         61, 62, 63, 64, 65, 66, 68, 69, 71, 73, 75, 76])),
+    ('original', 0.05, ([0, 5, 6, 8, 12, 22, 23, 26, 38, 39, 47, 48, 51, 52, 53, 56, 60, 61, 62, 63, 64, 65, 66, 67, 68
+                         , 69, 70, 71, 72, 73, 76, 78, 80, 83, 84, 85, 87, 89, 90, 91, 92, 94, 95, 96, 97, 98, 99, 101,
+                         102, 103, 105, 106, 108, 111, 118, 119, 121, 123, 125, 126, 127, 128, 130, 131, 132, 133, 134,
+                         135, 136, 137, 138, 140, 141, 142, 144, 145, 146, 147, 149, 151, 154],
+                        [1, 2, 3, 4, 7, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24, 25, 27, 28, 29, 30, 31, 32,
+                         33, 34, 35, 36, 37, 40, 41, 42, 43, 44, 45, 46, 49, 50, 54, 55, 57, 58, 59, 74, 75, 77, 79, 81,
+                         82, 86, 88, 93, 100, 104, 107, 109, 110, 112, 113, 114, 115, 116, 117, 120, 122, 124, 129,
+                         139, 143, 148, 150, 152, 153, 155, 156, 157, 158]))
+]
+
 
 def events_prf(events):
     good_events = sum(1 for _ in filter(lambda event: event[1] > -1, events))
@@ -196,6 +213,13 @@ def events_redundancy(events):
     return 1 - unique_events / total_events
 
 
+def events_noisiness(events):
+    noisy_events = len(events[0])
+    good_events = len(events[1])
+    total_events = noisy_events + good_events
+    return noisy_events / total_events
+
+
 def format_prf(method, dps, num_events, *prf):
     print('Detection method: {:s}'.format(method))
     print('DPS boundary: {:.02f}'.format(dps))
@@ -207,16 +231,32 @@ def format_prf(method, dps, num_events, *prf):
 def format_redundancy(method, dps, redundancy):
     print('Detection method: {:s}'.format(method))
     print('DPS boundary: {:.02f}'.format(dps))
-    print('Detection redundancy: {:.02f}'.format(redundancy))
+    print('Detection redundancy: {:.02f}%'.format(redundancy * 100))
+    print()
+
+
+def format_noisiness(method, dps, noisiness):
+    print('Detection method: {:s}'.format(method))
+    print('DPS boundary: {:.02f}'.format(dps))
+    print('Detection noisiness: {:.02f}%'.format(noisiness * 100))
     print()
 
 
 def main():
+    print('Precision, Recall, F-measure')
+    print('-' * 20)
     for method, dps, events in EVENTS_PRF:
         format_prf(method, dps, len(events), *events_prf(events))
 
+    print('Redundancy')
+    print('-' * 20)
     for method, dps, events in EVENTS_REDUNDANCY:
         format_redundancy(method, dps, events_redundancy(events))
+
+    print('Noisiness')
+    print('-' * 20)
+    for method, dps, events in EVENTS_NOISINESS:
+        format_noisiness(method, dps, events_noisiness(events))
 
 
 if __name__ == '__main__':
