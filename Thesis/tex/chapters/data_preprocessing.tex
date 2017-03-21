@@ -1,22 +1,12 @@
-The collection we work with comes directly from webscraping without any special structure. The documents consist only of headlines, bodies and publication days. Furthermore, there are some noisy patterns such as residual HTML entities, typos, words cut in the middle, etc. To make the most of the following methods, we preprocess the documents to remove as many of these errors as possible, and also to gain some additional information about the text.
+The collection we work with comes directly from webscraping and does not have any special structure. The documents consist only of headlines, bodies and publication days. Furthermore, there are some noisy words such as residual HTML entities, typos, words cut in the middle, etc. To make the most of the collection, we preprocess the documents to remove as many of these errors as possible, and also to gain some additional information about the text.
 
 We will first employ some NLP methods to gain insight into the data. Then, we will train a model to obtain word embeddings.
 
-Since most machine learning methods rely on the data being represented numerically, usually in a vector space, it is necessary to obtain such representation from the basic words we work with. Preferably, these vectors should retain as much information as possible. There are many ways to do so --- a simple TFIDF representation \cite{information-retrieval} which represents the words by weighted counts of their appearance in the document collection. More complicated methods, such as Latent Semantic Indexing \cite{lsi} attempt to discover latent structure within words to also reveal topical relations between them. This idea is further pursued by probabilistic topical models, such as Latent Dirichlet Allocation \cite{lda}.
+Since most machine learning and information retrieval methods rely on the data being represented numerically, usually in a vector space, it is necessary to obtain such representation from the plain text. Preferably, these vectors should retain as much information as possible. There are many ways to do so --- a simple TFIDF representation \cite{information-retrieval} which represents the words by weighted counts of their appearance in the document collection. More complicated methods, such as Latent Semantic Indexing \cite{lsi} attempt to discover latent structure within words to also reveal topical relations between them. This idea is further pursued by probabilistic topical models, such as Latent Dirichlet Allocation \cite{lda}.
 
-In this thesis, we use the \textit{word2vec} model introduced by Tomáš Mikolov \cite{distributed-representations, linguistic-regularities, word2vec}, which uses a shallow neural network to project the words from some vocabulary into a vector space. Vectors in this space have interesting semantical properties, such as vector arithmetics preserving semantic relations, or semantically related words forming clusters.
+In this thesis, we use the \textit{word2vec} model introduced by Tomáš Mikolov \cite{distributed-representations, linguistic-regularities, word2vec}, which uses a shallow neural network to project the words from a vocabulary into a vector space. Vectors in this space have interesting semantical properties, such as vector arithmetics preserving semantic relations, or semantically related words forming clusters.
 
-Later on, we will need to measure word similarity. This will come up several times in the process of event detection --- in the event detection itself, later when querying the document collection to obtain documents related to the detected events, and finally to compute human-readable summaries. The word2vec models is fit for all of these uses, as opposed to the other mentioned approaches, some of which are designed only to measure document similarity, or, on the other hand, do not support document similarity queries very well.
-
-
-\section{Document collection}
-The input to the algorithm is a collection of $\doccount$ news documents containing full text articles along with their publication days, headlines and, possibly, additional metadata. We assume no preprocessing was done prior to running the algorithm.
-
-If we denote $t_{i}$ as the publication day of a document $d_{i}$, the collection can be understood as a stream $\left\{ (d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{\doccount}, t_{\doccount}) \right\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $\streamlen$ to be the length of the stream (in days), and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{\doccount} = \streamlen$.
-
-
-\section{Dataset}
-{\color{red} TODO: Describe the dataset.}
+Later on, we will need some sort of word similarity measure. This will come up several times in the thesis --- in the event detection itself, later when querying the document collection to obtain document representation of the events detected, and finally to generate human-readable summaries. The word2vec models is fit for all of these uses, as opposed to the other mentioned approaches, some of which are designed only to measure document similarity, or, on the other hand, do not support document similarity queries very well.
 
 
 \section{Preprocessing}
@@ -24,14 +14,22 @@ Some of the documents contain residual HTML entities from errors during web scra
 
 We used the MorphoDiTa tagger \cite{morphodita} to perform tokenization, lemmatization and parts-of-speech tagging. Our whole analysis will be run on these lemmatized texts, and we will revert to the full forms only at the end when summarizing the events in a human-readable way.
 
-{\color{red} TODO: Mikolov's phrase detection model?}
-
 
 \section{Word embeddings} \label{word-embeddings}
-Here, we will train the mentioned word2vec model. Although the training is time-consuming, the word vectors can be pre-trained on a large document collection and then reused in following runs, even on different documents.
+Next, we train the previously mentioned word2vec model. Although the training is time-consuming, the word vectors can be pre-trained on a large document collection and then reused in following runs, even on different documents as long as the vocabulary is similar.
 
-For the training, we only discard punctuation marks and word denoted as unknown parts of speech my the tagger. Such unknown words are mostly typos or foreign language terms not important for our analysis. We do not remove any additional stopwords or parts of speech, as this would break word order, which is, to some extent, used by the word2vec model.
+For the training, we only discard punctuation marks and word denoted as unknown parts of speech by the tagger. Such unknown words are mostly typos or foreign language terms not important for our analysis. Furthermore, we discard all words appearing in less than 10 documents.
 
 The thesis was implemented using the Gensim \cite{gensim} package. The project contains memory efficient, easy to use Python implementations of various topic modeling algorithms, word2vec included. In addition, we used the SciPy toolkit \cite{scipy} and Scikit-Learn \cite{scikit-learn} for various machine learning-related computations.
 
-{\color{red} TODO: Describe the settings used in the algorithm (vector space dimensionality, avg/concat, etc.)}
+We embed the words in a 100-dimensional vector space using the skip-gram model, as defined in \cite{word2vec} with 5 passes over the collection.
+
+
+\section{Document collection}
+The dataset used is a collection of Czech text documents from news articles collected over a period from January 1, 2014 to January 31, 2015. The collection contains 2,078,774 documents averaging at 260 words each, with 2,058,316 unique word tokens in total. However, majority of the words are rare words or typos of no importance, so the number of unique real words is much lower. This is confirmed after discarding the words appearing in less than 10 documents, with only 351,136 unique words remaining.
+
+
+\section{Document stream formally}
+Formally, the input to the algorithm is a collection of $\doccount$ news documents containing full text articles along with their publication days and headlines.
+
+If we denote $t_{i}$ as the publication day of a document $d_{i}$, the collection can be understood as a stream $\left\{ (d_{1}, t_{1}), (d_{2}, t_{2}), \dots, (d_{\doccount}, t_{\doccount}) \right\}$ with $t_{i} \leq t_{j}$ for $i < j$. Furthermore, we define $\streamlen$ to be the length of the stream (in days), and we normalize the document publication days to be relative to the document stream start; that is $t_{1} = 1$ and $t_{\doccount} = \streamlen$.

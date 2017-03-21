@@ -1,14 +1,14 @@
 This is the first phase of the event detection algorithm, focused on obtaining a set of candidate word features for event representation. We do not yet perform the actual event detection, which will be addressed in the next chapter, but merely extract a subset of words carrying enough information to be considered representative.
 
-Here we work with the assumption that an event can be detected by observing the frequencies of individual words over time and grouping together those words which appear in similar documents during similar time periods \cite{event-detection, parameter-free}. This corresponds to an event being often mentioned in the text stream, be it a formal news stream or a stream of social network comments, around the period when it actually occurred. Of course, not all words are representative of an event, so we will have to impose a criterion of a ``word eventness''.
+Here we work with the assumption that an event can be detected by observing the frequencies of individual words over time and grouping together those words which appear in similar documents during similar time periods \cite{event-detection, parameter-free}. This corresponds to an event being often mentioned in the text stream around the period when it actually occurred. Of course, not all words are representative of an event, so we will have to impose a criterion of a ``word eventness''.
 
-\cite{event-detection} also distinguished between periodic and aperiodic words, where periodic words appear in bursts with a certain period (these words are related for example to sport matches played every weekend, weather forecasts reported every week, etc.) They divided the words into two groups by their periodicity, and detect events from each group separately. During our evaluation, some words were misclassified, which would split an event into several parts due to keywords for that event appearing in both categories. Therefore, we detect events from all ``eventful'' words at once, and examine the periodicities of the events later on.
+\cite{event-detection} also distinguished between periodic and aperiodic words, where periodic words being mentioned with a certain period (these words are related for example to sport matches played every weekend, weather forecasts reported every week, etc.) They divided the words into two groups by their periodicity, and detected events from each group separately. During our evaluation, some words' periodicities were misclassified, which would split an event into two parts due to keywords for that event appearing in both groups. Therefore, we detect events from all ``eventful'' words at once, and examine the periodicities of the events later on.
 
 {\color{red} TODO: Some example of a misclassified word}
 
-At first, we will construct a trajectory of each word --- a measure of word frequency over time. Then, we will introduce signal processing techniques which will be used to determine eventness of each word by its trajectory. We will then extract eventful words and discard the rest. The same technique will later be used to determine event periodicity.
+At first, we will construct a trajectory of each word --- a measure of word frequency over time. Then, we will apply signal processing techniques which will be used to determine the eventness of each word. The same techniques will be used to determine the event periodicities in \autoref{chap:document-retrieval}. We will then extract eventful words and discard the rest.
 
-These trajectories will then be examined for so called ``bursts'' in frequency, where a word would suddenly appear in a large number of documents. Should a higher number of words appear in similar documents with overlapping bursts, it may be an indicator that an event worthy of attention occurred.
+These trajectories will then be examined for so called ``bursts'' in frequency, where a word would suddenly appear in a large number of documents. Should a number of words appear in similar documents with overlapping bursts, it may be an indicator that an event worthy of attention occurred.
 
 One thing to note is that the frequency of a word is, by itself, not a good indicator of a word importance.
 Stopwords appearing in most documents, such as conjunctions, prepositions, etc. do not carry any information and should be ignored. Therefore, we will utilize the parts of speech tagging performed earlier and limit our analysis to Nouns, Verbs, Adjectives and Adverbs only.
@@ -19,7 +19,7 @@ This chapter focuses entirely on word analysis while ignoring the documents. Onc
 
 
 \section{Binary bag of words model}
-To construct the word trajectories, we first need to know which words appear in which documents, as we are interested in the document frequency of each word. We will create a binary bag of words model, which is represented by a binary matrix denoting the incidence of documents and words. This model completely ignores word order, which is not necessary for this analysis, and was considered previously in word embeddings.
+To construct the word trajectories, we first need to know which words appear in which documents, as we are interested in the document frequency of each word. We will create a binary bag of words model, which is represented by a binary matrix denoting the incidence of documents and words. This model completely ignores word order, which is not necessary for this analysis.
 
 We define a term-document matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \times \featcount}$, where $\doccount$ is the number of documents and $\featcount$ is the total vocabulary size. The document collection can then be interpreted as a set of $\doccount$ observations, each consisting of $\featcount$ binary features. The matrix $\bowmat$ is defined as
 
@@ -30,6 +30,8 @@ We define a term-document matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \
 		0, & \text{otherwise.}
 	\end{cases}
 \end{equation}
+
+Because every document contains only a small fraction of the vocabulary, the matrix $\bowmat$ consists mostly of zeroes. It can be efficiently stored in a sparse format, since the full dense matrix would have no hope in fitting into the memory. We use a sparse matrix instead of a more traditional inverted index, because this representation allows us to vectorize some further operations.
 
 To further limit the feature space, we discard words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies or typos. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\bowmat$ reasonably sized.
 
@@ -72,7 +74,7 @@ Now, every word feature $f$ is represented by two vectors --- $\vect{\traj}_{f}$
 
 
 \section{Spectral analysis}
-Having constructed the word trajectories, we still need to decide which words are eventful enough. We will interpret the word trajectories as signals, which allows us to analyze them using signal processing techniques. Here, we will analyze only the signal power to measure the eventness, but the same technique will be used in \autoref{chap:document-retrieval} to discover event periodicity.
+Having constructed the word trajectories, we still need to decide which words are eventful enough. We will interpret the word trajectories as time signals, which allows us to analyze them using signal processing techniques. Here, we will analyze only the signal power to measure the eventness, but the same general technique will be used in \autoref{chap:document-retrieval} to discover event periodicity.
 
 We apply the discrete Fourier transform to each trajectory to represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
 
@@ -80,7 +82,7 @@ We apply the discrete Fourier transform to each trajectory to represents the tim
 	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \exp(- \frac{2 \pi \mi}{\streamlen} (k - 1) t}), ~ k = 1, 2, \dots, \streamlen.
 \end{equation*}
 
-Having moved from the time domain to the frequency domain, we can now analyze the signal power of each word. They will be retrieved from the power spectra of the transformed trajectories, which are estimated using the periodogram estimator
+After moving from the time domain to the frequency domain, we can now analyze the signal power of each word from the power spectrum of each signal, estimated using the periodogram estimator
 
 \begin{equation*}
 	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
@@ -92,14 +94,14 @@ To measure the overall signal power, we define the dominant power spectrum of th
 	\text{DPS}_{f} \coloneqq \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
-{\color{red} TODO: Plot graphs of periodic and aperiodic word showing both time trajectory and its Fourier transform}
+{\color{red} TODO: Plot graphs of periodic and aperiodic word showing both time trajectory and its periodogram.}
 
 When applied to rows of the matrix $\trajmat$, this method yields a vector $\vect{DPS} \in \R^{\featcount}$ containing the dominant power spectra.
 
 We finally define the set of all eventful words as those whose trajectory signal is powerful enough, that is, they appear in a large number of documents in a noiseless pattern:
 
 \begin{equation}
-	\text{EW} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{dps-bound} \right\}.
+	\text{EW} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{DPS-bound} \right\}.
 \end{equation}
 
-{\color{red}TODO: Define dps-bound!}
+where \textit{DPS-bound} can be estimated from the \textit{Heuristic stopword detection} algorithm described in \cite{event-detection}. The algorithm starts with a seed stopword set, measures the stopword average trajectory  values and dominant power spectra, and then assigns all the words with average trajectory values or DPS lower than these into the stopword set. The DPS boundary is then defined as the maximum DPS value of the resulting stopword set.
