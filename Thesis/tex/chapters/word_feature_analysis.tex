@@ -1,4 +1,4 @@
-This is the first phase of the event detection algorithm, focused on obtaining a set of candidate word features for event representation. We do not yet perform the actual event detection, which will be addressed in the next chapter, but merely extract a subset of words carrying enough information to be considered representative.
+This is the first phase of the event detection algorithm, focused on obtaining a set of candidate words for event representation. We do not yet perform the actual event detection, which will be addressed in the next chapter, but merely extract a subset of words carrying enough information to be considered representative.
 
 Here we work with the assumption that an event can be detected by observing the frequencies of individual words over time and grouping together those words which appear in similar documents during similar time periods \cite{event-detection, parameter-free}. This corresponds to an event being often mentioned in the text stream around the period when it actually occurred. Of course, not all words are representative of an event, so we will have to impose a criterion of a ``word eventness''.
 
@@ -36,16 +36,16 @@ Because every document contains only a small fraction of the vocabulary, the mat
 To further limit the feature space, we discard words appearing in less than 30 documents or in more than 90\% of the documents. The idea behind this is that the words appearing only in few documents cannot possibly represent relevant events, and are mostly anomalies or typos. On the other hand, words appearing in most of the documents are likely stopwords, and do not carry much information. This helps to prune the feature space and makes $\bowmat$ reasonably sized.
 
 
-\section{Computing feature trajectories}
-The time trajectory of a word feature $f$ is a vector $\vect{\traj}_{f} = \left[ \traj_{f}(1), \traj_{f}(2), \dots, \traj_{f}(\streamlen) \right]$ with each element $\traj_{f}(t)$ being the relative frequency of $f$ at time $t$. This frequency is defined using the DFIDF score:
+\section{Computing word trajectories}
+The time trajectory of a word $w$ is a vector $\vect{\traj}_{w} = \left[ \traj_{w}(1), \traj_{w}(2), \dots, \traj_{w}(\streamlen) \right]$ with each element $\traj_{w}(t)$ being the relative frequency of $w$ at time $t$. This frequency is defined using the DFIDF score:
 
 \begin{equation}
-	\traj_{f}(t) \coloneqq \underbrace{\frac{\text{\df}_{f}(t)}{\text{\doccount}(t)}}_{\text{DF}} \cdot \underbrace{\log{\frac{\doccount}{\text{\df}_{f}}}}_{\text{IDF}},
+	\traj_{w}(t) \coloneqq \underbrace{\frac{\text{\df}_{w}(t)}{\text{\doccount}(t)}}_{\text{DF}} \cdot \underbrace{\log{\frac{\doccount}{\text{\df}_{w}}}}_{\text{IDF}},
 \end{equation}
 
-where $\text{\df}_{f}(t)$ is the number of documents published on day $t$ containing the feature $f$ (time-local document frequency), $\text{\doccount}(t)$ is the number of documents published on day $t$ and $\text{\df}_{f}$ is the number of documents containing the feature $f$ (global document frequency).
+where $\text{\df}_{w}(t)$ is the number of documents published on day $t$ containing the word $w$ (time-local document frequency), $\text{\doccount}(t)$ is the number of documents published on day $t$ and $\text{\df}_{w}$ is the number of documents containing the word $w$ (global document frequency).
 
-These feature trajectories are stored in a matrix $\trajmat \in \R^{\featcount \times \streamlen}$, with $\vect{\traj}_f$ being the $f$-th row of $\trajmat$. Here we take advantage of the normalization of the publication days, since they can now be used as column indices of $\trajmat$.
+These word trajectories are stored in a matrix $\trajmat \in \R^{\featcount \times \streamlen}$, with $\vect{\traj}_w$ being the $w$-th row of $\trajmat$. Here we take advantage of the normalization of the publication days, since they can now be used as column indices of $\trajmat$.
 
 To make the computation efficient, we vectorize most of the operations. Along with the matrix $\bowmat$ defined in \ref{eq:bow-matrix}, we define a matrix $\dtdmat \in \left\{ 0, 1 \right\}^{\doccount \times \streamlen}$ mapping the documents to their publication days:
 
@@ -70,16 +70,16 @@ Using these matrices and vectors, we can compute $\trajmat$ as follows:
 		\cdot \text{diag} \left( \frac{1}{\vect{\doccount}_{t}} \right)}_{\text{DF}}
 \end{equation}
 
-Now, every word feature $f$ is represented by two vectors --- $\vect{\traj}_{f}$ being its time trajectory, and $\embed_{f}$ being its word embedding. We obtained temporal and semantic representation of the words, both of which will be utilized for event detection in the next chapter.
+Now, every word $w$ is represented by two vectors -- $\vect{\traj}_{w}$ being its time trajectory, and $\embed_{w}$ being its word embedding. We obtained temporal and semantic representation of the words, both of which will be utilized for event detection in the next chapter.
 
 
 \section{Spectral analysis}
 Having constructed the word trajectories, we still need to decide which words are eventful enough. We will interpret the word trajectories as time signals, which allows us to analyze them using signal processing techniques. Here, we will analyze only the signal power to measure the eventness, but the same general technique will be used in \autoref{chap:document-retrieval} to discover event periodicity.
 
-We apply the discrete Fourier transform to each trajectory to represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{f} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
+We apply the discrete Fourier transform to each trajectory to represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{w} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
 
 \begin{equation*}
-	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{f}(t) \exp(- \frac{2 \pi \mi}{\streamlen} (k - 1) t}), ~ k = 1, 2, \dots, \streamlen.
+	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{w}(t) \exp(- \frac{2 \pi \mi}{\streamlen} (k - 1) t}), ~ k = 1, 2, \dots, \streamlen.
 \end{equation*}
 
 After moving from the time domain to the frequency domain, we can now analyze the signal power of each word from the power spectrum of each signal, estimated using the periodogram estimator
@@ -88,10 +88,10 @@ After moving from the time domain to the frequency domain, we can now analyze th
 	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
 \end{equation*}
 
-To measure the overall signal power, we define the dominant power spectrum of the word feature $f$ as the value of the highest peak in the power spectrum, that is
+To measure the overall signal power, we define the dominant power spectrum of the word $w$ as the value of the highest peak in the power spectrum, that is
 
 \begin{equation}
-	\text{DPS}_{f} \coloneqq \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
+	\text{DPS}_{w} \coloneqq \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
 {\color{red} TODO: Plot graphs of periodic and aperiodic word showing both time trajectory and its periodogram.}
@@ -101,7 +101,7 @@ When applied to rows of the matrix $\trajmat$, this method yields a vector $\vec
 We finally define the set of all eventful words as those whose trajectory signal is powerful enough, that is, they appear in a large number of documents in a noiseless pattern:
 
 \begin{equation}
-	\text{EW} \coloneqq \left\{ f \mid \text{DPS}_{f} > \textit{DPS-bound} \right\}.
+	\text{EW} \coloneqq \left\{ w \mid \text{DPS}_{w} > \textit{DPS-bound} \right\}.
 \end{equation}
 
 where \textit{DPS-bound} can be estimated from the \textit{Heuristic stopword detection} algorithm described in \cite{event-detection}. The algorithm starts with a seed stopword set, measures the stopword average trajectory  values and dominant power spectra, and then assigns all the words with average trajectory values or DPS lower than these into the stopword set. The DPS boundary is then defined as the maximum DPS value of the resulting stopword set.

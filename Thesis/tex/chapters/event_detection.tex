@@ -1,85 +1,76 @@
-%\begin{figure}[h]
-%    \centering
-%	\includegraphics[scale=0.5]{graph}
-%	\caption{An example graph}
-%	\label{fig:x sine graph}
-%\end{figure}
+In this chapter, we describe the actual event detection, for which we propose two algorithms.
 
-To perform the actual event detection, we propose two algorithms. The first one is a modification of the greedy approach introduced by \cite{event-detection}, which forms events by greedily minimizing temporal and semantical distance of words. We build on top of this algorithm to incorporate the word embeddings as well as alter the temporal distance measure.
+The first one is a modification of the greedy approach introduced by \cite{event-detection}, which forms events by greedily minimizing temporal and semantical distance of words. The original method used a very simple measure of pairwise semantic distance by computing the number of documents in which the two words appear together. This led to events consisting of very few keywords and large redundancy --- a ``real event'' scattered into several ``detected events'' --- as we will see during the evaluation. We build on top of this algorithm to incorporate the word embeddings as a finer measure of semantical similarity.
 
-The second approach interprets events as literal clusters of words and uses a clustering algorithm to obtain them, rather than explicitly minimize the cost function.
+The second method approaches the task of event detection as literal clustering of words using a custom distance measure. We will later compare both algorithms with the original method of \cite{event-detection}.
 
-In this chapter, we describe both algorithms, which we will later compare.
+Both algorithms use the same input, i.e. word trajectories and word embeddings obtained in previous steps, and output the events in the same format, as sets of words. Realizing that sets of words are not a very clear representation for a human user, we will explore the detected events further in the following chapters. There, we will obtain the actual documents concerning these events as well as short annotations beyond simple keywords description.
 
 
 \section{Greedy approach}
-This algorithm works by grouping word features together by greedily minimizing a cost function representing their temporal and semantic distance. We will first define a distance measure in each of these domains, combine them into the cost function and then describe the algorithm itself.
-
-An event will be represented by a set of keywords. In each iteration, the keyword closest to the event built so far will be added to that event. We will therefore need to measure the distance between a word feature and a whole set of features.
+This algorithm works by grouping words together into events by greedily minimizing a cost function representing their temporal and semantic distance. In each iteration, the word closest to the event built so far will be added to that event. We will therefore need to measure the distance between a word and a whole set of them. We will first define a distance measure in each of these domains, combine them into the cost function and then describe the algorithm itself.
 
 \subsection{Measuring trajectory distance}
-After normalization to sum up to 1, the trajectory $\vect{\traj}_{f}$ of a word feature $f$ can be interpreted as a probability distribution over days, with $\traj_{f}(i)$ denoting the probability that a random document published on day $i$ contains $f$. This interpretation allows us to compare the trajectories using information-theoretic techniques, notably the information divergence.
+After normalization to sum up to 1, the trajectory $\vect{\traj}_{w}$ of a word $w$ can be interpreted as a probability distribution over days, with $\traj_{w}(i)$ denoting the probability that a random document published on day $i$ contains $w$. This interpretation allows us to compare the trajectories using information-theoretic techniques, notably the information divergence.
 
-Given a set of word features $\featset$ and another feature $f$ with all trajectories normalized to probabilities, the temporal distance of $f$ to $\featset$ is
+Given a set of words $\featset$ and another word $w \notin \featset$ with all trajectories normalized to probabilities, the temporal distance of $w$ to $\featset$ is
 
 \begin{equation}
-	\trajdist{\featset}{f} \coloneqq \kl{\vect{\bar{\traj}}_{\featset}}{\vect{\traj}_{f}},
+	\trajdist{\featset}{w} \coloneqq \kl{\vect{\bar{\traj}}_{\featset}}{\vect{\traj}_{w}},
 \end{equation}
 
-where $\vect{\bar{\traj}}_{\featset}$ is the mean of all trajectories of features in $\featset$, $\vect{\traj}_{f}$ is the trajectory of feature $f$ and $\kl{\cdot}{\cdot}$ denotes the Kullback-Leibler divergence.
+where $\vect{\bar{\traj}}_{\featset}$ is the mean of all trajectories of $\featset$, $\vect{\traj}_{w}$ is the trajectory of $w$ and $\kl{\cdot}{\cdot}$ denotes the Kullback-Leibler divergence.
 
 
 \subsection{Measuring semantic similarity}
-Most of the astounding results of the word2vec model arise from linguistic relations between words preserved under vector arithmetic \cite{linguistic-regularities}. Semantically similar words form clusters and are close to each other in terms of cosine similarity, which is a standard measure used in information retrieval \cite{information-retrieval, cosine-similarity}.
+Some of the astounding results of the word2vec model arise from semantically similar words forming clusters \cite{linguistic-regularities} in terms of cosine similarity, which is a standard measure used in information retrieval \cite{information-retrieval, cosine-similarity}.
 
-We take advantage of these properties obtain a more fine-grained measure of semantic similarity than \cite{event-detection}. The original method measured the similarity of two words only in terms of their document overlap -- number of documents both words both appear in, which eventually led to events represented by only a handful of keywords.
-
-Given a set of word features $\featset$ and another feature $f \notin \featset$, the semantic similarity of $f$ and $\featset$ is
+We use the cosine similarity between word vectors as a semantic measure for our algorithm. Given a set of words $\featset$ and another word $w \notin \featset$, the semantic similarity of $w$ and $\featset$ is
 
 \begin{equation}
-	\semsim{\featset}{f} \coloneqq \frac{\inp[\big]{\bar{\embed}_{\featset}}{\embed_{j}}}{\| \bar{\embed}_{\featset} \| \cdot \| \embed_{j} \|},
+	\semsim{\featset}{w} \coloneqq \frac{\inp[\big]{\bar{\embed}_{\featset}}{\embed_{w}}}{\| \bar{\embed}_{\featset} \| \cdot \| \embed_{w} \|},
 \end{equation}
 
-where $\bar{\embed}_{\featset}$ is the mean of all vector embeddings of features in $\featset$ and $\embed_{f}$ is the vector embedding of the feature $f$. Here, the mean vector is supposed to represent a shared topic among words from $\featset$.
+where $\bar{\embed}_{\featset}$ is the mean of all vector embeddings of $\featset$ and $\embed_{w}$ is the vector embedding of $w$. Here, the mean vector represents the central topic of words in $\featset$.
 
 
 \subsection{Cost function}
 Intuitively, an event should be represented by keywords highly correlated in the time domain, concerning the same topic, and with high enough power to be considered representative.
 
-A cost function incorporating all these requirements is therefore defined as
+A cost function measuring the distance of a word $w$ and a set $\featset$ incorporating all these requirements is therefore defined as
 
 \begin{equation} \label{eq:cost-function}
-	\cost{\featset}{f} \coloneqq \frac{\trajdist{\featset}{f}}{\exp(\semsim{\featset}{f}) \cdot \sum_{g \in \featset \cup f}{\text{DPS}_{g}}},
+	\cost{\featset}{w} \coloneqq \frac{\trajdist{\featset}{w}}{\exp(\semsim{\featset}{w}) \cdot \sum_{g \in \featset \cup w}{\text{DPS}_{g}}},
 \end{equation}
 
-where we exponentiate the cosine similarity so that the resulting value is always positive. As the algorithm will minimize this function, the resulting events will have low trajectory divergence, high semantic similarity will consist of important keywords.
+where we exponentiate the cosine similarity so that the resulting value is always positive. As the algorithm will minimize this function, the resulting events will have low trajectory divergence, high semantic similarity and consist of important keywords.
 
 
 \subsection{Event detection}
-To perform the event detection itself, we mostly adapt the \textit{Unsupervised greedy event detection} algorithm from \cite{event-detection}. We do make a change in the initial sorting and sort the word features in \textit{ascending} rather than descending order. This ensures that words with lower DPS value will get selected first and that the cost function will not be minimized as quickly. As a result, the events will contain more representative keywords. This effectively relaxes the DPS part of the cost function while keeping emphasis on the trajectory distance and semantic similarity.
+To perform the event detection itself, we mostly adapt the \textit{Unsupervised greedy event detection} algorithm from \cite{event-detection}. We do make a change in the initial sorting and sort the words in \textit{ascending} rather than descending order. This ensures that words with lower DPS value will get selected first and that the cost function will not be minimized as quickly. As a result, the events will contain more representative keywords. This effectively relaxes the DPS part of the cost function while keeping emphasis on the trajectory distance and semantic similarity.
 
 \begin{algorithm}[H] \label{alg:greedy-event-detection}
 \begin{algorithmic}[1]
 \caption{Unsupervised greedy event detection}
-\Input $\text{Word feature set} ~ F$
+\Input $\text{Word set} ~ \featset$
 
-\State $\text{Sort the features in ascending DPS order: } DPS_{f_{1}} \leq \dots \leq DPS_{f_{\left\vert F \right\vert}}$
+\State $\text{Sort the words in ascending DPS order: } DPS_{w_{1}} \leq \dots \leq DPS_{w_{\left\vert \featset \right\vert}}$
 
 \State $k = 0$
 
-\ForEach{$f \in F$}
+\ForEach{$w \in \featset$}
 	\State $k = k + 1$	
-	\State $e_{k} = \{ f \}$
-	\State $cost_{e_{k}} = \frac{1}{DPS_{f}}$
-	\State $F = F \setminus f$
+	\State $e_{k} = \{ w \}$
+	\State $cost_{e_{k}} = \frac{1}{DPS_{w}}$
+	\State $\featset = \featset \setminus w$
 	
-	\While{$F \neq \emptyset$}
-		\State $m = \argmin\limits_{m}{\cost{e_{k}}{f_{m}}}$
+	\While{$\featset \neq \emptyset$}
+		\State $m = \argmin\limits_{m}{\cost{e_{k}}{w_{m}}}$
 
-		\If{$\cost{e_{k}}{f_{m}} < cost_{e_{k}}$}
-			\State $cost_{e_{k}} = \cost{e_{k}}{f_{m}}$
-			\State $e_{k} = e_{k} \cup f_{m}$
-			\State $F = F \setminus f_{m}$
+		\If{$\cost{e_{k}}{w_{m}} < cost_{e_{k}}$}
+			\State $cost_{e_{k}} = \cost{e_{k}}{w_{m}}$
+			\State $e_{k} = e_{k} \cup w_{m}$
+			\State $\featset = \featset \setminus w_{m}$
 		\Else
 			\Break
 		\EndIf
@@ -92,10 +83,17 @@ To perform the event detection itself, we mostly adapt the \textit{Unsupervised 
 
 
 \section{Cluster-based approach}
-This approach uses a clustering algorithm to create clusters out of word features directly, instead of explicitly minimizing a cost function. To achieve this, we need to define a proper distance function, and choose the right clustering algorithm.
+This approach uses a clustering algorithm to create clusters out of words instead of explicitly minimizing a cost function. To achieve this, we need to choose the right clustering algorithm, and define a proper distance function.
+
+The obvious requirement for the clustering algorithm is that it must not require an a priori knowledge of the desired number of clusters. Another requirement is that the algorithm must accept a custom distance measure. Speed is not of the essence, since the number of eventful words is typically in range of hundreds.
+
+Our experimentation suggests that the best results are obtained using the DBSCAN algorithm \cite{dbscan}. The algorithm is able to filter out noisy samples not fit for any of the clusters, so the hope is to obtain a more consistent events without noisy words.
+
+{\color{blue} TODO: Some comparison of the algorithms tested?}
+
 
 \subsection{Noise filtering}
-Before we proceed to the clustering, we will filter out the noisy parts from the word trajectories. Most words are at some level reported all the time, though only a fraction of their trajectories belongs to some notable event. Unlike the greedy optimization described previously, clustering is prone to such noise, and would yield clusters of poor quality, often with trajectories being put together only due to their noisy parts being similar.
+Before we apply clustering, we will filter out the noisy parts from the word trajectories. Most words are at some level reported all the time, though only a fraction of their trajectories belongs to some notable event. Unlike the greedy optimization described previously, clustering is prone to such noise, and would yield clusters of poor quality, often with trajectories being put together only due to their noisy parts being similar.
 
 {\color{red} TODO: Graphs of awesome vs. poor clusterings}
 
@@ -104,15 +102,15 @@ We want to keep only those trajectory parts exceeding a certain frequency level,
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
 \caption{Burst filtering}
-\Input $\text{window-length} \ w,\ \text{event trajectory} \ \vect{\traj_{e}}$
+\Input $\text{window-length} \ l,\ \text{word trajectory} \ \vect{\traj_{w}}$
 
-\State $\vect{MA}_{w} = \text{Moving Average of length} ~ w ~ \text{for} ~ \vect{\traj}_{e} = \left[ \traj_{e}(1), \traj_{e}(2), \dots, \traj_{e}(\streamlen) \right]$
+\State $\vect{MA}_{l} = \text{Moving Average of length} ~ l ~ \text{for} ~ \vect{\traj}_{w} = \left[ \traj_{w}(1), \traj_{w}(2), \dots, \traj_{w}(\streamlen) \right]$
 
-\State $\mathit{cutoff} = \text{mean} \left( \vect{MA}_{w} \right) + \text{std} \left( \vect{MA}_{w} \right)$
+\State $\mathit{cutoff} = \text{mean} \left( \vect{MA}_{l} \right) + \text{std} \left( \vect{MA}_{l} \right)$
 
-\State $\vect{bursts}_{e} = \left[ \traj_{e}(t) \mid \traj_{e}(t) > \mathit{cutoff} \right]$
+\State $\vect{bursts}_{w} = \left[ \traj_{w}(t) \mid \traj_{w	}(t) > \mathit{cutoff} \right]$
 
-\Output $\vect{bursts}_{e}$
+\Output $\vect{bursts}_{w}$
 \end{algorithmic}
 \end{algorithm}
 
@@ -124,23 +122,13 @@ The distance function conveys similar information as the cost function used in t
 
 Since the KL-divergence is not symmetric, we use the Jensen-Shannon divergence instead to measure trajectory distance. Here, we replace the cosine similarity by standard Euclidean distance to make the points spread farther apart, which helps to obtain better clustering.
 
-The distance between two word features $f_{i}$,\ $f_{j}$ with trajectories $\vect{\traj}_{i},\ \vect{\traj}_{j}$ and embeddings $\embed_{i},\ \embed_{j}$ is therefore defined as
+The distance between two words $w_{i}$,\ $w_{j}$ with trajectories $\vect{\traj}_{i},\ \vect{\traj}_{j}$ and embeddings $\embed_{i},\ \embed_{j}$ is therefore defined as
 
 \begin{equation}
-	\distfunc{f_{i}}{f_{j}} \coloneqq \jsd{\vect{\traj}_{i}}{\vect{\traj}_{j}} \cdot \| \embed_{i} - \embed_{j}\|_{2},
+	\distfunc{w_{i}}{w_{j}} \coloneqq \jsd{\vect{\traj}_{i}}{\vect{\traj}_{j}} \cdot \| \embed_{i} - \embed_{j}\|_{2},
 \end{equation}
 
 with $\jsd{\vect{p}}{\vect{q}} = \frac{1}{2} \left( \kl{\vect{p}}{\vect{m}} + \kl{\vect{q}}{\vect{m}} \right) ,\ \vect{m} = \frac{1}{2} \left( \vect{p} + \vect{q} \right)$. As we replace the semantic ``similarity'' by ``distance'', we multiply the two components rather than divide them.
-
-
-\subsection{Clustering algorithm}
-We will need to select an appropriate clustering algorithm. The obvious requirement is that the algorithm must not depend on an a priori knowledge of the desired number of clusters. Another requirement is that the algorithm must accept custom distance measures. Speed is not the essence, since the number of representative words is typically in tens to hundreds.
-
-Our experimentation suggests that the best results are obtained using the HDBSCAN algorithm \cite{hdbscan}.
-
-{\color{red} TODO: Test this on the full dataset and if (H)DBSCAN proves functional, mention the noise detection.}
-
-{\color{blue} TODO: Some comparison of the algorithms tested?}
 
 
 \subsection{Event detection}
@@ -149,15 +137,15 @@ The input and output of the event detection algorithm remains the same as in \re
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
 \caption{Cluster-based event detection}
-\Input $\text{Word feature set} ~ F$
+\Input $\text{Word set} ~ \featset$
 
-\State Precompute a distance matrix $\distmat \in \R^{\left\vert F \right\vert \times \left\vert F \right\vert}$ with $\distmat_{ij} = \distfunc{f_{i}}{f_{j}}$
+\State Precompute a distance matrix $\distmat \in \R^{\left\vert \featset \right\vert \times \left\vert \featset \right\vert}$ with $\distmat_{ij} = \distfunc{w_{i}}{w_{j}}$
 
 \State Apply HDBSCAN to $\distmat$, obtaining $k$ clusters and the noisy cluster
 
-\ForEach{$(f, cluster) \in \text{HDBSCAN.clusters}$}
+\ForEach{$(w, cluster) \in \text{HDBSCAN.clusters}$}
 	\If{$cluster \neq noise$}
-		\State $e_{cluster} = e_{cluster} \cup f$
+		\State $e_{cluster} = e_{cluster} \cup w$
 	\EndIf
 \EndFor
 
