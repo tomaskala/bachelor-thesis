@@ -76,7 +76,12 @@ def precompute_divergences(feature_trajectories, dominant_periods):
                                p0=(peak_days[len(peak_days) // 2], len(peak_days) / 4), bounds=(0.0, n_days))
 
         mean, std = popt
-        return gaussian_curve(days, mean, std)
+        curve = gaussian_curve(days, mean, std)
+        bottom = math.ceil(max(0, mean - std))
+        top = math.floor(min(n_days, mean + std))
+        curve[0:bottom] = 0.0
+        curve[top:n_days] = 0.0
+        return curve
 
     def estimate_distribution_periodic(feature_index):
         """
@@ -132,9 +137,6 @@ def precompute_divergences(feature_trajectories, dominant_periods):
 
     return similarities
 
-    # return {(i, j): jensen_shannon_divergence(f1, f2) for i, f1 in enumerate(distributions) for j, f2 in
-    #         enumerate(distributions) if i < j}
-
 
 def precompute_df_overlaps(bow_matrix):
     """
@@ -156,7 +158,6 @@ def set_similarity(feature_indices, divergences):
     :param divergences: precomputed matrix of feature trajectory divergences
     :return: similarity of the set
     """
-    # return max(divergences[i, j] for i in feature_indices for j in feature_indices if i < j)
     return np.max(divergences[np.ix_(feature_indices, feature_indices)])
 
 
@@ -202,8 +203,8 @@ def unsupervised_greedy_event_detection(global_indices, bow_matrix, feature_traj
 
     logging.info('Examining %d features.', len(feature_trajectories))
 
-    # Sort feature indices by DPS in ascending order.
-    indices = list(sorted(range(len(feature_trajectories)), key=lambda i: dps[i]))
+    # Sort feature indices by DPS in descending order.
+    indices = list(sorted(range(len(feature_trajectories)), key=lambda i: dps[i], reverse=True))
 
     t = time()
     divergences = precompute_divergences(feature_trajectories, dp)
