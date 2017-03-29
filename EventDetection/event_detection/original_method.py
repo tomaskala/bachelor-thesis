@@ -85,12 +85,9 @@ def precompute_divergences(feature_trajectories, dominant_periods):
 
     def estimate_distribution_periodic(feature_index):
         """
-        Model the feature trajectory by a mixture of (stream_length / dominant_period) Cauchy distributions, whose
-        shape tends to represent the peaks more closely than Gaussians due to steeper peaks and fatter tails.
-        Cauchy distribution parameters are the location (GMM means are used) and half width at half maximum, which
-        is computed from GMM standard deviations as HWHM = sqrt(2 * ln(2)) * sigma.
+        Model the feature trajectory by a mixture of (stream_length / dominant_period) Gaussian distributions.
         :param feature_index: index of the feature whose trajectory to model
-        :return: feature trajectory modeled by a mixture of Cauchy distributions
+        :return: feature trajectory modeled by a mixture of Gaussian distributions
         """
         days = np.arange(n_days).reshape(-1, 1)
         ma = moving_average(feature_trajectories[feature_index].reshape(-1), WINDOW)
