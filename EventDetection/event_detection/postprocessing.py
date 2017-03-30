@@ -181,11 +181,12 @@ def keywords2docids_simple(events, feature_trajectories, dps, dtd_matrix, bow_ma
         return start, end, docs_both
 
     n_days = feature_trajectories.shape[1]
+    n_days_half = math.ceil(n_days / 2)
     documents = []
     event_trajectories, event_periods = create_events_trajectories(events, feature_trajectories, dps)
 
     for i, (event, event_trajectory, event_period) in enumerate(zip(events, event_trajectories, event_periods)):
-        is_aperiodic = event_period == n_days
+        is_aperiodic = event_period > n_days_half
 
         if is_aperiodic:
             burst_loc, burst_scale = estimate_distribution_aperiodic(event_trajectory)
@@ -292,11 +293,12 @@ def _describe_event_bursts(events, feature_trajectories, dps, dtd_matrix):
     :return: burst description of the events
     """
     n_days = feature_trajectories.shape[1]
+    n_days_half = math.ceil(n_days / 2)
     events_out = []
     event_trajectories, event_periods = create_events_trajectories(events, feature_trajectories, dps)
 
     for i, (event, event_trajectory, event_period) in enumerate(zip(events, event_trajectories, event_periods)):
-        if event_period == n_days:
+        if event_period > n_days_half:
             # Aperiodic event
             burst_loc, burst_scale = estimate_distribution_aperiodic(event_trajectory)
             burst_start, burst_end, burst_docs = _get_burst_docids(dtd_matrix, burst_loc, burst_scale)

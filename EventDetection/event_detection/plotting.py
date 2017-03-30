@@ -158,7 +158,7 @@ def plot_events(feature_trajectories, events, id2word, dps, dirname='../events')
         plt.grid(True)
         plt.plot(days, event_trajectory, label='Period: {:d}'.format(event_period), color='red', linewidth=1.5)
 
-        if event_period == n_days:
+        if event_period > np.ceil(n_days / 2):
             # Aperiodic
             mean, std = post.estimate_distribution_aperiodic(event_trajectory)
 
