@@ -72,6 +72,8 @@ The mixing parameters $\alpha_{k} \geq 0,\ \sum_{k = 1}^{K}{\alpha_{k}} = 1$, lo
 
 The Cauchy distribution has a narrower peak and thicker tails than the Gaussian distribution, which models the periodic bursts more closely. The individual bursts of a periodic event tend to be quite short, but even between two consecutive bursts, the frequency remains at a non-negligible level, which makes the Cauchy distribution a somewhat better choice.
 
+\end{enumerate}
+
 
 \subsection{Burst detection}
 The bursty period of an aperiodic event $e$ is now defined as $\interval{\mu - \sigma}{\mu + \sigma}$. For a periodic event, there are $K = \floor{\streamlen / \text{DP}_{e}}$ bursty periods, each defined as $\interval{\mu_{k} - \gamma_{k}}{\mu_{k} + \gamma_{k}}$.
@@ -118,5 +120,3 @@ Since the WMD is a measure of distance, we use the WMD similarity instead, defin
 \Output $\doc{e} = \text{first}\ n\ \text{elements of}\ \mathit{burst\_docs}$
 \end{algorithmic}
 \end{algorithm}
-
-\end{enumerate}
