@@ -1,4 +1,6 @@
+import collections
 import os
+import pickle
 
 
 REAL_EVENTS = [
@@ -879,6 +881,15 @@ ORIGINAL_EVENT_BURSTS = [
 ]
 
 
+CLUSTER_LABELS = [
+    'Ukrajina', 'Rusko', 'policie', 'soud', 'Zeman', 'EU', 'Sparta', 'festival', 'Babiš', 'Putin', 'Google',
+    'ekonomika', 'letadlo', 'východ', 'politika', 'zabít', 'poslanec', 'armáda', 'Kyjev', 'Škoda', 'hokejista',
+    'fotbalista', 'doprava', 'vražda', 'Vánoce', 'Francie', 'sport', 'NATO', 'Moskva', 'ropa', 'turnaj', 'Obama',
+    'referendum', 'ebola', 'parlament', 'koalice', 'Paříž', 'automobil', 'mistrovství', 'elektrárna', 'Sýrie',
+    'islamista', 'Brusel', 'olympiáda', 'sníh', 'průmysl', 'revoluce', 'výbuch', 'finance', 'terorista'
+]
+
+
 def automatic_prf_matching(event_keywords, event_bursts):
     real_events_path = '../../real_events'
     real_events = []
@@ -939,6 +950,45 @@ def events_noisiness(events):
     return noisy_events / total_events
 
 
+def cluster_purity(documents_path):
+    with open(documents_path, 'rb') as f:
+        event_documents = pickle.load(f)
+
+    total_tagged = 0
+    numerator = 0
+
+    for i, event in enumerate(event_documents):
+        keyword_counter = {keyword: 0 for keyword in CLUSTER_LABELS}
+        seen = set()
+
+        print('\nEvent {:d}'.format(i))
+
+        for burst_start, burst_end, burst_docs in event:
+            for document in burst_docs:
+                doc_name = document.document.name_lemma
+
+                if tuple(doc_name) in seen:
+                    continue
+
+                seen.add(tuple(doc_name))
+
+                print(document.document.name_forms)
+
+                for token in doc_name:
+                    if token in keyword_counter:
+                        keyword_counter[token] += 1
+
+        keyword_counter = collections.Counter(keyword_counter)
+        most_common, frequency = keyword_counter.most_common(1)[0]
+        event_tagged = sum(keyword_counter.values())
+        total_tagged += event_tagged
+
+        event_purity = frequency / event_tagged if event_tagged > 0 else 0
+        numerator += event_purity * event_tagged
+
+    return numerator / total_tagged
+
+
 def format_prf(method, dps, num_events, *prf):
     print('Detection method: {:s}'.format(method))
     print('DPS boundary: {:.02f}'.format(dps))
@@ -961,7 +1011,25 @@ def format_noisiness(method, dps, noisiness):
     print()
 
 
+def format_purity(method, purity):
+    print('Detection method: {:s}'.format(method))
+    print('Document cluster purity: {:.02f}%'.format(purity * 100))
+    print()
+
+
 def main():
+    PICKLE_PATH = '../event_detection/pickle'
+    EVENT_SUMM_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_clusters.pickle')
+    EVENT_SUMM_DOCS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_greedy.pickle')
+    EVENT_SUMM_DOCS_ORIGINAL_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_original.pickle')
+
+    print('CLUSTERS')
+    # format_purity('Clusters', cluster_purity(EVENT_SUMM_DOCS_CLUSTERS_PATH))
+    print()
+    print('ORIGINAL')
+    format_purity('Original', cluster_purity(EVENT_SUMM_DOCS_ORIGINAL_PATH))
+    exit()
+
     print('Precision, Recall, F-measure AUTOMATIC')
     print('-' * 20)
     automatic_matching = automatic_prf_matching(CLUSTERS_EVENT_KEYWORDS, CLUSTERS_EVENT_BURSTS)

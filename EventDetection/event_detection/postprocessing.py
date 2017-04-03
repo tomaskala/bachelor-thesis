@@ -178,6 +178,10 @@ def keywords2docids_simple(events, feature_trajectories, dps, dtd_matrix, bow_ma
         # periodic events, as some bursty periods may overlap.
         docs_both = np.intersect1d(burst_docs_all, docs_words, assume_unique=aperiodic)
 
+        # if len(docs_both) == 0:
+        #     docs_words = np.where(docs_either_words.getnnz(axis=1) >= len(event) - 1)[0]
+        #     docs_both = np.intersect1d(burst_docs_all, docs_words, assume_unique=aperiodic)
+
         return start, end, docs_both
 
     n_days = feature_trajectories.shape[1]
@@ -200,6 +204,10 @@ def keywords2docids_simple(events, feature_trajectories, dps, dtd_matrix, bow_ma
 
             for burst_loc, burst_scale in sorted(event_parameters, key=lambda item: item[0]):
                 burst_start, burst_end, burst_docs = process_burst(burst_loc, burst_scale, is_aperiodic)
+
+                if len(burst_docs) > 150:
+                    burst_docs = burst_docs[:150]
+
                 event_bursts.append((burst_start, burst_end, burst_docs))
                 num_docs += len(burst_docs)
 

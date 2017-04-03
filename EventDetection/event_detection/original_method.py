@@ -13,9 +13,9 @@ from scipy.optimize import curve_fit
 from scipy.stats import entropy, norm
 from sklearn.feature_extraction.text import CountVectorizer
 
-from event_detection import data_fetchers, plotting, preprocessing
-from event_detection.event_detector import construct_feature_trajectories
-from event_detection.postprocessing import spectral_analysis
+from event_detection import annotations, data_fetchers, plotting, preprocessing
+from event_detection.event_detector import construct_doc_to_day_matrix, construct_feature_trajectories
+from event_detection.postprocessing import spectral_analysis, keywords2docids_simple
 
 
 def moving_average(vector, window):
@@ -278,11 +278,15 @@ ID2WORD_PATH = os.path.join(PICKLE_PATH, 'id2word.pickle')
 BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document.npz')
 RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days.pickle')
 
+EVENT_DOCIDS_ORIGINAL_PATH = os.path.join(PICKLE_PATH, 'event_docids_original.pickle')
+EVENT_SUMM_DOCS_ORIGINAL_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_original.pickle')
+
 
 def main():
     total_time = time()
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
     keyword_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_KEYWORDS)
+    summarization_fetcher = data_fetchers.CzechSummarizationTexts(dataset=DATASET)
 
     if os.path.exists(ID2WORD_PATH) and os.path.exists(BOW_MATRIX_PATH) and os.path.exists(RELATIVE_DAYS_PATH):
         t = time()
@@ -340,16 +344,62 @@ def main():
 
     # Aperiodic events
     aperiodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=True)
-    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname='./original_aperiodic')
+    # plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname='./original_aperiodic')
     logging.info('Aperiodic done')
 
     # Periodic events
     periodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=False)
-    plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname='./original_periodic')
+    # plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname='./original_periodic')
     logging.info('Periodic done')
+
+    events = aperiodic_events + periodic_events
+    dtd = construct_doc_to_day_matrix(bow_matrix.shape[0], relative_days, names_separately=NAMES_SEPARATELY)
+
+    if os.path.exists(EVENT_DOCIDS_ORIGINAL_PATH):
+        logging.info('Deserializing event doc IDs.')
+
+        with open(EVENT_DOCIDS_ORIGINAL_PATH, mode='rb') as f:
+            all_docids = pickle.load(f)
+
+        logging.info('Deserialized event doc IDs.')
+    else:
+        logging.info('Retrieving event doc IDs.')
+        t = time()
+
+        all_docids = keywords2docids_simple(events, trajectories, dps, dtd, bow_matrix)
+
+        with open(EVENT_DOCIDS_ORIGINAL_PATH, mode='wb') as f:
+            pickle.dump(all_docids, f)
+
+        logging.info('Retrieved and serialized event doc IDs in %fs.', time() - t)
+
+    if os.path.exists(EVENT_SUMM_DOCS_ORIGINAL_PATH):
+        logging.info('Deserializing full documents.')
+
+        with open(EVENT_SUMM_DOCS_ORIGINAL_PATH, mode='rb') as f:
+            events_docs_repr = pickle.load(f)
+
+        logging.info('Deserialized full documents.')
+    else:
+        logging.info('Retrieving full documents.')
+        t = time()
+
+        events_docs_repr = annotations.docids2documents(all_docids, summarization_fetcher)
+
+        with open(EVENT_SUMM_DOCS_ORIGINAL_PATH, mode='wb') as f:
+            pickle.dump(events_docs_repr, f)
+
+        logging.info('Retrieved and serialized full documents in %fs.', time() - t)
 
     logging.info('All done in %fs.', time() - total_time)
 
 
 if __name__ == '__main__':
+    logger = logging.getLogger()
+    handler = logging.FileHandler('./documents_original_log.log')
+    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
     main()

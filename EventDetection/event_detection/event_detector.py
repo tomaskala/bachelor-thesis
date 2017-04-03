@@ -325,7 +325,7 @@ def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, which, clus
 
 
 # DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
-DPS_BOUNDARY = 0.05  # Dominant power spectrum boundary between high and low power features.
+DPS_BOUNDARY = 0.01  # Dominant power spectrum boundary between high and low power features.
 DATASET = 'full'  # Dataset is shared across all document fetchers.
 # Embeddings generally need all POS tags, this removes only punctuation (Z) and unknowns (X).
 POS_EMBEDDINGS = ('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T')
@@ -420,11 +420,24 @@ def main(cluster_based):
 
     # All events
     events = detect_events(w2v_model, trajectories, dps, dp, id2word, which='all', cluster_based=cluster_based)
+
+    # Step 2.5: Discard low period events
+    # -----------------------------------
+    event_trajectories, event_periods = postprocessing.create_events_trajectories(events, trajectories, dps)
+    kept_events = []
+
+    for event, period in zip(events, event_periods):
+        if period > 7:
+            kept_events.append(event)
+
+    events = kept_events
+    del kept_events
+    del event_trajectories
+    del event_periods
+
     plotting.plot_events(trajectories, events, id2word, dps,
                          dirname='./events_clusters' if cluster_based else './events_greedy')
     logging.info('Events detected')
-
-    exit()  # TODO: Don't exit.
 
     # Step 3: Obtain IDs of documents related to each event.
     # ------------------------------------------------------
@@ -476,11 +489,11 @@ def main(cluster_based):
     # Step 4: Summarize the events.
     # -----------------------------
 
-    summarize_events(events, all_docids, id2word, w2v_model, len(aperiodic_events), cluster_based)
+    summarize_events(events, all_docids, id2word, w2v_model, cluster_based)
     logging.info('All done in %fs.', time() - total_time)
 
 
-def summarize_events(events, events_docids_repr, id2word, w2v_model, num_aperiodic, cluster_based):
+def summarize_events(events, events_docids_repr, id2word, w2v_model, cluster_based):
     summarization_fetcher = data_fetchers.CzechSummarizationTexts(dataset=DATASET)
 
     if cluster_based:
@@ -520,13 +533,9 @@ def summarize_events(events, events_docids_repr, id2word, w2v_model, num_aperiod
 
             logging.info('Retrieved and serialized full documents in %fs.', time() - t)
 
-    aperiodic_events = events[:num_aperiodic]
-    periodic_events = events[num_aperiodic:]
+    exit()  # TODO: Don't exit.
 
-    aperiodic_events_docs_repr = events_docs_repr[:num_aperiodic]
-    periodic_events_docs_repr = events_docs_repr[num_aperiodic:]
-
-    summarize_inner(aperiodic_events_docs_repr, aperiodic_events, id2word, w2v_model)
+    summarize_inner(events_docs_repr, events, id2word, w2v_model)
 
 
 def summarize_inner(events_docs_repr, events, id2word, w2v_model):
@@ -557,13 +566,13 @@ def summarize_inner(events_docs_repr, events, id2word, w2v_model):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+    # logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
-    # logger = logging.getLogger()
-    # handler = logging.FileHandler('./bow_matrix_log.log')
-    # formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
-    # handler.setFormatter(formatter)
-    # logger.addHandler(handler)
-    # logger.setLevel(logging.INFO)
+    logger = logging.getLogger()
+    handler = logging.FileHandler('./documents_clusters_log.log')
+    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
     main(cluster_based=True)
