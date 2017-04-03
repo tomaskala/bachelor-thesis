@@ -37,13 +37,13 @@ where $\bar{\embed}_{\featset}$ is the mean of all vector embeddings of $\featse
 \subsection{Cost function}
 Intuitively, an event should be represented by keywords highly correlated in the time domain, concerning the same topic, and with high enough power to be considered representative.
 
-A cost function measuring the distance of a word $w$ and a set $\featset$ incorporating all these requirements is therefore defined as
+With these requirements in mind, we define the cost function as
 
 \begin{equation} \label{eq:cost-function}
 	\cost{\featset}{w} \coloneqq \frac{\trajdist{\featset}{w}}{\exp(\semsim{\featset}{w}) \cdot \sum_{g \in \featset \cup w}{\text{DPS}_{g}}},
 \end{equation}
 
-where we exponentiate the cosine similarity so that the resulting value is always positive. As the algorithm will minimize this function, the resulting events will have low trajectory divergence, high semantic similarity and consist of important keywords.
+which measures the  distance of a word $w$ to a set $\featset$. We exponentiate the cosine similarity so that it is always positive. As the algorithm will minimize this function, the resulting events will have low trajectory divergence, high semantic similarity and consist of important keywords.
 
 
 \subsection{Event detection}

@@ -1,14 +1,24 @@
-After retrieving the event documents, we can use them to generate some sort of human-readable annotation of the individual events to present to the user. We aim to generate short summaries so that the user does not have to process a large quantity of text, and can just skim through a few sentences to decide whether he is interested in that particular event. If so, then he can examine it more closely and read the actual documents.
+The final step of our method is to annotate the detected events in a human-readable way. We aim to generate short summaries so that the user does not have to process a large quantity of text, and can just skim through a few sentences to decide whether they are interested in that particular event. If so, then they can examine the event more closely and go through the actual documents, which we have retrieved in chapter \autoref{chap:document-retrieval}.
 
-A simple approach is to annotate an event by the headline of the most relevant document in terms of Word Mover's Similarity. This assumes that a single document characterizes the whole set well enough to be used as a representant. Though this method does result in somewhat readable annotations, we also investigate a more complex approach.
+Although the keyword set discovered in \autoref{chap:event-detection} provides a concise representation of an event, it can lead to ambiguities or simply not reveal enough information. {\color{red} TODO: Add an example of an event not well recognizable by its keyword set.} The keywords should be considered an internal representation used in the detection process, not something presentable to the user.
 
-The second method we use is based on a multi-document summarization system presented in \cite{multi-summarization-1, multi-summarization-2} and attempts to retrieve some number of highly relevant sentences to describe an event's document set. Again, we enrich this system by using word embeddings to measure sentence similarity, as in \cite{mogren-1}, as well as other similarity metrics \cite{mogren-2}.
+A simple method is to annotate an event by the headline of the most relevant document in terms of Word Mover's Similarity. This may give insight of the general topic of the particular event, but it is unlikely that a whole event will be well characterized by a single document. For this reason, we also investigate a more complex method. Nevertheless, we will provide such headlines for comparison.
+
+The second approach is to use multi-document summarization techniques to generate a short summary of an event's document set. More specifically, we attempt to extract some number of sentences from the document set which cover the general topic of the set without providing redundant information. As the documents come from different sources and describe the events from different perspectives, the result will not generally be a continuous paragraph, but more of a set of characteristic sentences. Still, a longer piece of text will likely provide a better insight into an event than a single headline.
+
+We use the multi-document summarization system presented in \cite{multi-summarization-1, multi-summarization-2}, which we describe in more detail in the following paragraphs. This system was later improved by \cite{mogren-1}, who evaluated the usage of different word embedding techniques for sentence similarity measures. Their work led to the system presented in \cite{mogren-2} which aggregates several different similarity measures to obtain a better quality summary.
 
 
 \section{Multi-document summarization}
-In \cite{multi-summarization-1}, the authors formulate the task of multi-document summarization as a combinatorial optimization problem, where the goal is to retrieve a subset of sentences maximizing a reward function $\quality{\cdot}$ under some constraints. The reward function measures the similarity of a summarization to the whole sentence set as well as diversity, so that two sentences do not carry duplicit information. The constraints limit the length of the resulting summary, either by total number of sentences or number of words.
+In \cite{multi-summarization-1}, the authors formulate the task of multi-document summarization as a constrained combinatorial optimization problem, where the goal is to retrieve a subset of sentences maximizing a monotone submodular function $\quality{\cdot}$ measuring the summary quality.
 
-In \cite{multi-summarization-1}, the authors laid out conditions under which a greedy algorithm finds a solution only a constant factor off the optimum and described a basic function satisfying these conditions. In \cite{multi-summarization-2}, a function better capturing sentence similarity and diversity was used.
+A submodular function $\quality{\cdot}$ on a set of sentences $V$ satisfies the property of \textit{diminishing returns}; that is, for $A \subseteq B \subseteq V \setminus \{ v \},\ \quality{A \cup \{ v \}} - \quality{A} \geq \quality{B \cup \{ v \}} - \quality{B},\ v \in V$. This has intuitive explanation for text summarization, namely that adding a sentence $v$ to a longer summary does not improve the summary as much as adding it to a smaller one. The reason is that the information carried by $v$ is more likely present in the longer summary already.
+
+Even though solving the task exactly is NP-hard, a greedy algorithm is guaranteed to find a solution inly a constant factor off the optimum, as discussed by the authors.
+
+The summary quality is measured in terms of how representative it is to the whole set (coverage) and how dissimilar the sentences are to each other (diversity). The constraints limit the summary to a reasonable length by bounding either the number of sentences or the number of words.
+
+In \cite{multi-summarization-1}, basic submodular functions to be used in multi-document summarization are described. In \cite{multi-summarization-2}, these functions are further developed to better capture the semantic properties.
 
 Mathematically, the task is formulated as
 
@@ -21,7 +31,7 @@ Mathematically, the task is formulated as
 
 where $V$ is the set of all sentences from the document set being summarized, $\sentcost_{i}$ is the cost of sentence $i$ (either 1 when limiting the number of sentences or the number of words in the sentence) and $\budget$ is the total budget.
 
-The function $\coverage{\cdot}$ is a measure of how well does the summary cover the whole sentence set, and $\diversity{\cdot}$ is a measure of diversity, so that the sentences chosen for the summary do not carry redundant information. Both of these functions will be defined later, as we first need to define several of their components. The parameter $\lambda \geq 0$ can be used to control the diversity influence.
+A feasible set $S$ maximizing $\quality{\cdot}$ will provide a reasonable number of sentences well capturing the overall topic of the whole document set, no two of which being redundant. What remains is to define the coverage function $\coverage{\cdot}$ and diversity function $\diversity{\cdot}$, whose influence can be controlled by the parameter $\lambda \geq 0$. Additionally, the functions must be defined in a way that the conditions from \cite{multi-summarization-1} are not broken, so that a greedy algorithm can still be used.
 
 
 \section{Coverage function}
@@ -32,15 +42,15 @@ In \cite{multi-summarization-2}, the coverage function $\coverage{\cdot}$ is def
 \coverage{S} = \sum_{i \in V}{\min{\Big\{ \sum_{j \in S}{\semsim{i}{j}}, \alpha \sum_{k \in V}{\semsim{i}{k}} \Big\} }}.
 \end{equation}
 
-The first element of the minimum describes how similar $S$ is to $i$ -- how much of the sentence $i$ is covered by the summary $S$. The second element is then the largest possible value attainable. By discounting this largest possible value by an $0 \leq \alpha < 1$, more similar sentences to $i$ are allowed into $S$.
+The first argument measures the similarity between the sentence $i$ and the summary $S$, while the second argument measures the similarity between the sentence $i$ and the rest of the sentences $V$. The number $\alpha \in [0,1]$ is a threshold coefficient.
 
-The authors further prove that if $\semsim{i}{j} \in [0,1]\ \forall i, j \in V$, the greedy algorithm still performs up to a constant factor close to the optimum.
+The authors further prove that if $\semsim{i}{j} \in [0,1]\ \forall i, j \in V$, the whole function remains submodular. {\color{red} TODO: Where was that?}
 
-Originally, only a simple cosine similarity between TFIDF sentence vectors \cite{information-retrieval} was used as $\semsim{\cdot}{\cdot}$. Kågebäck et al. examined various methods of word embeddings in \cite{mogren-1} to obtain a finer measure of similarity. This alone outperformed the original method, and in \cite{mogren-2}, a more complex system aggregating multiple similarity measures was built. We build on this method to add a few different similarity measures fit for event detection.
+Originally, only a simple cosine similarity between TFIDF sentence vectors \cite{information-retrieval} was used in $\semsim{\cdot}{\cdot}$. Kågebäck et al. examined various methods of word embeddings in \cite{mogren-1} to obtain a finer measure of similarity. This alone outperformed the original method, and in \cite{mogren-2}, a more complex system aggregating multiple similarity measures was built. We use this method with several different similarity measures fit for the event detection task.
 
-The resulting sentence similarity $\semsim{i}{j}$ will be computed as a product of the individual similarities, all bounded in $[0, 1]$: $\semsim{i}{j} = \prod_{l}{\similarity_{s_{i}s_{j}}^{l}}$.
+The sentence similarity $\semsim{i}{j}$ will be computed as a product of these individual similarities, all bounded in $[0, 1]$: $\semsim{i}{j} = \prod_{l}{\similarity_{s_{i}s_{j}}^{l}}$.
 
-Next, we define the individual sentence similarities used.
+Next, we describe the individual sentence similarities used.
 
 \subsection{TFIDF similarity}
 
