@@ -12,7 +12,7 @@ We use the multi-document summarization system presented in \cite{multi-summariz
 \section{Multi-document summarization}
 In \cite{multi-summarization-1}, the authors formulate the task of multi-document summarization as a constrained combinatorial optimization problem, where the goal is to retrieve a subset of sentences maximizing a monotone submodular function $\quality{\cdot}$ measuring the summary quality.
 
-A submodular function $\quality{\cdot}$ on a set of sentences $V$ satisfies the property of \textit{diminishing returns}; that is, for $A \subseteq B \subseteq V \setminus \{ v \},\ \quality{A \cup \{ v \}} - \quality{A} \geq \quality{B \cup \{ v \}} - \quality{B},\ v \in V$. This has intuitive explanation for text summarization, namely that adding a sentence $v$ to a longer summary does not improve the summary as much as adding it to a smaller one. The reason is that the information carried by $v$ is more likely present in the longer summary already.
+A submodular function $\quality{\cdot}$ on a set of sentences $V$ satisfies the property of \textit{diminishing returns}; that is, for $A \subseteq B \subseteq V \setminus \{ v \},\ \quality{A \cup \{ v \}} - \quality{A} \geq \quality{B \cup \{ v \}} - \quality{B},\ v \in V$. This has an intuitive interpretation for text summarization, namely that adding a sentence $v$ to a longer summary does not improve the summary as much as adding it to a smaller one. The reason is that the information carried by $v$ is more likely present in the longer summary already.
 
 Even though solving the task exactly is NP-hard, a greedy algorithm is guaranteed to find a solution inly a constant factor off the optimum, as discussed by the authors.
 
@@ -54,7 +54,29 @@ Next, we describe the individual sentence similarities used.
 
 \subsection{TFIDF similarity}
 
+The first measure used is the standard cosine similarity between TFIDF vectors \cite{information-retrieval} of two sentences $s_{i}$ and $s_{j}$. Such method is a simple measure of document similarity often used in information retrieval. As noted by \cite{multi-summarization-2}, this method often performs well enough to be used by itself.
+
+If we denote the frequency of the word $w$ in sentence $s_{i}$ as $\text{tf}_{w,i}$ and the inverse document frequency of $w$ as $\text{idf}_{w}$, the similarity is written as
+
+\begin{equation}
+	\similarity_{s_{i}s_{j}} = \frac{\sum_{w \in s_{i} \cup s_{j}} \text{tf}_{w,i} \times \text{tf}_{w,j} \times \text{idf}_{w}^{2}}{\sqrt{\sum_{w \in s_{i}} \text{tf}_{w, i}^{2} \times \text{idf}_{w}^{2}} \sqrt{\sum_{w \in s_{j}} \text{tf}_{w, j}^{2} \times \text{idf}_{w}^{2}}}.
+\end{equation}
+
+In this case, the term frequencies are always non-negative, and so the whole cosine similarity is in $[0, 1]$.
+
+The major setback of TFIDF similarity is that it does not go beyond simple word overlap, though weighted in a clever way. That means that should two sentences convey essentially the same information through different words, they would not be ranked similar. That can be a problem in larger document collections from different sources, with each document using a slightly different vocabulary.
+
 \subsection{Word2Vec similarity}
+
+We attempt to solve this problem by considering the word embeddings of the individual sentence words, as first examined by \cite{mogren-1}.
+
+We represent a sentence $s_{i}$ by summing together the vector embeddings of its words, $\embed_{i} = \sum_{w \in s_{i}} \embed_{w}$. The similarity of two sentences is then the cosine similarity of these vectors, transformed to $[0, 1]$:
+
+\begin{equation}
+	\similarity_{s_{i}, s_{j}} = \left(\frac{\inp{\embed_{i}}{\embed_{j}}}{\| \embed_{i} \| \| \embed_{j} \|} + 1 \right) / \ 2.
+\end{equation}
+
+This similarity brings a finer distinction of word-level semantics and can handle for example synonyms well. This means that even if two sources reporting the same event use fairly different vocabularies, the sentences will still be ranked similar.
 
 \subsection{LSI similarity}
 
