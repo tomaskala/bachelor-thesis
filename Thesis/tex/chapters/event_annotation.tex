@@ -80,13 +80,23 @@ This similarity brings a finer distinction of word-level semantics and can handl
 
 \subsection{LSI similarity}
 
-\subsection{TextRank similarity}
+The next similarity uses Latent Semantic Indexing \cite{lsi} to project the sentence TFIDF vectors to a latent space, whose dimensions can be interpreted as topics of the document collection. We measure the cosine similarity between sentence vectors in this space to compare the sentence topics.
+
+Some level of topical similarity was obtained previously from Word2Vec similarity. That measure, however, compared only the individual words based on their semantics. In this measure, we attempt to concern the topic among whole sentences with respect to the whole sentence set.
+
+The similarity is once again defined as the cosine similarity of sentence vectors from the latent space, transformed into $[0, 1]$.
 
 \subsection{Keyword similarity}
 
-\subsection{Sentiment similarity}
+The final similarity comes from \cite{mogren-2} and measures the degree of overlap of the sentences with a predefined keyword set. Namely, we use the keyword representation of the events obtained previously. The similarity is defined as 
 
-\subsection{Temporal similarity}
+\begin{equation}
+	\similarity_{s_{i}, s_{j}} = \frac{\sum_{w \in \left( s_{i} \cap s_{j} \cap \text{KW} \right)} \text{tf}_{w} \text{idf}_{w}}{\left| s_{i} \right| + \left| s_{j} \right|}.
+\end{equation}
+
+The measure effectively chooses only those sentences having non-zero word overlap with the keyword set. This requirement breaks the continuity of the text, making the summary more of a set of sentences characteristic for the event.
+
+This does not necessarily mean losing some degree of summary quality. Since the sentences come from a potentially large set of different documents from different authors, the chance of appending two sentences in a way that they make sense is quite small. On the other hand, requiring that they both share some words with the keywords characteristic for the event will severely limit the candidate sentences, choosing only relevant ones. 
 
 
 \section{Diversity function}
