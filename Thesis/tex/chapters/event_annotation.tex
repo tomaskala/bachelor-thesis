@@ -46,7 +46,7 @@ The first argument measures the similarity between the sentence $i$ and the summ
 
 The authors further prove that if $\semsim{i}{j} \in [0,1]\ \forall i, j \in V$, the whole function remains submodular. {\color{red} TODO: Where was that?}
 
-Originally, only a simple cosine similarity between TFIDF sentence vectors \cite{information-retrieval} was used in $\semsim{\cdot}{\cdot}$. Kågebäck et al. examined various methods of word embeddings in \cite{mogren-1} to obtain a finer measure of similarity. This alone outperformed the original method, and in \cite{mogren-2}, a more complex system aggregating multiple similarity measures was built. We use this method with several different similarity measures fit for the event detection task.
+Originally, only a simple cosine similarity between TFIDF sentence vectors \citep{information-retrieval} was used in $\semsim{\cdot}{\cdot}$. \cite{mogren-1} examined various methods of word embeddings in to obtain a finer measure of similarity. This alone outperformed the original method, and in \cite{mogren-2}, a more complex system aggregating multiple similarity measures was built. We use this method with several different similarity measures fit for the event detection task.
 
 The sentence similarity $\semsim{i}{j}$ will be computed as a product of these individual similarities, all bounded in $[0, 1]$: $\semsim{i}{j} = \prod_{l}{\similarity_{s_{i}s_{j}}^{l}}$.
 
@@ -54,49 +54,73 @@ Next, we describe the individual sentence similarities used.
 
 \subsection{TFIDF similarity}
 
-The first measure used is the standard cosine similarity between TFIDF vectors \cite{information-retrieval} of two sentences $s_{i}$ and $s_{j}$. Such method is a simple measure of document similarity often used in information retrieval. As noted by \cite{multi-summarization-2}, this method often performs well enough to be used by itself.
+The first measure used is the standard cosine similarity between TFIDF vectors \citep{information-retrieval} of two sentences $s_{i}$ and $s_{j}$. Such method is a simple measure of document similarity often used in information retrieval.
 
 If we denote the frequency of the word $w$ in sentence $s_{i}$ as $\text{tf}_{w,i}$ and the inverse document frequency of $w$ as $\text{idf}_{w}$, the similarity is written as
 
 \begin{equation}
-	\similarity_{s_{i}s_{j}} = \frac{\sum_{w \in s_{i} \cup s_{j}} \text{tf}_{w,i} \times \text{tf}_{w,j} \times \text{idf}_{w}^{2}}{\sqrt{\sum_{w \in s_{i}} \text{tf}_{w, i}^{2} \times \text{idf}_{w}^{2}} \sqrt{\sum_{w \in s_{j}} \text{tf}_{w, j}^{2} \times \text{idf}_{w}^{2}}}.
+	\similarity_{s_{i}s_{j}} = \frac{\sum_{w \in s_{i} \cup s_{j}} \text{tf}_{w,i} \cdot \text{tf}_{w,j} \cdot \text{idf}_{w}^{2}}{\sqrt{\sum_{w \in s_{i}} \text{tf}_{w, i}^{2} \cdot \text{idf}_{w}^{2}} \cdot \sqrt{\sum_{w \in s_{j}} \text{tf}_{w, j}^{2} \cdot \text{idf}_{w}^{2}}}.
 \end{equation}
 
-In this case, the term frequencies are always non-negative, and so the whole cosine similarity is in $[0, 1]$.
+The term frequencies are always non-negative, and so the whole cosine similarity is in $[0, 1]$.
 
-The major setback of TFIDF similarity is that it does not go beyond simple word overlap, though weighted in a clever way. That means that should two sentences convey essentially the same information through different words, they would not be ranked similar. That can be a problem in larger document collections from different sources, with each document using a slightly different vocabulary.
+The major setback of TFIDF similarity is that it does not go beyond simple word overlap, though weighted to diminish stopwords and amplify important words. That means that if two sentences convey essentially the same information through different vocabulary, they will not be ranked similar due to having only a few words in common. That can be a problem in larger document collections from different sources and authors.
 
 \subsection{Word2Vec similarity}
 
-We attempt to solve this problem by considering the word embeddings of the individual sentence words, as first examined by \cite{mogren-1}.
+We attempt to solve this problem by considering the word embeddings of the individual words, as first examined by \cite{mogren-1}.
 
 We represent a sentence $s_{i}$ by summing together the vector embeddings of its words, $\embed_{i} = \sum_{w \in s_{i}} \embed_{w}$. The similarity of two sentences is then the cosine similarity of these vectors, transformed to $[0, 1]$:
 
 \begin{equation}
-	\similarity_{s_{i}, s_{j}} = \left(\frac{\inp{\embed_{i}}{\embed_{j}}}{\| \embed_{i} \| \| \embed_{j} \|} + 1 \right) / \ 2.
+	\similarity_{s_{i}, s_{j}} = \left(\frac{\inp{\embed_{i}}{\embed_{j}}}{\| \embed_{i} \| \cdot \| \embed_{j} \|} + 1 \right) / \ 2.
 \end{equation}
 
-This similarity brings a finer distinction of word-level semantics and can handle for example synonyms well. This means that even if two sources reporting the same event use fairly different vocabularies, the sentences will still be ranked similar.
+This similarity brings a finer distinction of word-level semantics. This means that even if two sources reporting the same event use fairly different vocabularies, the sentences will still be ranked similar.
 
-\subsection{LSI similarity}
+\subsection{TR similarity}
 
-The next similarity uses Latent Semantic Indexing \cite{lsi} to project the sentence TFIDF vectors to a latent space, whose dimensions can be interpreted as topics of the document collection. We measure the cosine similarity between sentence vectors in this space to compare the sentence topics.
+The next measure uses Text Rank (TR) similarity, as defined by \cite{textrank}. Each sentence is represented by a set of words, and the overlap of these sets is measured. \cite{mogren-2} achieved best results by combining the TFIDF similarity, word embeddings and the TR similarity, which is defined as
 
-Some level of topical similarity was obtained previously from Word2Vec similarity. That measure, however, compared only the individual words based on their semantics. In this measure, we attempt to concern the topic among whole sentences with respect to the whole sentence set.
+\begin{equation}
+	\similarity_{s_{i}, s_{j}} = \frac{\left| s_{i} \cap s_{j} \right|}{\log{\left| s_{i} \right|} + \log{\left| s_{j} \right|}}.
+\end{equation}
 
-The similarity is once again defined as the cosine similarity of sentence vectors from the latent space, transformed into $[0, 1]$.
 
 \subsection{Keyword similarity}
 
-The final similarity comes from \cite{mogren-2} and measures the degree of overlap of the sentences with a predefined keyword set. Namely, we use the keyword representation of the events obtained previously. The similarity is defined as 
+In addition to the three previously described similarities, \cite{mogren-2} considered a keyword similarity, which measures the overlap between two sentences and a predefined keyword set. Having previously obtained the event keyword representation, we use this measure to make sure the sentences actually concern the particular event.
+
+The similarity is defined as 
 
 \begin{equation}
-	\similarity_{s_{i}, s_{j}} = \frac{\sum_{w \in \left( s_{i} \cap s_{j} \cap \text{KW} \right)} \text{tf}_{w} \text{idf}_{w}}{\left| s_{i} \right| + \left| s_{j} \right|}.
+	\similarity_{s_{i}, s_{j}} = \frac{\sum_{w \in \left( s_{i} \cap s_{j} \cap \text{KW} \right)} \text{tf}_{w} \cdot \text{idf}_{w}}{\left| s_{i} \right| + \left| s_{j} \right|}.
 \end{equation}
 
-The measure effectively chooses only those sentences having non-zero word overlap with the keyword set. This requirement breaks the continuity of the text, making the summary more of a set of sentences characteristic for the event.
+The measure effectively chooses only those sentences having non-zero word overlap with the keyword set. It also breaks the summary fluency, making the summary more of a set of sentences characteristic for the given event. On the other hand, the resulting sentences will be highly relevant to the event, often revealing important information about it.
 
-This does not necessarily mean losing some degree of summary quality. Since the sentences come from a potentially large set of different documents from different authors, the chance of appending two sentences in a way that they make sense is quite small. On the other hand, requiring that they both share some words with the keywords characteristic for the event will severely limit the candidate sentences, choosing only relevant ones. 
+This tradeoff between fluency and quality is more worth it when summarizing a large number of documents. Even without the keyword similarity, the chance that two summary sentences will make sense consecutively is quite small, when they come from different douments.
 
+If an event consisted of only one or two documents, it would make sense to use a different measure.
 
 \section{Diversity function}
+
+Now, we can define the diversity function, which will positively reward a summary consisting of non-redundant sentences. \cite{multi-summarization-2} again defined the function in terms of a simple TFIDF similarity. We only redefine the function to accept the custom similarity function built in the previous steps.
+
+The diversity of a summary $S$ is based on clustering the sentences by their similarity $\semsim{\cdot}{\cdot}$ and then preferrably choosing sentences from different clusters not similar to each other. Formally, the function is defined as
+
+\begin{equation}
+	\diversity{S} = \sum_{k = 1}^{K} \sqrt{\sum_{j \in S \cap P_{k}} r_{j}},
+\end{equation}
+
+where $P_{i},\ i = 1, \dots, K$ is a clustering of the sentence set $V$. The value $r_{j} = \frac{1}{N} \sum_{i \in V} \semsim{i}{j}$ is the singleton reward for adding sentence $i$ into the summary $S$.
+
+This function positively rewards diverse sentences in a sense that once an element $i$ from a cluster $P_{k}$ is chosen, other elements from the same cluster will have diminishing gains due to the square root function (see \cite{multi-summarization-2} for a concrete example). This means that if the clustering partitions the sentences into semantically different clusters, the summary will draw from different semantical categories and will consist of sentences conveying different information.
+
+We apply the K-Medoids algorithm with $\semsim{\cdot}{\cdot}$ as a custom distance function. As in the original paper, we set the number of clusters $K$ to $\frac{\left| V \right|}{5}$, putting 5 sentences into each cluster on average.
+
+
+\section{Optimization}
+Having defined the cost function $\quality{\cdot}$, we can use the greedy algorithm defined in \cite{multi-summarization-1} to obtain the desired summary.
+
+For the experiments, we set a budget of {\color{red} TODO} words and other parameters to {\color{red} TODO}. Below are several summary examples, full list of which can be found in appendix {\color{red} TODO}.

@@ -6,8 +6,8 @@
 \usepackage{graphicx}
 \graphicspath{ {images/} }
 
-\usepackage[backend=bibtex,style=alphabetic,sorting=none]{biblatex}
-\addbibresource{tex/references.bib}
+\usepackage[authoryear,round]{natbib}
+\bibliographystyle{abbrvnat}
 
 \usepackage{fancyhdr}
 \pagestyle{fancy}
@@ -162,6 +162,6 @@ These are my acknowledgements.
 
 
 % Bibliography
-\printbibliography
+\bibliography{tex/references}
 
 \end{document}
