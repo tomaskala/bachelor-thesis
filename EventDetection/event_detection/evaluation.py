@@ -2,7 +2,6 @@ import collections
 import os
 import pickle
 
-
 REAL_EVENTS = [
     (0, 152, '2. června – španělský král Juan Carlos I. abdikoval a za svého nástupce určil svého syna Filipa.'),
     (1, 154, '4. a 5. června – konal se 40. summit G8 v Bruselu.'),
@@ -11,48 +10,77 @@ REAL_EVENTS = [
     (4, 160, "10. června – V izraelských prezidentských volbách byl zvolen Re'uven Rivlin"),
     (5, 162, '12. června – v Brazílii začalo 20. mistrovství světa ve fotbale.'),
     (6, 165, '15. června – Andrej Kiska složil prezidentskou přísahu a stal se prezidentem Slovenska.'),
-    (7, 168, '18. června – vůdci vojenského převratu v Turecku z roku 1980 Kenan Evren a Tahsin Şahinkaya byli odsouzeni na doživotí.'),
+    (7, 168,
+     '18. června – vůdci vojenského převratu v Turecku z roku 1980 Kenan Evren a Tahsin Şahinkaya byli odsouzeni na doživotí.'),
     (8, 169, '19. června – Filip, asturský kníže složil přísahu a stal se králem Španělska jako Filip VI. Španělský'),
     (9, 181, '1. července – Itálie se ujala předsednictví EU.'),
-    (10, 187, '8. července – armáda České republiky utrpěla největší ztrátu v novodobých dějinách, kdy při sebevražedném útoku poblíž letecké základny Bagram zemřeli čtyři čeští vojáci, spolu s dalšími 12 tamními oběťmi. Pátý český voják byl těžce raněn a 14. července zemřel.'),
+    (10, 187,
+     '8. července – armáda České republiky utrpěla největší ztrátu v novodobých dějinách, kdy při sebevražedném útoku poblíž letecké základny Bagram zemřeli čtyři čeští vojáci, spolu s dalšími 12 tamními oběťmi. Pátý český voják byl těžce raněn a 14. července zemřel.'),
     (11, 193, '13. července – mistry světa ve fotbale se stala německá fotbalová reprezentace.'),
-    (12, 195, '15. července – novým předsedou Evropské komise se stal lucemburský politik a bývalý premiér Jean-Claude Juncker.'),
-    (13, 197, '17. července – v oblasti bojů na východní Ukrajině se zřítil Boeing 777 malajsijských aerolinií. Zemřelo všech 295 osob na palubě.'),
-    (14, 201, '21. července – vláda Bohuslava Sobotky vybrala nového eurokomisaře. Stane se jím ministryně pro místní rozvoj Věra Jourová, která ve výběru porazila Pavla Mertlíka.'),
-    (15, 221, '10. srpna – V historicky první přímé prezidentské volbě v Turecku byl zvolen premiér Recep Tayyip Erdoğan.'),
+    (12, 195,
+     '15. července – novým předsedou Evropské komise se stal lucemburský politik a bývalý premiér Jean-Claude Juncker.'),
+    (13, 197,
+     '17. července – v oblasti bojů na východní Ukrajině se zřítil Boeing 777 malajsijských aerolinií. Zemřelo všech 295 osob na palubě.'),
+    (14, 201,
+     '21. července – vláda Bohuslava Sobotky vybrala nového eurokomisaře. Stane se jím ministryně pro místní rozvoj Věra Jourová, která ve výběru porazila Pavla Mertlíka.'),
+    (15, 221,
+     '10. srpna – V historicky první přímé prezidentské volbě v Turecku byl zvolen premiér Recep Tayyip Erdoğan.'),
     (16, 227, '16. srpna až 28. srpna – Letní olympijské hry mládeže 2014 v čínském Nankingu'),
-    (17, 230, '19. srpna – americký novinář James Foley byl popraven v syrské poušti neznámým islámským radikálem, jeho smrt vyvolala v západním světe vlnu pobouření.'),
+    (17, 230,
+     '19. srpna – americký novinář James Foley byl popraven v syrské poušti neznámým islámským radikálem, jeho smrt vyvolala v západním světe vlnu pobouření.'),
     (18, 235, '24. srpna – Meziplanetární sonda New Horizons prolétla blízko L5 soustavy Slunce–Neptun.'),
-    (19, 236, '25. srpna – ve sporu o amnestii Václava Klause soud schválil smír, podle něhož se bývalý hradní právník Pavel Hasenkopf na vyhlášeném znění amnestie nepodílel.'),
+    (19, 236,
+     '25. srpna – ve sporu o amnestii Václava Klause soud schválil smír, podle něhož se bývalý hradní právník Pavel Hasenkopf na vyhlášeném znění amnestie nepodílel.'),
     (20, 239, '28. srpna – Recep Tayyip Erdoğan složil prezidentskou přísahu a stal se prezidentem Turecka.'),
     (21, 241, '30. srpna – polský premiér Donald Tusk byl na summitu Evropské unie zvolen předsedou Evropské rady.'),
-    (22, 243, '1. září – Pavel Hasenkopf podal na Vratislava Mynáře trestní oznámení pro pomluvu ohledně Mynářova výroku, že Hasenkopf je jedním z autorů amnestie Václava Klause.'),
-    (23, 244, '2. září – další americký novinář Steven Sotloff byl popraven v syrské poušti neznámým islámským radikálem, stejně jako James Foley v srpnu.'),
-    (24, 246, '4. září – ve Vilémově se zřítil most, na kterém probíhala rekonstrukce. Zemřeli čtyři dělníci, další dva byli zraněni.'),
+    (22, 243,
+     '1. září – Pavel Hasenkopf podal na Vratislava Mynáře trestní oznámení pro pomluvu ohledně Mynářova výroku, že Hasenkopf je jedním z autorů amnestie Václava Klause.'),
+    (23, 244,
+     '2. září – další americký novinář Steven Sotloff byl popraven v syrské poušti neznámým islámským radikálem, stejně jako James Foley v srpnu.'),
+    (24, 246,
+     '4. září – ve Vilémově se zřítil most, na kterém probíhala rekonstrukce. Zemřeli čtyři dělníci, další dva byli zraněni.'),
     (25, 248, '6. září – počet nakažených ebolou při celoroční epidemii se přehoupl přes 4 000'),
     (26, 250, '8. září – britský následník trůnu Princ William a jeho manželka Kate oznámili, že čekají druhé dítě.'),
-    (27, 252, '10. září – kandidátka na českou eurokomisařku Věra Jourová získala portfolio spravedlnosti, spotřebitelské politiky a rovnosti pohlaví.'),
-    (28, 255, '13. září – islámští radikálové popravili dalšího západního zajatce, tentokrát jím byl britský humanitární pracovník David Haines.'),
-    (29, 260, '18. září – Ve Skotsku proběhlo referendum o nezávislosti na Spojeném království. Pro odtržení od Británie hlasovalo 44,7% lidí, proti 55,3% lidí, Skotsko tak zůstane její součástí.'),
-    (30, 262, '20. září – náčelník Generálního štábu Armády ČR Petr Pavel byl zvolen předsedou vojenského výboru NATO.'),
-    (31, 266, '24. září – na Pražský hrad se dostal výhružný dopis adresovaný prezidentovi Miloši Zemanovi s bílým práškem. Případ šetří policie.'),
+    (27, 252,
+     '10. září – kandidátka na českou eurokomisařku Věra Jourová získala portfolio spravedlnosti, spotřebitelské politiky a rovnosti pohlaví.'),
+    (28, 255,
+     '13. září – islámští radikálové popravili dalšího západního zajatce, tentokrát jím byl britský humanitární pracovník David Haines.'),
+    (29, 260,
+     '18. září – Ve Skotsku proběhlo referendum o nezávislosti na Spojeném království. Pro odtržení od Británie hlasovalo 44,7% lidí, proti 55,3% lidí, Skotsko tak zůstane její součástí.'),
+    (
+        30, 262,
+        '20. září – náčelník Generálního štábu Armády ČR Petr Pavel byl zvolen předsedou vojenského výboru NATO.'),
+    (31, 266,
+     '24. září – na Pražský hrad se dostal výhružný dopis adresovaný prezidentovi Miloši Zemanovi s bílým práškem. Případ šetří policie.'),
     (32, 275, '3. října – prezident Miloš Zeman přijal demisi ministryně pro místní rozvoj Věry Jourové.'),
-    (33, 275, '3. října – islámští radikálové popravili dalšího západního zajatce, stal se jím opět britský humanitární pracovník Alan Henning.'),
-    (34, 279, '7. října – evropský parlament schválil nominaci Věry Jourové na post eurokomisařky pro spravedlnost, spotřebitelskou politiku a rovnost pohlaví.'),
-    (35, 282, '10. října a 11. října – proběhly volby do Senátu Parlamentu České republiky, volby do zastupitelstev obcí a volby do Zastupitelstva hlavního města Prahy. Ve volbách uspěly především vládní strany ČSSD, ANO a KDU-ČSL.'),
-    (36, 286, '14. října – žena trpící schizofrenii pobodala na obchodní akademii ve Žďáru nad Sázavou tři studenty a zasahujícího policistu. Jeden ze studentů útok nepřežil.'),
-    (37, 288, '16. října – Ve Vrběticích došlo k výbuchu muničního skladu č. 16. Na místě zahynuli dva zaměstnanci skladu, došlo k evakuaci obyvatel přilehlých obcí.'),
-    (38, 288, '16. října – zanikla europarlamentní frakce Evropa svobody a přímé demokracie, 20. října byla opět obnovena.'),
-    (39, 289, '17. října a 18. října – proběhlo druhé kolo voleb do Senátu Parlamentu České republiky. Ve volbách uspěly především vládní strany ČSSD, ANO a KDU-ČSL.'),
+    (33, 275,
+     '3. října – islámští radikálové popravili dalšího západního zajatce, stal se jím opět britský humanitární pracovník Alan Henning.'),
+    (34, 279,
+     '7. října – evropský parlament schválil nominaci Věry Jourové na post eurokomisařky pro spravedlnost, spotřebitelskou politiku a rovnost pohlaví.'),
+    (35, 282,
+     '10. října a 11. října – proběhly volby do Senátu Parlamentu České republiky, volby do zastupitelstev obcí a volby do Zastupitelstva hlavního města Prahy. Ve volbách uspěly především vládní strany ČSSD, ANO a KDU-ČSL.'),
+    (36, 286,
+     '14. října – žena trpící schizofrenii pobodala na obchodní akademii ve Žďáru nad Sázavou tři studenty a zasahujícího policistu. Jeden ze studentů útok nepřežil.'),
+    (37, 288,
+     '16. října – Ve Vrběticích došlo k výbuchu muničního skladu č. 16. Na místě zahynuli dva zaměstnanci skladu, došlo k evakuaci obyvatel přilehlých obcí.'),
+    (38, 288,
+     '16. října – zanikla europarlamentní frakce Evropa svobody a přímé demokracie, 20. října byla opět obnovena.'),
+    (39, 289,
+     '17. října a 18. října – proběhlo druhé kolo voleb do Senátu Parlamentu České republiky. Ve volbách uspěly především vládní strany ČSSD, ANO a KDU-ČSL.'),
     (40, 312, '9. listopadu – v Katalánsku začalo symbolické hlasování o nezávislosti na Španělsku.'),
     (41, 315, '12. listopadu – přistál modul Philae jako historicky první lidský stroj na kometě.'),
-    (42, 318, '15. listopad islámští radikálové popravili dalšího západního zajatce, stal se jím americký humanitární pracovník Peter Kassig.Komunální volby na Slovensku'),
+    (42, 318,
+     '15. listopad islámští radikálové popravili dalšího západního zajatce, stal se jím americký humanitární pracovník Peter Kassig.Komunální volby na Slovensku'),
     (43, 318, '15. a 16. listopadu – Summit G20 v Brisbane'),
-    (44, 334, '1. prosince – ledovková kalamita ochromila hromadnou dopravu v ČR a dodávky elektřiny v mnoha regionech. Tramvajová doprava v Praze dokonce poprvé ve své historii zažila úplné zastavení provozu. Do normálu se dopravní i energetická situace vrátila až 3. prosince.'),
+    (44, 334,
+     '1. prosince – ledovková kalamita ochromila hromadnou dopravu v ČR a dodávky elektřiny v mnoha regionech. Tramvajová doprava v Praze dokonce poprvé ve své historii zažila úplné zastavení provozu. Do normálu se dopravní i energetická situace vrátila až 3. prosince.'),
     (45, 334, '1. prosince – Druhým předsedou Evropské rady se stal Donald Tusk.'),
-    (46, 336, '3. prosince – Ve Vrběticích došlo k dalšímu výbuchu muničního skladu č. 12. Opět proběhla evakuace obyvatel přilehlých obcí, oba dva výbuchy jsou vyšetřovány jako úmyslný trestný čin.    '),
-    (47, 349, '16. prosince – Ozbrojenci ze skupiny Tahrík-e Tálibán-e Pákistán spáchali masakr v péšávarské vojenské škole škole. Útok si vyžádal 141 obětí většinu z nich tvořili děti.'),
-    (48, 361, '28. prosince – na cestě ze Surabaje do Singapuru se ztratilo letadlo malajsijské společnosti AirAsia se 162 lidmi na palubě.')
+    (46, 336,
+     '3. prosince – Ve Vrběticích došlo k dalšímu výbuchu muničního skladu č. 12. Opět proběhla evakuace obyvatel přilehlých obcí, oba dva výbuchy jsou vyšetřovány jako úmyslný trestný čin.    '),
+    (47, 349,
+     '16. prosince – Ozbrojenci ze skupiny Tahrík-e Tálibán-e Pákistán spáchali masakr v péšávarské vojenské škole škole. Útok si vyžádal 141 obětí většinu z nich tvořili děti.'),
+    (48, 361,
+     '28. prosince – na cestě ze Surabaje do Singapuru se ztratilo letadlo malajsijské společnosti AirAsia se 162 lidmi na palubě.')
 ]
 
 # For Precision, Recall and F-measure. The format is (method, dps_boundary, mapping) with mapping being
@@ -154,6 +182,52 @@ EVENTS_PRF = [
                         (140, -1), (141, -1), (142, 47), (143, 47), (144, -1), (145, -1), (146, -1), (147, -1),
                         (148, -1), (149, -1), (150, 30), (151, -1), (152, -1), (153, -1), (154, -1), (155, -1),
                         (156, 13), (157, -1), (158, 35)])]
+
+CLUSTERS_PRECISION = [(0, -1), (1, 35), (2, -1), (3, -1), (4, -1), (5, -1), (6, 10), (7, -1), (8, -1), (9, 5),
+                      (10, -1), (11, -1), (12, -1), (13, -1), (14, 25), (15, -1), (16, 17), (17, -1), (18, -1),
+                      (19, -1), (20, 35), (21, -1), (22, -1), (23, -1), (24, -1), (25, 13), (26, 13), (27, -1),
+                      (28, -1), (29, -1), (30, -1), (31, -1), (32, -1), (33, -1), (34, -1), (35, -1), (36, -1),
+                      (37, 29), (38, -1), (39, -1), (40, -1), (41, -1), (42, -1), (43, 46), (44, 13), (45, -1),
+                      (46, -1), (47, -1), (48, -1), (49, -1), (50, -1), (51, -1), (52, 5), (53, -1), (54, -1),
+                      (55, -1), (56, 44), (57, 13), (58, -1), (59, -1), (60, -1), (61, -1), (62, 5), (63, 25),
+                      (64, 39), (65, -1), (66, -1), (67, -1), (68, 35), (69, -1), (70, -1), (71, -1), (72, -1),
+                      (73, -1), (74, -1), (75, 44), (76, 39)]
+CLUSTERS_RECALL = [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
+                   0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1]
+
+GREEDY_PRECISION = [(0, -1), (1, -1), (2, -1), (3, -1), (4, -1), (5, -1), (6, -1), (7, -1), (8, 35), (9, -1),
+                    (10, -1), (11, -1), (12, -1), (13, -1), (14, -1), (15, -1), (16, -1), (17, -1), (18, -1),
+                    (19, -1), (20, -1), (21, -1), (22, -1), (23, -1), (24, -1), (25, -1), (26, -1), (27, -1),
+                    (28, -1), (29, -1), (30, -1), (31, -1), (32, -1), (33, -1), (34, -1), (35, -1), (36, -1),
+                    (37, -1), (38, -1), (39, -1), (40, -1), (41, -1), (42, -1), (43, -1), (44, -1), (45, -1),
+                    (46, 5), (47, -1), (48, -1), (49, -1), (50, -1), (51, 5), (52, -1), (53, -1), (54, 10),
+                    (55, -1), (56, 35), (57, 13), (58, -1), (59, -1), (60, 47), (61, -1), (62, -1), (63, 13),
+                    (64, -1), (65, -1), (66, 35), (67, -1), (68, 13), (69, -1), (70, 35), (71, 1), (72, -1),
+                    (73, 35), (74, 47), (75, 13), (76, 35), (77, -1), (78, 47), (79, -1), (80, -1), (81, -1)]
+GREEDY_RECALL = [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+
+ORIGINAL_PRECISION = [(0, -1), (1, -1), (2, -1), (3, -1), (4, -1), (5, -1), (6, -1), (7, -1), (8, -1), (9, -1),
+                      (10, -1), (11, -1), (12, -1), (13, -1), (14, -1), (15, 17), (16, -1), (17, -1), (18, -1),
+                      (19, 47), (20, -1), (21, -1), (22, -1), (23, -1), (24, -1), (25, -1), (26, -1), (27, -1),
+                      (28, -1), (29, -1), (30, -1), (31, -1), (32, -1), (33, -1), (34, 23), (35, -1), (36, -1),
+                      (37, -1), (38, -1), (39, -1), (40, -1), (41, -1), (42, 5), (43, -1), (44, -1), (45, -1),
+                      (46, -1), (47, -1), (48, -1), (49, -1), (50, -1), (51, 35), (52, -1), (53, 23), (54, -1),
+                      (55, -1), (56, -1), (57, -1), (58, -1), (59, -1), (60, -1), (61, -1), (62, -1), (63, -1),
+                      (64, -1), (65, -1), (66, -1), (67, -1), (68, -1), (69, -1), (70, -1), (71, -1), (72, 35),
+                      (73, -1), (74, -1), (75, -1), (76, -1), (77, 17), (78, 28), (79, -1), (80, -1), (81, -1),
+                      (82, 13), (83, -1), (84, -1), (85, -1), (86, -1), (87, -1), (88, -1), (89, -1), (90, -1),
+                      (91, -1), (92, -1), (93, -1), (94, -1), (95, -1), (96, -1), (97, -1), (98, -1), (99, 47),
+                      (100, 23), (101, -1), (102, -1), (103, -1), (104, -1), (105, 44), (106, -1), (107, -1),
+                      (108, -1), (109, 5), (110, 2), (111, -1), (112, -1), (113, -1), (114, -1), (115, -1),
+                      (116, -1), (117, 35), (118, -1), (119, -1), (120, -1), (121, -1), (122, -1), (123, -1),
+                      (124, 35), (125, -1), (126, 4), (127, -1), (128, -1), (129, 35), (130, -1), (131, -1),
+                      (132, -1), (133, 47), (134, -1), (135, -1), (136, -1), (137, -1), (138, -1), (139, 47),
+                      (140, -1), (141, -1), (142, 47), (143, 47), (144, -1), (145, -1), (146, -1), (147, -1),
+                      (148, -1), (149, -1), (150, 30), (151, -1), (152, -1), (153, -1), (154, -1), (155, -1),
+                      (156, 13), (157, -1), (158, 35)]
+ORIGINAL_RECALL = [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0,
+                   0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1]
 
 # Events grouped by relatedness.
 EVENTS_REDUNDANCY = [
@@ -356,7 +430,6 @@ CLUSTERS_EVENT_KEYWORDS = [
     ['volba', 'volební', 'volič']
 ]
 
-
 CLUSTERS_EVENT_BURSTS = [
     [(141, 163)], [(276, 387)], [(102, 131)], [(16, 41), (83, 99), (139, 180), (187, 236), (275, 292), (297, 368)],
     [(114, 146)], [(0, 395)], [(174, 295)], [(118, 125), (126, 135), (373, 375)], [(241, 395)], [(146, 217)],
@@ -471,7 +544,6 @@ CLUSTERS_EVENT_BURSTS = [
     [(58, 168), (277, 303), (388, 391)]
 ]
 
-
 GREEDY_EVENT_KEYWORDS = [
     ['pevný', 'květen', 'červen', 'předpokládat', 'model', 'vůz', 'automobil', 'značka', 'technologie', 'výroba',
      'verze', 'množství', 'klasický', 'technický', 'vývoj', 'střední'],
@@ -570,7 +642,6 @@ GREEDY_EVENT_KEYWORDS = [
     ['Minsk', 'Peking', 'maďarský', 'shlédnout'],
     ['posunutý', 'Janukovyč', 'demonstrant', 'tyč', 'humanitární', 'Litvínov', 'palestinský']
 ]
-
 
 GREEDY_EVENT_BURSTS = [
     [(127, 172)], [(0, 395)], [(241, 273)],
@@ -756,7 +827,6 @@ GREEDY_EVENT_BURSTS = [
     [(27, 90), (16, 263)]
 ]
 
-
 ORIGINAL_EVENT_KEYWORDS = [
     ['Soča', 'Soči'],
     ['Citroen', 'jednotka'],
@@ -858,7 +928,6 @@ ORIGINAL_EVENT_KEYWORDS = [
     ['vývojový', 'infrastruktura']
 ]
 
-
 ORIGINAL_EVENT_BURSTS = [
     [(21, 53)], [(113, 159)], [(120, 160)], [(118, 160)], [(119, 148)], [(115, 166)], [(115, 160)], [(372, 387)],
     [(105, 149)], [(106, 149)], [(106, 166)], [(116, 146)], [(106, 149)], [(116, 146)], [(115, 141)], [(115, 141)],
@@ -879,7 +948,6 @@ ORIGINAL_EVENT_BURSTS = [
     [(120, 269), (325, 375)], [(114, 117), (116, 141)], [(87, 166), (264, 387)], [(128, 135), (140, 152)],
     [(114, 117), (117, 137)], [(114, 124), (128, 136)], [(115, 123), (128, 136)]
 ]
-
 
 CLUSTER_LABELS = [
     'Ukrajina', 'Rusko', 'policie', 'soud', 'Zeman', 'EU', 'Sparta', 'festival', 'Babiš', 'Putin', 'Google',
@@ -924,14 +992,14 @@ def automatic_prf_matching(event_keywords, event_bursts):
 
         evaluated_events.append((i, real_event_id))
 
-    return evaluated_events
+    return evaluated_events, [1 for _ in set(event_pair[1] for event_pair in evaluated_events)]
 
 
-def events_prf(events):
+def events_prf(events, events_recall):
     good_events = sum(1 for _ in filter(lambda event: event[1] > -1, events))
 
     precision = good_events / len(events)
-    recall = good_events / len(REAL_EVENTS)
+    recall = sum(events_recall) / len(REAL_EVENTS)
     f_measure = (2 * precision * recall) / (precision + recall)
 
     return precision, recall, f_measure
@@ -961,10 +1029,15 @@ def cluster_purity(documents_path):
         keyword_counter = {keyword: 0 for keyword in CLUSTER_LABELS}
         seen = set()
 
-        print('\nEvent {:d}'.format(i))
+        # if i < 60:
+        #     print('\nEvent {:d}'.format(i))
 
         for burst_start, burst_end, burst_docs in event:
-            for document in burst_docs:
+            for j, document in enumerate(burst_docs):
+                # if i < 60 and j < 10:
+                #     print(document.document.name_lemma)
+                #     print(document.document.sentences_lemma)
+                #     print()
                 doc_name = document.document.name_lemma
 
                 if tuple(doc_name) in seen:
@@ -972,7 +1045,7 @@ def cluster_purity(documents_path):
 
                 seen.add(tuple(doc_name))
 
-                print(document.document.name_forms)
+                # print(document.document.name_forms)
 
                 for token in doc_name:
                     if token in keyword_counter:
@@ -1023,26 +1096,28 @@ def main():
     EVENT_SUMM_DOCS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_greedy.pickle')
     EVENT_SUMM_DOCS_ORIGINAL_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_original.pickle')
 
-    print('CLUSTERS')
+    # print('CLUSTERS')
     # format_purity('Clusters', cluster_purity(EVENT_SUMM_DOCS_CLUSTERS_PATH))
-    print()
-    print('ORIGINAL')
-    format_purity('Original', cluster_purity(EVENT_SUMM_DOCS_ORIGINAL_PATH))
-    exit()
+    # print()
+    # print('ORIGINAL')
+    # format_purity('Original', cluster_purity(EVENT_SUMM_DOCS_ORIGINAL_PATH))
+    # exit()
 
     print('Precision, Recall, F-measure AUTOMATIC')
     print('-' * 20)
-    automatic_matching = automatic_prf_matching(CLUSTERS_EVENT_KEYWORDS, CLUSTERS_EVENT_BURSTS)
-    format_prf('Clusters', 0.01, len(CLUSTERS_EVENT_KEYWORDS), *events_prf(automatic_matching))
-    automatic_matching = automatic_prf_matching(GREEDY_EVENT_KEYWORDS, GREEDY_EVENT_BURSTS)
-    format_prf('Greedy', 0.04, len(GREEDY_EVENT_KEYWORDS), *events_prf(automatic_matching))
-    automatic_matching = automatic_prf_matching(ORIGINAL_EVENT_KEYWORDS, ORIGINAL_EVENT_BURSTS)
-    format_prf('Original', 0.05, len(ORIGINAL_EVENT_KEYWORDS), *events_prf(automatic_matching))
+    automatic_precision, automatic_recall = automatic_prf_matching(CLUSTERS_EVENT_KEYWORDS, CLUSTERS_EVENT_BURSTS)
+    format_prf('Clusters', 0.01, len(CLUSTERS_EVENT_KEYWORDS), *events_prf(automatic_precision, automatic_recall))
+    automatic_precision, automatic_recall = automatic_prf_matching(GREEDY_EVENT_KEYWORDS, GREEDY_EVENT_BURSTS)
+    format_prf('Greedy', 0.04, len(GREEDY_EVENT_KEYWORDS), *events_prf(automatic_precision, automatic_recall))
+    automatic_precision, automatic_recall = automatic_prf_matching(ORIGINAL_EVENT_KEYWORDS, ORIGINAL_EVENT_BURSTS)
+    format_prf('Original', 0.05, len(ORIGINAL_EVENT_KEYWORDS), *events_prf(automatic_precision, automatic_recall))
 
     print('Precision, Recall, F-measure')
     print('-' * 20)
-    for method, dps, events in EVENTS_PRF:
-        format_prf(method, dps, len(events), *events_prf(events))
+
+    format_prf('Clusters', 0.01, len(CLUSTERS_EVENT_KEYWORDS), *events_prf(CLUSTERS_PRECISION, CLUSTERS_RECALL))
+    format_prf('Greedy', 0.04, len(GREEDY_EVENT_KEYWORDS), *events_prf(GREEDY_PRECISION, GREEDY_RECALL))
+    format_prf('Original', 0.05, len(ORIGINAL_EVENT_KEYWORDS), *events_prf(ORIGINAL_PRECISION, ORIGINAL_RECALL))
 
     print('Redundancy')
     print('-' * 20)

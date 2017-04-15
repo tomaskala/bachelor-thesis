@@ -271,12 +271,12 @@ WINDOW = 7
 
 DATASET = 'full'  # Dataset is shared across all document fetchers.
 POS_KEYWORDS = ('N', 'V', 'A', 'D')  # Allowed POS tags for keyword extraction.
-NAMES_SEPARATELY = True  # Whether the documents are pairs (document_headline, document_body) for each real document.
+NAMES_SEPARATELY = False  # Whether the documents are pairs (document_headline, document_body) for each real document.
 
 PICKLE_PATH = '../event_detection/pickle'
-ID2WORD_PATH = os.path.join(PICKLE_PATH, 'id2word.pickle')
-BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document.npz')
-RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days.pickle')
+ID2WORD_PATH = os.path.join(PICKLE_PATH, 'id2word_original.pickle')
+BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document_original.npz')
+RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days_original.pickle')
 
 EVENT_DOCIDS_ORIGINAL_PATH = os.path.join(PICKLE_PATH, 'event_docids_original.pickle')
 EVENT_SUMM_DOCS_ORIGINAL_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_original.pickle')
@@ -355,6 +355,11 @@ def main():
     events = aperiodic_events + periodic_events
     dtd = construct_doc_to_day_matrix(bow_matrix.shape[0], relative_days, names_separately=NAMES_SEPARATELY)
 
+    if NAMES_SEPARATELY:
+        logging.info('Dropping headlines.')
+        bow_matrix = bow_matrix[1::2, :]
+        logging.info('Headlines dropped.')
+
     if os.path.exists(EVENT_DOCIDS_ORIGINAL_PATH):
         logging.info('Deserializing event doc IDs.')
 
@@ -372,6 +377,8 @@ def main():
             pickle.dump(all_docids, f)
 
         logging.info('Retrieved and serialized event doc IDs in %fs.', time() - t)
+
+    del bow_matrix
 
     if os.path.exists(EVENT_SUMM_DOCS_ORIGINAL_PATH):
         logging.info('Deserializing full documents.')
@@ -396,7 +403,7 @@ def main():
 
 if __name__ == '__main__':
     logger = logging.getLogger()
-    handler = logging.FileHandler('./documents_original_log.log')
+    handler = logging.FileHandler('./docids_documents_original_log.log')
     formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)

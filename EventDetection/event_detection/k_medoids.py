@@ -127,6 +127,9 @@ class KMedoids(BaseEstimator, ClusterMixin, TransformerMixin):
         # the medoids keep changing and the maximum number
         # of iterations is not exceeded
         self.n_iter_ = 0
+
+        cluster_ics = self._get_cluster_ics(D, medoid_ics)
+
         while not np.all(old_medoid_ics == medoid_ics) and \
                         self.n_iter_ < self.max_iter:
 

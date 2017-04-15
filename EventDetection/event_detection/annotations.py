@@ -159,8 +159,17 @@ class Summarizer:
         logging.info('Created sentences in %fs.', time() - t)
 
         self.n_sentences = len(sentences_forms)
-        self.n_clusters = self.n_sentences // self.avg_cluster_size
-        self.alpha_ = self.a / self.n_sentences
+
+        if self.n_sentences == 0:
+            return []
+
+        if self.n_sentences < self.a:
+            self.alpha_ = 1.0
+            self.n_clusters = 1
+        else:
+            self.alpha_ = self.a / self.n_sentences
+            self.n_clusters = self.n_sentences // self.avg_cluster_size
+
         assert 0 <= self.alpha_ <= 1, 'The parameter `alpha` = `a/N` must be in [0,1]'
 
         t = time()
@@ -234,6 +243,8 @@ class Summarizer:
         distance_matrix[np.diag_indices_from(distance_matrix)] = 0.0
 
         k_medoids = KMedoids(n_clusters=self.n_clusters, distance_metric='precomputed', random_state=1)
+        distance_matrix[distance_matrix > 1e9] = 1e9
+        distance_matrix[np.isnan(distance_matrix)] = 1e9
         labels = k_medoids.fit_predict(distance_matrix)
 
         sentence_ids = np.arange(self.n_sentences)
@@ -262,22 +273,10 @@ class Summarizer:
         np.multiply(self.similarity_matrix, lsi_similarities, out=self.similarity_matrix)
         del lsi_similarities
 
-        # TextRank similarity
-        tr_similarities = self._tr_similarity(sentences_lemma, sentences_pos)
-        np.multiply(self.similarity_matrix, tr_similarities, out=self.similarity_matrix)
-        del tr_similarities
-
-        # TODO: Use either KeyWord or Sentiment similarity, but they cancel each other.
-
         # KeyWord similarity
         kw_similarities = self._kw_similarity(sentences_lemma, event_keywords)
         np.multiply(self.similarity_matrix, kw_similarities, out=self.similarity_matrix)
         del kw_similarities
-
-        # Sentiment similarity
-        # sentiment_similarities = self._sentiment_similarity(sentences_lemma, sentiment='both')
-        # np.multiply(self.similarity_matrix, sentiment_similarities, out=self.similarity_matrix)
-        # del sentiment_similarities
 
         # Transform similarities to [0,1].
         min_val = np.min(self.similarity_matrix)
@@ -325,7 +324,7 @@ class Summarizer:
         :param k: latent space dimensionality
         :return: matrix cosine similarities between the LSI-transformed vectors
         """
-        lsi = TruncatedSVD(n_components=k, random_state=1)
+        lsi = TruncatedSVD(n_components=min(k, sentence_vectors.shape[0]), random_state=1)
         lsi_matrix = lsi.fit_transform(sentence_vectors)
         return cosine_similarity(lsi_matrix, dense_output=True)
 
@@ -350,7 +349,7 @@ class Summarizer:
     def _kw_similarity(self, sentences, keywords):
         """
         Compute Keyword similarity of the sentences, defined as
-        Sim(i,j) = sum_{w <- i `cap` j `cap KW}{TFIDF_w} / (|i| + |j|).
+        Sim(i,j) = sum_{w <- i `cap` j `cap` KW}{TFIDF_w} / (|i| + |j|).
         :param sentences: lemmatized sentences
         :param keywords: keyword representation of the summarized event
         :return: matrix of Keyword similarities

@@ -167,7 +167,7 @@ def event_detection_greedy(global_indices, w2v_model, feature_trajectories, dps,
 
         return index, min_cost
 
-    logging.info('Detecting events using the classical approach.')
+    logging.info('Detecting events using the greedy approach.')
     logging.info('Examining %d features.', len(feature_trajectories))
 
     # Sort feature indices by DPS in ascending order.
@@ -362,7 +362,7 @@ def main(cluster_based):
         with open(ID2WORD_PATH, mode='rb') as f:
             id2word = pickle.load(f)
 
-        bow_matrix = data_fetchers.load_sparse_csr(BOW_MATRIX_PATH)
+        # bow_matrix = data_fetchers.load_sparse_csr(BOW_MATRIX_PATH)
 
         with open(RELATIVE_DAYS_PATH, mode='rb') as f:
             relative_days = pickle.load(f)
@@ -370,8 +370,8 @@ def main(cluster_based):
         stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
 
         logging.info('Deserialized id2word, bag of words matrix and relative days in %fs.', time() - t)
-        logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
-                     bow_matrix.getnnz())
+        # logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
+        #              bow_matrix.getnnz())
         logging.info('Stream length: %d', stream_length)
     else:
         t = time()
@@ -406,48 +406,51 @@ def main(cluster_based):
     if NAMES_SEPARATELY:
         relative_days = np.repeat(relative_days, 2)
 
-    n_docs = bow_matrix.shape[0]
-    trajectories = construct_feature_trajectories(bow_matrix, relative_days)
+    # n_docs = bow_matrix.shape[0]
+    # trajectories = construct_feature_trajectories(bow_matrix, relative_days)
 
     # Bag of Words matrix is no longer needed -> delete it to free some memory.
-    del bow_matrix
+    # del bow_matrix
 
-    dps, dp = postprocessing.spectral_analysis(trajectories)
+    # dps, dp = postprocessing.spectral_analysis(trajectories)
     w2v_model = preprocessing.perform_word2vec(embedding_fetcher, NAMES_SEPARATELY)
 
     # Step 2: Detect events
     # ---------------------
 
     # All events
-    events = detect_events(w2v_model, trajectories, dps, dp, id2word, which='all', cluster_based=cluster_based)
+    # events = detect_events(w2v_model, trajectories, dps, dp, id2word, which='all', cluster_based=cluster_based)
 
     # Step 2.5: Discard low period events
     # -----------------------------------
-    event_trajectories, event_periods = postprocessing.create_events_trajectories(events, trajectories, dps)
-    kept_events = []
+    # event_trajectories, event_periods = postprocessing.create_events_trajectories(events, trajectories, dps)
+    # kept_events = []
 
-    for event, period in zip(events, event_periods):
-        if period > 7:
-            kept_events.append(event)
+    # for event, period in zip(events, event_periods):
+    #     if period > 7:
+    #         kept_events.append(event)
 
-    events = kept_events
-    del kept_events
-    del event_trajectories
-    del event_periods
+    # events = kept_events
+    # del kept_events
+    # del event_trajectories
+    # del event_periods
 
-    plotting.plot_events(trajectories, events, id2word, dps,
-                         dirname='./events_clusters' if cluster_based else './events_greedy')
-    logging.info('Events detected')
+    # plotting.plot_events(trajectories, events, id2word, dps,
+    #                      dirname='./events_clusters' if cluster_based else './events_greedy')
+    # logging.info('Events detected')
 
     # Step 3: Obtain IDs of documents related to each event.
     # ------------------------------------------------------
 
-    dtd = construct_doc_to_day_matrix(n_docs, relative_days, names_separately=NAMES_SEPARATELY)
+    # dtd = construct_doc_to_day_matrix(n_docs, relative_days, names_separately=NAMES_SEPARATELY)
 
     # Relative days are no longer needed -> delete them to free some memory.
     del relative_days
 
     if cluster_based:
+        with open(os.path.join(PICKLE_PATH, 'events_clusters.pickle'), mode='rb') as f:
+            events = pickle.load(f)
+
         if os.path.exists(EVENT_DOCIDS_CLUSTERS_PATH):
             logging.info('Deserializing event doc IDs.')
 
@@ -459,11 +462,11 @@ def main(cluster_based):
             logging.info('Retrieving event doc IDs.')
             t = time()
 
-            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
-                                                            w2v_model, id2word)
-
-            with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='wb') as f:
-                pickle.dump(all_docids, f)
+            # all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
+            #                                                 w2v_model, id2word)
+            #
+            # with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='wb') as f:
+            #     pickle.dump(all_docids, f)
 
             logging.info('Retrieved and serialized event doc IDs in %fs.', time() - t)
     else:
@@ -478,11 +481,11 @@ def main(cluster_based):
             logging.info('Retrieving event doc IDs.')
             t = time()
 
-            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
-                                                            w2v_model, id2word)
+            # all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
+            #                                                 w2v_model, id2word)
 
-            with open(EVENT_DOCIDS_GREEDY_PATH, mode='wb') as f:
-                pickle.dump(all_docids, f)
+            # with open(EVENT_DOCIDS_GREEDY_PATH, mode='wb') as f:
+            #     pickle.dump(all_docids, f)
 
             logging.info('Retrieved and serialized event doc IDs in %fs.', time() - t)
 
@@ -533,8 +536,6 @@ def summarize_events(events, events_docids_repr, id2word, w2v_model, cluster_bas
 
             logging.info('Retrieved and serialized full documents in %fs.', time() - t)
 
-    exit()  # TODO: Don't exit.
-
     summarize_inner(events_docs_repr, events, id2word, w2v_model)
 
 
@@ -566,13 +567,13 @@ def summarize_inner(events_docs_repr, events, id2word, w2v_model):
 
 
 if __name__ == '__main__':
-    # logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
-    logger = logging.getLogger()
-    handler = logging.FileHandler('./documents_clusters_log.log')
-    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+    # logger = logging.getLogger()
+    # handler = logging.FileHandler('./documents_clusters_log.log')
+    # formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    # handler.setFormatter(formatter)
+    # logger.addHandler(handler)
+    # logger.setLevel(logging.INFO)
 
     main(cluster_based=True)
