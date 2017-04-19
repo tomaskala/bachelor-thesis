@@ -121,11 +121,11 @@ Having constructed the cost function, we use Algorithm \ref{alg:greedy-event-det
 \section{Cluster-based approach}
 The final method interprets the task as literal clustering of words, using a custom distance function. The distance function will actually be a modification of the cost function yet again, though some means have to be taken to make it usable in this context. First, we need to consider a proper clustering algorithm.
 
-The obvious requirement for the clustering algorithm is that it must not require an a priori knowledge of the desired number of clusters. Another requirement is that the algorithm must accept a custom distance measure. Speed is not of the essence, since the number of eventful words is typically in range of hundreds.
+The obvious requirement for the clustering algorithm is that it must not require an a priori knowledge of the desired number of clusters. Another requirement is that the algorithm must accept a custom distance measure.
 
 We considered three candidate algorithms: Affinity propagation \citep{affinity-propagation}, DBSCAN \citep{dbscan} and its modification, HDBSCAN \citep{hdbscan}.
 
-During our experimentation, Affinity propagation performed poorly, its clusters being often seemingly random and of low quality. The quality of HDBSCAN clusters was considerably better, though the algorithm took longer to converge as the number of eventful words grew. It also required to tune multiple parameters, which was difficult to do without any annotated data. We decided to use the DBSCAN algorithm, which also outperformed Affinity propagation and does not require to tune many parameters.
+During our experimentation, Affinity propagation performed poorly, its clusters being often seemingly random and of low quality. The quality of HDBSCAN clusters was considerably better, though the algorithm took longer to converge as the number of eventful words grew. It also required to tune multiple parameters, which was difficult to do without any annotated data. We decided to use the DBSCAN algorithm, which outperformed Affinity propagation as well, and does not require to tune as many parameters as HDBSCAN.
 
 In addition to the previously stated requirements, DBSCAN is also capable of filtering out noisy samples, not fit for any of the clusters. This property will prove advantageous for our task, as will become clear during the evaluation in \autoref{chap:evaluation}.
 
@@ -140,6 +140,7 @@ We want to keep only those trajectory parts exceeding a certain frequency level,
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
 \caption{Burst filtering}
+\label{alg:burst-filtering}
 \Input $\text{window-length} \ l,\ \text{word trajectory} \ \vect{\traj_{w}}$
 
 \State $\vect{MA}_{l} = \text{Moving Average of length} ~ l ~ \text{for} ~ \vect{\traj}_{w} = \left[ \traj_{w}(1), \traj_{w}(2), \dots, \traj_{w}(\streamlen) \right]$
