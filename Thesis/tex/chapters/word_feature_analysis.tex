@@ -72,15 +72,17 @@ Now, having trained the word2vec model in \autoref{chap:data-preprocessing} and 
 
 
 \section{Spectral analysis}
-Having constructed the word trajectories, we still need to decide which words are eventful enough. We will interpret the word trajectories as time signals, which allows us to analyze them using signal processing techniques. Here, we will analyze only the signal power to measure the eventness, but the same general technique will be used in \autoref{chap:document-retrieval} to discover event periodicity.
+Having constructed the word trajectories, we still need to decide which words are eventful enough. \cite{event-detection} interpreted the word trajectories as time signals, which allowed them to analyze the trajectories using signal processing techniques. They performed the analysis both to decide word eventness and to discover the word periodicity.
 
-We apply the discrete Fourier transform to each trajectory to represents the time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{w} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
+Unlike the original paper, we only analyze the signal power to decide which words are eventful enough. We will detect events from both periodic and aperiodic words at once, and decide the periodicity of the whole events in \autoref{chap:document-retrieval}.
+
+We apply the discrete Fourier transform to the trajectories to represent each time series as a linear combination of $\streamlen$ complex sinusoids. We obtain $\mathcal{F} \vect{\traj}_{w} = \left[ X_{1}, X_{2}, \dots, X_{\streamlen}\right ]$ such that
 
 \begin{equation*}
 	X_{k} = \sum_{t = 1}^{\streamlen}{\traj_{w}(t) \exp(- \frac{2 \pi \mi}{\streamlen} (k - 1) t}), ~ k = 1, 2, \dots, \streamlen.
 \end{equation*}
 
-After moving from the time domain to the frequency domain, we can now analyze the signal power of each word from the power spectrum of each signal, estimated using the periodogram estimator
+The measure of ``eventness'' of a word is simply its signal power. That can be determined from the power spectrum of each signal, estimated using the periodogram estimator
 
 \begin{equation*}
 	\vect{P} = \left[ \|X_{1}\|^{2}, \|X_{2}\|^{2}, \dots, \|X_{\ceil{\streamlen / 2}}\|^{2} \right].
@@ -94,12 +96,10 @@ To measure the overall signal power, we define the dominant power spectrum of th
 
 {\color{red} TODO: Plot graphs of periodic and aperiodic word showing both time trajectory and its periodogram.}
 
-When applied to rows of the matrix $\trajmat$, this method yields a vector $\vect{DPS} \in \R^{\featcount}$ containing the dominant power spectra.
-
-We finally define the set of all eventful words as those whose trajectory signal is powerful enough, that is, they appear in a large number of documents in a noiseless pattern:
+Finally, \cite{event-detection} define the set of all eventful words (EW) as those words whose trajectory signal is powerful enough. This corresponds to their occurrence in a large number of documents in a noiseless pattern:
 
 \begin{equation}
 	\text{EW} \coloneqq \left\{ w \mid \text{DPS}_{w} > \textit{DPS-bound} \right\}.
 \end{equation}
 
-where \textit{DPS-bound} can be estimated from the \textit{Heuristic stopword detection} algorithm described in \cite{event-detection}. The algorithm starts with a seed stopword set, measures the stopword average trajectory  values and dominant power spectra, and then assigns all the words with average trajectory values or DPS lower than these into the stopword set. The DPS boundary is then defined as the maximum DPS value of the resulting stopword set.
+where \textit{DPS-bound} can be estimated using the \textit{Heuristic stopword detection} algorithm described in \cite{event-detection}. The algorithm computes the average trajectory value and DPS values from a given seed stopwords set. The DPS boundary is then defined as the maximum DPS value of the stopwords set.
