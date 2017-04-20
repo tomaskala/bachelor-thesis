@@ -24,7 +24,7 @@ To construct the word trajectories, we first need to know which words appear in 
 We define a term-document matrix $\bowmat \in \left\{ 0, 1 \right\}^{\doccount \times \featcount}$, where $\doccount$ is the number of documents and $\featcount$ is the total vocabulary size. The document collection can then be interpreted as a set of $\doccount$ observations, each consisting of $\featcount$ binary features. The matrix $\bowmat$ is defined as
 
 \begin{equation} \label{eq:bow-matrix}
-	\bowmat_{ij} \coloneqq
+	\bowmat_{ij} =
 	\begin{cases}
 		1, & \text{document}~i~\text{contains the word}~j \text{;} \\
 		0, & \text{otherwise.}
@@ -38,7 +38,7 @@ Because every document contains only a small fraction of the vocabulary, the mat
 \cite{event-detection} defined the time trajectory of a word $w$ as a vector\\ $\vect{\traj}_{w} = \left[ \traj_{w}(1), \traj_{w}(2), \dots, \traj_{w}(\streamlen) \right]$ with each element $\traj_{w}(t)$ being the relative frequency of $w$ at time $t$. This frequency is defined using the DFIDF score:
 
 \begin{equation}
-	\traj_{w}(t) \coloneqq \underbrace{\frac{\text{\df}_{w}(t)}{\text{\doccount}(t)}}_{\text{DF}} \cdot \underbrace{\log{\frac{\doccount}{\text{\df}_{w}}}}_{\text{IDF}},
+	\traj_{w}(t) = \underbrace{\frac{\text{\df}_{w}(t)}{\text{\doccount}(t)}}_{\text{DF}} \cdot \underbrace{\log{\frac{\doccount}{\text{\df}_{w}}}}_{\text{IDF}},
 \end{equation}
 
 where $\text{\df}_{w}(t)$ is the number of documents published on day $t$ containing the word $w$ (time-local document frequency), $\text{\doccount}(t)$ is the number of documents published on day $t$, $\doccount$ is the total number of documents and $\text{\df}_{w}$ is the number of documents containing the word $w$ (global document frequency).
@@ -48,7 +48,7 @@ These word trajectories are stored in a matrix $\trajmat \in \R^{\featcount \tim
 To make the computation efficient, we vectorize most of the operations. Along with the matrix $\bowmat$ defined in \ref{eq:bow-matrix}, we define a matrix $\dtdmat \in \left\{ 0, 1 \right\}^{\doccount \times \streamlen}$ mapping the documents to their publication days:
 
 \begin{equation}
-	\dtdmat_{ij} \coloneqq
+	\dtdmat_{ij} =
 	\begin{cases}
 		1, & \text{document}~i~\text{was published on day}~j \text{;} \\
 		0, & \text{otherwise}.
@@ -60,7 +60,7 @@ Next, we sum the rows of $\bowmat$ together to obtain $\vect{\df} = \left[ \text
 Using these matrices and vectors, we can compute $\trajmat$ as follows:
 
 \begin{equation}
-	\trajmat \coloneqq
+	\trajmat =
 		\underbrace{\text{diag} \left( \log{\frac{\doccount}{\vect{\df}}} \right)}_{\text{IDF}}
 		\cdot
 		\underbrace{\bowmat^{\T}
@@ -91,7 +91,7 @@ The measure of ``eventness'' of a word is simply its signal power. That can be d
 To measure the overall signal power, we define the dominant power spectrum of the word $w$ as the value of the highest peak in the power spectrum, that is
 
 \begin{equation}
-	\text{DPS}_{w} \coloneqq \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
+	\text{DPS}_{w} = \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
 {\color{red} TODO: Plot graphs of periodic and aperiodic word showing both time trajectory and its periodogram.}
@@ -99,7 +99,7 @@ To measure the overall signal power, we define the dominant power spectrum of th
 Finally, \cite{event-detection} define the set of all eventful words (EW) as those words whose trajectory signal is powerful enough. This corresponds to their occurrence in a large number of documents in a noiseless pattern:
 
 \begin{equation}
-	\text{EW} \coloneqq \left\{ w \mid \text{DPS}_{w} > \textit{DPS-bound} \right\}.
+	\text{EW} = \left\{ w \mid \text{DPS}_{w} > \textit{DPS-bound} \right\}.
 \end{equation}
 
 where \textit{DPS-bound} can be estimated using the \textit{Heuristic stopword detection} algorithm described in \cite{event-detection}. The algorithm computes the average trajectory value and DPS values from a given seed stopwords set. The DPS boundary is then defined as the maximum DPS value of the stopwords set.
