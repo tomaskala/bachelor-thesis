@@ -1,6 +1,6 @@
 In this chapter, we compare the three methods for event detection from various standpoints. We will compare the original method (``original''), its modification based on greedy optimization of a different cost function (``greedy'') and the method using clustering algorithm to group similar words together (``cluster'').
 
-Most of these methods evaluate the events on the keyword level. We will be referring to the average number of keywords per event, which we provide in the following table.
+Most of these evaluations rate the detected events on the keyword level. We will be referring to the average number of keywords per event, which we provide in the following table.
 
 We discarded trivial events only consisting of a single keyword.
 
@@ -8,7 +8,7 @@ We discarded trivial events only consisting of a single keyword.
 
 \begin{minipage}{\linewidth}
 \centering
-\begin{tabular}{ c c c c }\toprule[1.5pt]
+\begin{tabular}{ l c c c }\toprule[1.5pt]
 \bf Method 	 & \bf Events detected & \bf Keywords & \bf Keywords per event \\ \midrule
 \bf Original & 217 & 451 & 2.08 \\
 \bf Greedy   & 82 & 583 & 7.11 \\
@@ -29,7 +29,7 @@ We manually inspected the detected events and matched them with real world event
 
 \begin{minipage}{\linewidth}
 \centering
-\begin{tabular}{ c c c c }\toprule[1.5pt]
+\begin{tabular}{ l c c c }\toprule[1.5pt]
 \bf Method 	 & \bf Precision & \bf Recall & \bf F-measure \\ \midrule
 \bf Original &  16.35\%     & \bf 28.57\%     &  20.80\% \\
 \bf Greedy   &  20.73\%     & 16.33\%      &  18.27\% \\
@@ -40,7 +40,7 @@ We manually inspected the detected events and matched them with real world event
 
 \hspace{\fill}
 
-The original method's precision was poor due to high redundancy of events not appearing in the reference list, which will be more clear in redundancy evaluation later. On the other hand, the cluster-based method attained higher precision due to events consisting of more keywords, rather than having the keywords distributed across several events.
+The original method's precision was poor due to high duplicity of events not appearing in the reference list, which will be more clear in redundancy evaluation later. As the average number of keywords per event is low, the real events are scattered among many detected events. On the other hand, the cluster-based method attained the highest precision due to events consisting of more keywords, meaning lower duplicity.
 
 The greedy method's recall was poor, as the events often consist of unrelated keywords, making them difficult to assign to their real world counterparts.\\
 
@@ -52,7 +52,7 @@ A real event, consisting of occurrence date and a headline, was considered detec
 
 \begin{minipage}{\linewidth}
 \centering
-\begin{tabular}{ c c c c }\toprule[1.5pt]
+\begin{tabular}{ l c c c }\toprule[1.5pt]
 \bf Method 	 & \bf Precision & \bf Recall & \bf F-measure \\ \midrule
 \bf Original &  7.14\%     & 16.33\%     &  9.94\% \\
 \bf Greedy   &  \bf 28.05\%     & \bf 36.73\%      &  \bf 31.81\% \\
@@ -63,19 +63,21 @@ A real event, consisting of occurrence date and a headline, was considered detec
 
 \hspace{\fill}
 
-This method of evaluation favors the greedy approach which generally has larger keyword sets that intersect with the healines more often. On the other hand, the original method's keyword sets usually consist of only two words that may not appear in the headlines at all.
+This method of evaluation favors the greedy approach whose keyword sets are less coherent. This allows to intersect a headline more often due to seemingly random words appearing among the keywords. On the other hand, the original method's keyword sets usually consist of only two words that may not appear in the headlines at all.
 
 The cluster-based method's results are similar to the manual evaluation.
 
 \section{Redundancy}
 
-Next, we evaluate redundancy -- the tendency to divide real events into several detected events. We manually collected occurrences of the same real event into groups, and computed the redundancy as $1 - \frac{\left| \text{groups} \right|}{\left| \text{events} \right|}$.
+Next, we evaluate redundancy --- the tendency to scatter a real event among several detected events. We manually collected occurrences of the same real event into groups, and computed the redundancy as $1 - (\left| \text{groups} \right| / \left| \text{events} \right|)$.
+
+If it was unclear which real event does a detected event refer to, we considered it to be equal to some other event if they had similar burst characteristics and semantically similar keywords.
 
 \hspace{\fill}
 
 \begin{minipage}{\linewidth}
 \centering
-\begin{tabular}{ c c }\toprule[1.5pt]
+\begin{tabular}{ l c }\toprule[1.5pt]
 \bf Method 	 & \bf Redundancy \\ \midrule
 \bf Original &  77.99\% \\
 \bf Greedy   &  75.61\% \\
@@ -98,7 +100,7 @@ Next, we evaluate the event noisiness. An event is considered noisy if its traje
 
 \begin{minipage}{\linewidth}
 \centering
-\begin{tabular}{ c c }\toprule[1.5pt]
+\begin{tabular}{ l c }\toprule[1.5pt]
 \bf Method 	 & \bf Noisiness \\ \midrule
 \bf Original &  50.94\% \\
 \bf Greedy   &  37.80\% \\
@@ -111,7 +113,7 @@ Next, we evaluate the event noisiness. An event is considered noisy if its traje
 
 Here, the cluster-based method performed the best, as the clustering algorithm chosen (DBSCAN) is capable of automatic filtering of noisy samples. With the distance function measuring both trajectory and keyword similarity, it filters out words unrelated to any event.
 
-Poor performance of the original method is partially caused by its large redundancy. Even if a number of words with noisy trajectories appear in similar documents, the method would not group them together to a single event, but split into several noisy events.
+Poor performance of the original method is partially caused by its large redundancy. Even if a number of words with noisy trajectories appears in similar documents, the method would not group them together to a single event, but split into several noisy events. All of these noisy events then negatively contribute to the noisiness score.
 
 Surprisingly, the greedy method did not perform the worst even though manual check revealed poor keyword quality {\color{red} TODO: As can be seen from the purity evaluation?}. This can again be explained by larger keyword sets of the greedy method, which makes even the noisy words clustered together into a smaller number of noisy events.
 
@@ -121,7 +123,7 @@ All previous evaluations concerned the events on the keyword level. The purity m
 
 The evaluation is similar to the standard measure of cluster purity in the sense that we measure the consistency of class labelling within each cluster. Each event is interpreted as a cluster of documents. Clearly, a high quality event should contain documents concerning similar topics. The problem is that our documents do not have any notion of class labels, which we will have to supplement.
 
-We first assembled a list of 50 words from 1000 most often occurring Nouns and Verbs in document headlines. The words are \textit{Ukrajina (Ukraine), Rusko (Russia), policie (police), soud (court), Zeman, EU, Sparta, festival, Babiš, Putin, Google, ekonomika (economics), letadlo (airplane), východ (east), politika (politics), zabít (to kill), poslanec (deputy), armáda (army), Kyjev (Kiev), Škoda, hokejista (hockey player), fotbalista (football player), doprava (traffic), vražda (murder), Vánoce (Christmas), Francie (France), sport, NATO, Moskva (Moscow), ropa (petroleum), turnaj (tournament), Obama, referendum, ebola, parlament (parliament), koalice (coalition), Paříž (Paris), automobil, mistrovství (championship), elektrárna (power plant), Sýrie (Syria), islamista (islamist), Brusel (Brussels), olympiáda (olympics), sníh (snow), průmysl (industry), revoluce (revolution), výbuch (explosion), finance, terorista (terrorist)}. All documents which contained any of these words in their headline were tagged with the corresponding class label.
+We first assembled a list of 50 words from 1000 most often occurring Nouns and Verbs in document headlines. The words are \textit{Ukrajina (Ukraine), Rusko (Russia), policie (police), soud (court), Zeman, EU, Sparta, festival, Babiš, Putin, Google, ekonomika (economics), letadlo (airplane), východ (east), politika (politics), zabít (to kill), poslanec (deputy), armáda (army), Kyjev (Kiev), Škoda, hokejista (hockey player), fotbalista (football player), doprava (traffic), vražda (murder), Vánoce (Christmas), Francie (France), sport, NATO, Moskva (Moscow), ropa (petroleum), turnaj (tournament), Obama, referendum, ebola, parlament (parliament), koalice (coalition), Paříž (Paris), automobil, mistrovství (championship), elektrárna (power plant), Sýrie (Syria), islamista (islamist), Brusel (Brussels), olympiáda (olympics), sníh (snow), průmysl (industry), revoluce (revolution), výbuch (explosion), finance, terorista (terrorist)}. All documents that contained any of these words in their headline were tagged with the corresponding class label.
 
 Then, for each event, we computed the fraction of documents with the most frequently appearing class label out of all tagged documents. The measure is a weighted average of these values across all events, with weights being the number of tagged documents within each event.
 
@@ -129,7 +131,7 @@ Then, for each event, we computed the fraction of documents with the most freque
 
 \begin{minipage}{\linewidth}
 \centering
-\begin{tabular}{ c c }\toprule[1.5pt]
+\begin{tabular}{ l c }\toprule[1.5pt]
 \bf Method 	 & \bf Purity \\ \midrule
 \bf Original &  30.53\% \\
 \bf Greedy   &  {\color{red} TODO} \\
@@ -142,13 +144,13 @@ Then, for each event, we computed the fraction of documents with the most freque
 
 \section{Computation time}
 
-Finally, we evaluate the computation time. We measure the execution time of the individual detection units, so it is clear which parts are the bottlenecks. All experiments were performed on a laptop with a 64bit operating system, quad-core processor and 8GB of RAM.
+Finally, we evaluate the computation time. We measure the execution time of the individual detection steps, so it is clear which parts are the bottlenecks. All experiments were performed on a laptop computer with a 64bit operating system, quad-core processor and 8GB RAM.
 
 \hspace{\fill}
 
 \begin{minipage}{\linewidth}
 \centering
-\begin{tabular}{ c c c c }\toprule[1.5pt]
+\begin{tabular}{ r c c c }\toprule[1.5pt]
 \bf Unit & \bf Original & \bf Greedy & \bf Clusters \\ \midrule
 Word2Vec embedding & --- & \multicolumn{2}{c}{3h 50min} \\
 Bag of words model construction & \multicolumn{3}{c}{37min} \\
@@ -165,4 +167,6 @@ Event annotation & {\color{red} TODO} & {\color{red} TODO} & {\color{red} TODO} 
 \hspace{\fill}
 
 {\color{red} TODO: Measure how much of the BOW model construction is taken by IO operations.}
+
+{\color{red} TODO: Write a conclusion of this evaluation once the results are known.}
 
