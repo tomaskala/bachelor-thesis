@@ -23,14 +23,39 @@ We will first need to construct an \textit{event trajectory} out of its \textit{
 	\vect{\traj_{e}} = \frac{1}{\sum_{k \in \kw{e}}{\text{DPS}_{k}}} \sum_{k \in \kw{e}}{\text{DPS}_{k} \cdot \vect{\traj}_{k}}
 \end{equation}
 
-{\color{red} TODO: Graph of event keyword trajectories and the weighted average}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{11_words_no_label}  % charlie hebdo words without labels
+  \caption{Event keywords}
+  \label{fig:hebdo-words}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{11_trajectory}  % charlie hebdo trajectory
+  \caption{Event trajectory}
+  \label{fig:hebdo-trajectory}
+\end{subfigure}
+\caption{Keywords and trajectory of the event related to Charlie Hebdo attack. The keywords are \textit{Charlie, Hebdo, Mohamed (Muhammad), Paříž (Paris), Islam, karikatura (caricature), Muslim, náboženství (religion), pařížský (Parisian), prorok (prophet), satirický (satirical), teroristický (terroristic), terorizmus (terrorism)}.}
+\end{figure}
 
 
 \subsection{Trajectory filtering}
 
-Now, a typical event (shown in {\color{red} TODO: Put a pretty picture here}) will usually have some number of dominant bursts corresponding to the period(s) when the event actually occurred. Additionally, there will be some milder, noisy bursts due to the keywords appearing elsewhere, independently of that particular event.
+Now, a typical event (shown in \autoref{fig:vrbetice-trajectory}) will usually have some number of dominant bursts corresponding to the period(s) when the event actually occurred. Additionally, there will be some milder, noisy bursts due to the keywords appearing elsewhere, independently of that particular event.
 
-We aim to fit a probability density function to the event trajectory. The noisy bursts would behave as outliers, shifting the fitted function away from the main event bursts. Once again, we apply the Burst filtering algorithm \ref{alg:burst-filtering} described in \autoref{chap:event-detection} to filter out noise, this time from the event trajectories.
+We aim to fit a probability density function to the event trajectory. The noisy bursts would behave as outliers, shifting the fitted function away from the main event bursts. Once again, we apply the Burst filtering algorithm described in \autoref{chap:event-detection} to filter out noise, this time from the event trajectories.
+
+
+\begin{figure}
+  \centering
+  \includegraphics{41_trajectory_cutoff}  % Vrbetice trajectory with cutoff
+  \caption{An event with some noise and mild bursts. The dashed red line is the cutoff value --- the parts of the trajectory under the cutoff will be discarded. The keywords are \textit{Vrbětice, muniční (ammunition), sklad (storage)}.}
+  \label{fig:vrbetice-trajectory}
+\end{figure}
+
 
 \subsection{Event periodicity}
 We apply the signal processing techniques described in \autoref{chap:word-analysis} once more, this time to determine the dominant period $\text{DP}_{e}$ of each event $e$. After computing the periodogram, the dominant period is defined as the inverse of the frequency corresponding to the highest peak in the event trajectory:
@@ -41,8 +66,6 @@ We apply the signal processing techniques described in \autoref{chap:word-analys
 
 as the Fourier coefficient $X_{k}$ denotes the amplitude at frequency $\frac{k}{T}$. We then consider an event $e$ to be \textit{aperiodic} if it happened only once in the stream, that is if $\text{DP}_{e} > \ceil{\streamlen / 2}$. Similarly, the event is \textit{periodic} if $\text{DP}_{e} \leq \ceil{\streamlen / 2}$.
 
-{\color{red} TODO: Graphs here}
-
 \subsection{Density fitting}
 We normalize the event trajectories to have unit sums, so they can be interpreted as probability distribution over days. An element $\traj_{e}(i)$ of the trajectory can be interpreted as the probability of that event occurring on day $i$. This allows us to fit a probability density function to them. \cite{event-detection} adapted a similar approach, though only for word rather than event trajectories.
 
@@ -52,7 +75,7 @@ We describe aperiodic and periodic events separately, as different probability d
 
 \item \textbf{Aperiodic events}
 
-An aperiodic event trajectory $\vect{\traj}_{e}$ is modeled by a Gaussian distribution $\mathcal{N}(\mu,\,\sigma^{2})$. We fit the Gaussian function to the trajectory $\vect{\traj}_{e}$ and estimate the parameters $\mu$ and $\sigma$ using non-linear least squares method. Unlike \cite{event-detection} who use the EM algorithm, least squares proved to be less prone to outliers, yielding a shape more resembling the actual trajectory.
+An aperiodic event trajectory $\vect{\traj}_{e}$ is modeled by a Gaussian distribution $\mathcal{N}(\mu,\,\sigma^{2})$. We fit the Gaussian function to the trajectory $\vect{\traj}_{e}$ and estimate the parameters $\mu$ and $\sigma$ using non-linear least squares method. Unlike \cite{event-detection} who used the EM algorithm, least squares proved to be less prone to outliers, yielding a shape more resembling the actual trajectory.
 
 \item \textbf{Periodic events}
 
@@ -69,10 +92,59 @@ The Cauchy distribution has a narrower peak and thicker tails than the Gaussian 
 \end{enumerate}
 
 
+\begin{figure}[H]
+  \begin{subfigure}[b]{0.5\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{39_trajectory} 
+    \caption{An aperiodic event} 
+    \label{fig:aperiodic-trajectory} 
+    \vspace{4ex}
+  \end{subfigure}%% 
+  \begin{subfigure}[b]{0.5\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{39_periodogram} 
+    \caption{The aperiodic event's periodogram} 
+    \label{fig:aperiodic-periodogram} 
+    \vspace{4ex}
+  \end{subfigure} 
+  \begin{subfigure}[b]{0.5\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{63_trajectory} 
+    \caption{A periodic event} 
+    \label{fig:periodic-trajectory} 
+  \end{subfigure}%%
+  \begin{subfigure}[b]{0.5\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{63_periodogram} 
+    \caption{The periodic event's periodogram} 
+    \label{fig:periodic-periodogram} 
+  \end{subfigure} 
+  \caption{Examples of event periodicities. (a) \textit{Sochi, ZOH (Winter Olympic Games), olympijský (olympic), olympiáda (olympiad)}. (c) \textit{volba (election), volební (electoral), volič (voter)} with period of 132 days.}
+\end{figure}
+
+
 \subsection{Burst detection}
 Using the fitted probability density functions, we define the bursty period(s) as the regions with the highest density. The bursty period of an aperiodic event $e$ is now defined as $\interval{\mu - \sigma}{\mu + \sigma}$. For a periodic event, there are $K = \floor{\streamlen / \text{DP}_{e}}$ bursty periods, each defined as $\interval{\mu_{k} - \gamma_{k}}{\mu_{k} + \gamma_{k}}$.
 
-{\color{red} TODO: More graphs}
+\newpage
+
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{42_words}  % boeing crash words
+  \caption{Event keywords}
+  \label{fig:boeing-words}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{42_trajectory_bursts}  % boeing crash trajectory with bursts
+  \caption{Event trajectory with bursts highlighted}
+  \label{fig:boeing-trajectory}
+\end{subfigure}
+\caption{(a) A periodic event consisting of the words \textit{boeing, malaysian, mha, shooting down, shot down}. (b) Trajectory of the event with three bursts highlighted. The center $\mu_{k}$ of each burst is shown on the x-axis.}
+\end{figure}
 
 
 \section{Document retrieval}
