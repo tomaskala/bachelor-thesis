@@ -42,6 +42,7 @@ The cost function is a combination of the trajectory distance and document overl
 
 Since the algorithm will attempt to minimize it, the intuitive result will be a set of words with with low trajectory distance and high document overlap. The algorithm will also prefer words of higher importance due to the last term of the denominator, counting in the power spectra.
 
+
 \subsection{Event detection algorithm}
 The algorithm, called \textit{unsupervised greedy event detection algorithm} in the original paper, is defined as follows.
 
@@ -77,6 +78,14 @@ The algorithm, called \textit{unsupervised greedy event detection algorithm} in 
 \Output $\text{Events} ~ \{ e_{1}, \dots, e_{k} \}$
 \end{algorithmic}
 \end{algorithm}
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics{original_event}  % original event
+  \caption{Example of an event detected using the original method. The event consists of the words \textit{palestinian}, \textit{israeli}, \textit{Palestinian} and \textit{Israel}, respectively.}
+  \label{fig:original-event}
+\end{figure}
 
 
 \section{Greedy approach}
@@ -118,6 +127,14 @@ Since the cosine similarity is bounded in $[-1, 1]$, we exponentiate it so that 
 Having constructed the cost function, we use Algorithm \ref{alg:greedy-event-detection} to detect events once again.
 
 
+\begin{figure}[H]
+  \centering
+  \includegraphics{greedy_event}  % greedy event
+  \caption{Example of an event detected using the greedy method. The event consists of the words \textit{to shoot}, \textit{missile}, \textit{Israel} and \textit{israeli}, respectively, and is related to the same real event as \autoref{fig:original-event}.}
+  \label{fig:greedy-event}
+\end{figure}
+
+
 \section{Cluster-based approach}
 The final method interprets the task as literal clustering of words, using a custom distance function. The distance function will actually be a modification of the cost function yet again, though some means have to be taken to make it usable in this context. First, we need to consider a proper clustering algorithm.
 
@@ -132,8 +149,6 @@ In addition to the previously stated requirements, DBSCAN is also capable of fil
 
 \subsection{Noise filtering}
 Before we apply clustering, we will filter out the noisy parts from the word trajectories. Most words are on some level reported all the time, though only a fraction of these reportings corresponds to notable events. Unlike the greedy optimization described previously, clustering is prone to such noise, and would yield clusters of poor quality, often with trajectories being put together only due to their noisy parts being similar. With DBSCAN capable of filtering out noisy samples, quality words with some noise in their trajectories would be discarded.
-
-{\color{red} TODO: Graphs of awesome vs. poor clusterings}
 
 We want to keep only those trajectory parts exceeding a certain frequency level, distinguishing notable bursts from the general noise. We do this by computing a cutoff value for each event trajectory and discarding the sectors falling under this cutoff. This procedure is adopted from \cite{online-search-queries}. The algorithm is based on computing a moving average along the trajectory, and works as follows:
 
@@ -191,3 +206,11 @@ The input and output of the event detection algorithm remains the same as in Alg
 \Output $\text{Events} ~ \{ e_{1}, e_{2}, \dots, e_{k} \}$
 \end{algorithmic}
 \end{algorithm}
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics{cluster_event}  % cluster event
+  \caption{Example of an event detected using the cluster-based method. The event is related to the same real event as \autoref{fig:original-event} and \autoref{fig:greedy-event}. Note that the trajectories are clean of noise due to application of Algorithm \ref{alg:burst-filtering}}
+  \label{fig:cluster-event}
+\end{figure}
