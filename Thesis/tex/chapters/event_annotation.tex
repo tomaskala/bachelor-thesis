@@ -1,6 +1,15 @@
 The final step of our method is to annotate the detected events in a human-readable way. We aim to generate short summaries so that the user does not have to process a large quantity of text, and can just skim through a few sentences to decide whether he is interested in that particular event. If so, then he can examine the event more closely and go through the actual documents, which we have retrieved in chapter \autoref{chap:document-retrieval}.
 
-Although the keyword set discovered in \autoref{chap:event-detection} provides a concise representation of an event, it can lead to ambiguities or simply not reveal enough information. {\color{red} TODO: Add an example of an event not well recognizable by its keyword set.} The keywords should be considered an internal representation used in the detection process, not something presentable to the user.
+Although the keyword set discovered in \autoref{chap:event-detection} provides a concise representation of an event, it can lead to ambiguities or simply not reveal enough information. The keywords should be considered an internal representation used in the detection process, not something presentable to the user.
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics{18_words}  % original event
+  \caption{An event concerning Viktor Yanukovych being ousted from Ukraine's presidency, which is not recognizable from the keyword set.}
+  \label{fig:not-recognizable}
+\end{figure}
+
 
 A simple method is to annotate an event by the headline of the most relevant document in terms of Word Mover's Similarity. This may give insight of the general topic of the particular event, but it is unlikely that a whole event will be well characterized by a single document. For this reason, we also investigate a more complex method. Nevertheless, we will provide such headlines for comparison in {\color{red} TODO: Appendix with the events}.
 
