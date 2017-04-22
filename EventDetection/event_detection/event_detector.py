@@ -362,7 +362,7 @@ def main(cluster_based):
         with open(ID2WORD_PATH, mode='rb') as f:
             id2word = pickle.load(f)
 
-        # bow_matrix = data_fetchers.load_sparse_csr(BOW_MATRIX_PATH)
+        bow_matrix = data_fetchers.load_sparse_csr(BOW_MATRIX_PATH)
 
         with open(RELATIVE_DAYS_PATH, mode='rb') as f:
             relative_days = pickle.load(f)
@@ -370,8 +370,8 @@ def main(cluster_based):
         stream_length = max(relative_days) + 1  # Zero-based, hence the + 1.
 
         logging.info('Deserialized id2word, bag of words matrix and relative days in %fs.', time() - t)
-        # logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
-        #              bow_matrix.getnnz())
+        logging.info('BOW: %s, %s, storing %d elements', str(bow_matrix.shape), str(bow_matrix.dtype),
+                     bow_matrix.getnnz())
         logging.info('Stream length: %d', stream_length)
     else:
         t = time()
@@ -406,13 +406,18 @@ def main(cluster_based):
     if NAMES_SEPARATELY:
         relative_days = np.repeat(relative_days, 2)
 
-    # n_docs = bow_matrix.shape[0]
-    # trajectories = construct_feature_trajectories(bow_matrix, relative_days)
+    n_docs = bow_matrix.shape[0]
+    trajectories = construct_feature_trajectories(bow_matrix, relative_days)
 
     # Bag of Words matrix is no longer needed -> delete it to free some memory.
     # del bow_matrix
 
-    # dps, dp = postprocessing.spectral_analysis(trajectories)
+    dps, dp = postprocessing.spectral_analysis(trajectories)
+
+    plotting.plot_aperiodic_words(trajectories, dps, dp, 0.05, stream_length, id2word, '../APERIODIC_WORDS')
+    plotting.plot_periodic_words(trajectories, dps, dp, 0.05, stream_length, id2word, '../PERIODIC_WORDS')
+    exit()
+
     w2v_model = preprocessing.perform_word2vec(embedding_fetcher, NAMES_SEPARATELY)
 
     # Step 2: Detect events

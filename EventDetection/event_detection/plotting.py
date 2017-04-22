@@ -201,6 +201,137 @@ def plot_events(feature_trajectories, events, id2word, dps, dirname='../events')
         plt.clf()
 
 
+def cm2inch(*tupl):
+    inch = 2.54
+    if isinstance(tupl[0], tuple):
+        return tuple(i/inch for i in tupl[0])
+    else:
+        return tuple(i/inch for i in tupl)
+
+
+def plot_aperiodic_words(trajectories, dps, dp, dps_boundary, stream_length, id2word, dirname):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    font = {'family': 'normal',
+            'size': 12}
+
+    matplotlib.rc('font', **font)
+
+    # aperiodic_word_indices = np.where((dps > dps_boundary) & (dp > np.floor(stream_length / 2)))[0]
+    aperiodic_word_indices = [64746, 71593, 63608, 84358, 105282, 21255, 60141]
+    print('Plotting {:d} aperiodic words'.format(len(aperiodic_word_indices)))
+
+    n_days = trajectories.shape[1]
+    days = np.arange(n_days)
+
+    with open(os.path.join(dirname, 'id2word.txt'), 'w', encoding='utf8') as f:
+        for i in aperiodic_word_indices:
+            print('{:d}: {:s}'.format(i, id2word[i]), file=f)
+
+    for i in aperiodic_word_indices:
+        fig = plt.figure()
+        word_trajectory = trajectories[i]
+
+        if i == 60141:
+            label = '{:s} ({:s})'.format(id2word[i], 'Christmas')
+        else:
+            label = id2word[i]
+
+        plt.xlim(0.0, n_days)
+        plt.plot(days, word_trajectory, label=label)
+        plt.xlabel('Days (relative to 1/1/2014)')
+        plt.ylabel('DFIDF')
+        plt.legend()
+        plt.tight_layout()
+
+        fig.set_size_inches(cm2inch(14, 8))
+        fig.savefig(os.path.join(dirname, '{:d}.eps'.format(i)), format='eps', dpi=1200, bbox_inches='tight')
+        # fig.savefig(os.path.join(dirname, '%s_%d.png' % (id2word[i], i)))
+        plt.close(fig)
+        plt.clf()
+
+    print('Plotting finished')
+
+
+def plot_periodic_words(trajectories, dps, dp, dps_boundary, stream_length, id2word, dirname):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    font = {'family': 'normal',
+            'size': 12}
+
+    matplotlib.rc('font', **font)
+
+    # periodic_word_indices = np.where((dps > dps_boundary) & (dp <= np.floor(stream_length / 2)))[0]
+    periodic_word_indices = [152999, 84055, 116963, 91143, 144057, 139919]
+    print('Plotting {:d} periodic words'.format(len(periodic_word_indices)))
+
+    n_days = trajectories.shape[1]
+    days = np.arange(n_days)
+
+    with open(os.path.join(dirname, 'id2word.txt'), 'w', encoding='utf8') as f:
+        for i in periodic_word_indices:
+            print('{:d}: {:s}'.format(i, id2word[i]), file=f)
+
+    for i in periodic_word_indices:
+        fig = plt.figure()
+        word_trajectory = trajectories[i]
+
+        if i == 116963:
+            label = '{:s} ({:s})'.format(id2word[i], 'Friday')
+        elif i == 91143:
+            label = '{:s} ({:s})'.format(id2word[i], 'airplane')
+        else:
+            label = id2word[i]
+
+        plt.xlim(0.0, n_days)
+        plt.plot(days, word_trajectory, label=label)
+        plt.xlabel('Days (relative to 1/1/2014)')
+        plt.ylabel('DFIDF')
+        plt.legend()
+        plt.tight_layout()
+
+        fig.set_size_inches(cm2inch(14, 8))
+        fig.savefig(os.path.join(dirname, '{:d}.eps'.format(i)), format='eps', dpi=1200, bbox_inches='tight')
+        # fig.savefig(os.path.join(dirname, '%s_%d_%d.png' % (id2word[i], i, dp[i])))
+        plt.close(fig)
+        plt.clf()
+
+    from scipy.signal import periodogram
+    freqs, pgram = periodogram(trajectories)
+
+    dps_indices = np.argmax(pgram, axis=1)
+    feature_indices = np.arange(trajectories.shape[0])
+
+    dps = pgram[feature_indices, dps_indices]
+
+    with np.errstate(divide='ignore'):
+        ffreqs = np.tile(freqs, (trajectories.shape[0], 1))
+
+    df = ffreqs[feature_indices, dps_indices]
+
+    fig = plt.figure()
+
+    plt.xlim(0.0, freqs[-1])
+    plt.plot(freqs, pgram[91143], label='{:s} ({:s})'.format(id2word[91143], 'airplane'))
+    plt.hlines(dps[91143], 0.0, df[91143])
+
+    plt.scatter(df[91143], dps[91143], s=60, c='r')
+
+    plt.xlabel('Frequency')
+    plt.ylabel('Periodogram')
+    plt.legend()
+    plt.tight_layout()
+
+    fig.set_size_inches(cm2inch(14, 8))
+    fig.savefig(os.path.join(dirname, '{:d}_periodogram.eps'.format(91143)), format='eps', dpi=1200, bbox_inches='tight')
+    plt.close(fig)
+    plt.clf()
+
+    print('Plotting finished')
+
+
 def plot_aperiodic_features(feature_trajectories, dps, dp, dps_boundary, stream_length, id2word,
                             dirname='../aperiodic'):
     if not os.path.exists(dirname):
