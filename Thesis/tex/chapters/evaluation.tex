@@ -94,7 +94,24 @@ Large redundancy of the original method is to be expected with events consisting
 
 Next, we evaluate the event noisiness. An event is considered noisy if its trajectory does not contain any distinguishable burst of activity, or if it consists of keywords unrelated to each other. The score is then a fraction of noisy events detected.
 
-{\color{red} TODO: Examples of noisy events (both due to poor trajectory and due to poor keyword set)}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{19_trajectory}  % noisy trajectory
+  \caption{Event trajectory}
+  \label{fig:noisy-trajectory}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{17_words}  % noisy keywords
+  \caption{Event keywords}
+  \label{fig:noisy-keywords}
+\end{subfigure}
+\caption{(a) Event with noisy trajectory. (b) Event with noisy keywords \textit{to make, to utilize, type, program, different, interesting, to discover, directly, basic, area, to concern}.}
+\end{figure}
+
 
 \hspace{\fill}
 
@@ -116,6 +133,8 @@ Here, the cluster-based method performed the best, as the clustering algorithm c
 Poor performance of the original method is partially caused by its large redundancy. Even if a number of words with noisy trajectories appears in similar documents, the method would not group them together to a single event, but split into several noisy events. All of these noisy events then negatively contribute to the noisiness score.
 
 Surprisingly, the greedy method did not perform the worst even though manual check revealed poor keyword quality {\color{red} TODO: As can be seen from the purity evaluation?}. This can again be explained by larger keyword sets of the greedy method, which makes even the noisy words clustered together into a smaller number of noisy events.
+
+\newpage
 
 \section{Purity}
 
