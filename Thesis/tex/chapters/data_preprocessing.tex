@@ -2,9 +2,9 @@ The collection we work with comes directly from webscraping various Czech news s
 
 We will first employ some NLP (Natural Language Processing) methods to gain insight into the data. Then, we will train a model to obtain word embeddings, which we discuss next.
 
-Since most machine learning and information retrieval methods rely on the data being represented numerically, usually in a vector space, it is necessary to obtain such representation from the plain text. Preferably, these vectors should retain as much information about the text as possible. There are many ways to do so --- a simple TFIDF representation \cite{information-retrieval} which represents the words by weighted counts of their appearance in the document collection. More complicated methods, such as Latent Semantic Indexing \cite{lsi} attempt to discover latent structure within words to also reveal topical relations between them. This idea is further pursued by probabilistic topical models, such as Latent Dirichlet Allocation \cite{lda}.
+Since most machine learning and information retrieval methods rely on the data being represented numerically, usually in a vector space, it is necessary to obtain such representation from the plain text. Preferably, these vectors should retain as much information about the text as possible. There are many ways to do so --- a simple TFIDF (Term Frequency-Inverse Document Frequency) representation \cite{information-retrieval} which represents the words by weighted counts of their appearance in the document collection. More complicated methods, such as Latent Semantic Indexing \cite{lsi} attempt to discover latent structure within words to also reveal topical relations between them. This idea is further pursued by probabilistic topical models, such as Latent Dirichlet Allocation \cite{lda}.
 
-In this thesis, we use the \textit{Word2Vec} model introduced by \cite{Word2Vec, distributed-representations, linguistic-regularities}, which uses a shallow neural network to project the words from a predetermined vocabulary into a vector space. Vectors in this space have interesting semantical properties, such as vector arithmetics preserving semantic relations, or semantically related words forming clusters.
+In this thesis, we use the \textit{Word2Vec} model introduced by \cite{word2vec, distributed-representations, linguistic-regularities}, which uses a shallow neural network to project the words from a predetermined vocabulary into a vector space. Vectors in this space have interesting semantical properties, such as vector arithmetics preserving semantic relations, or semantically related words forming clusters.
 
 Later on, we will need some sort of word similarity measure. This will come up several times in the thesis --- in the event detection itself, later when querying the document collection to obtain document representation of the events detected, and finally to generate human-readable summaries. The Word2Vec models is fit for all of these uses, as opposed to the other mentioned approaches, some of which are designed only to measure document similarity, or, on the other hand, do not support document similarity queries very well.
 
@@ -22,7 +22,7 @@ For the training, we only discard punctuation marks and words denoted as unknown
 
 The thesis was implemented using the Gensim \cite{gensim} library. The project contains memory efficient, easy to use Python implementations of various topic modeling algorithms, Word2Vec included. In addition, we used the SciPy toolkit \cite{scipy} and Scikit-Learn \cite{scikit-learn} for various machine learning-related computations.
 
-We embed the words in a 100-dimensional vector space using the skip-gram model, as defined in \cite{Word2Vec} with 5 passes over the collection.
+We embed the words in a 100-dimensional vector space using the skip-gram model, as defined in \cite{word2vec} with 5 passes over the collection.
 
 
 \section{Document collection}

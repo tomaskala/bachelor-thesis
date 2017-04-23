@@ -167,6 +167,8 @@ Finally, we evaluate the computation time. We measure the execution time of the 
 
 In the greedy and cluster-based methods, we did not retrieve documents for events with a period of 7 days or lower. The reason is that such short periods will essentialy cover the entire stream with short bursts and the Word Mover's Distance, computationally expensive on its own, will need to be computed to almost all documents. This might take a day's worth of time, and the short period events mostly concern unineresting events such as sport matches, weather forecasts, etc.
 
+In addition, the summaries were extracted only using 50 most relevant documents, so that the overall process would not take too long.
+
 \hspace{\fill}
 
 \begin{minipage}{\linewidth}
@@ -178,8 +180,8 @@ Bag of words model construction & \multicolumn{3}{c}{37min} \\
 Word trajectories \& spectral analysis & \multicolumn{3}{c}{8s} \\
 Event detection & 2min 12s & 50s & 4min 50s \\
 Document retrieval & 7min 30s & {\color{red} TODO} & 7h 40min \\
-Event annotation & {\color{red} TODO} & {\color{red} TODO} & 7min 30s \\ \midrule
-\bf Total & & & 12h 20min\\ \bottomrule[1.25pt]
+Event annotation & 3h 13min & {\color{red} TODO} & 7min 30s \\ \midrule
+\bf Total & 4h & & 12h 20min\\ \bottomrule[1.25pt]
 
 \end{tabular}\par
 \captionof{table}{Computation time comparison} \label{tab:title}
@@ -187,5 +189,5 @@ Event annotation & {\color{red} TODO} & {\color{red} TODO} & 7min 30s \\ \midrul
 
 \hspace{\fill}
 
-{\color{red} TODO: Write a conclusion of this evaluation once the results are known.}
+{\color{red} TODO: Write a conclusion of this evaluation once the results are known. Something about event annotation comparison being unfair, since greedy \& clusters discarded events with periods $\leq$ 7 days, unlike original (In original, it's no problem to retrieve documents for those, in the other two, documents would take eternity to get, summarization would still work).}
 
