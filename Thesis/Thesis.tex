@@ -34,6 +34,8 @@
 \usepackage{color}
 \usepackage{subcaption}
 
+\renewcommand{\tabularxcolumn}[1]{>{\small}m{#1}}
+
 
 %% Definitions %%
 
@@ -172,6 +174,10 @@ These are my acknowledgements.
 \chapter{List of real events used for evaluation}
 \label{app:real-events}
 \input{tex/chapters/appendix_real_events}
+
+\chapter{Events detected using the cluster-based method}
+\label{app:clusters-events}
+\input{tex/chapters/appendix_clusters_events}
 
 
 % Bibliography
