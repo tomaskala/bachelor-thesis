@@ -11,7 +11,7 @@ Although the keyword set discovered in \autoref{chap:event-detection} provides a
 \end{figure}
 
 
-A simple method is to annotate an event by the headline of the most relevant document in terms of Word Mover's Similarity. This may give insight of the general topic of the particular event, but it is unlikely that a whole event will be well characterized by a single document. For this reason, we also investigate a more complex method. Nevertheless, we will provide such headlines for comparison in {\color{red} TODO: Appendix with the events}.
+A simple method is to annotate an event by the headline of the most relevant document in terms of Word Mover's Similarity. This may give insight of the general topic of the particular event, but it is unlikely that a whole event will be well characterized by a single document. For this reason, we also investigate a more complex method.
 
 To obtain richer annotations, we apply multi-document summarization techniques to generate a short summary of an event's document set. More specifically, we attempt to extract a subset of sentences out of the event documents, which cover the general topic of the event without providing redundant information. As the documents come from different sources and describe the events from different perspectives, the result will not generally be a continuous paragraph, but more of a set of characteristic sentences. Still, a longer piece of text will likely provide a better insight into an event than a single headline.
 
@@ -124,10 +124,10 @@ where $P_{k},\ k = 1, \dots, K$ is a clustering of the sentence set $V$. The val
 
 This function positively rewards diverse sentences in a sense that once an element $i$ from a cluster $P_{k}$ is chosen, other elements from the same cluster will have diminishing gains due to the square root function (see \cite{multi-summarization-2} for a concrete example). This means that if the clustering partitions the sentences into semantically different clusters, the summary will draw from different semantical categories and will consist of sentences conveying different information.
 
-We apply the K-Medoids algorithm with $\semsim{\cdot}{\cdot}$ as a custom distance function. As in the original paper, we set the number of clusters $K$ to $\frac{\left| V \right|}{5}$, putting 5 sentences into each cluster on average.
+We apply the K-Medoids algorithm with $\semsim{\cdot}{\cdot}$ as a custom distance function.
 
 
 \section{Optimization}
 Having defined the cost function $\quality{\cdot}$, we can use the greedy algorithm defined in \cite{multi-summarization-1} to obtain the desired summary.
 
-For the experiments, we set a budget of {\color{red} TODO} words and other parameters to {\color{red} TODO}. Below are several summary examples, full list of which can be found in appendix {\color{red} TODO}.
+For the experiments, we set a budget of 50 words. In the diversity function the number of clusters $K$ was set to $\frac{\left| V \right|}{10}$, putting 10 sentences into each cluster on average. As for the other parameters, we used the values from the original papers \citep{multi-summarization-1, multi-summarization-2}. The list of generated summaries can be found in \autoref{app:clusters-events}.

@@ -165,6 +165,8 @@ Then, for each event, we computed the fraction of documents with the most freque
 
 Finally, we evaluate the computation time. We measure the execution time of the individual detection steps, so it is clear which parts are the bottlenecks. All experiments were performed on a laptop computer with a 64bit operating system, quad-core processor and 8GB RAM.
 
+In the greedy and cluster-based methods, we did not retrieve documents for events with a period of 7 days or lower. The reason is that such short periods will essentialy cover the entire stream with short bursts and the Word Mover's Distance, computationally expensive on its own, will need to be computed to almost all documents. This might take a day's worth of time, and the short period events mostly concern unineresting events such as sport matches, weather forecasts, etc.
+
 \hspace{\fill}
 
 \begin{minipage}{\linewidth}
@@ -184,8 +186,6 @@ Event annotation & {\color{red} TODO} & {\color{red} TODO} & 7min 30s \\ \midrul
 \end{minipage}
 
 \hspace{\fill}
-
-{\color{red} TODO: Measure how much of the BOW model construction is taken by IO operations.}
 
 {\color{red} TODO: Write a conclusion of this evaluation once the results are known.}
 

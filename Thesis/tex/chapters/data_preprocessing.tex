@@ -12,13 +12,13 @@ Later on, we will need some sort of word similarity measure. This will come up s
 \section{Preprocessing}
 Some of the documents contain residual HTML entities from errors during web scraping, which we filter out using a manually constructed stopwords list.
 
-We used the MorphoDiTa tagger \cite{morphodita} to perform tokenization, lemmatization and parts-of-speech tagging. Our whole analysis will be run on these lemmatized texts, and we will revert to the full forms only at the end when annotating the events in a human-readable way.
+We used the MorphoDiTa tagger \cite{morphodita} to perform tokenization, lemmatization and parts of speech tagging. Our whole analysis will be run on these lemmatized texts, and we will revert to the full forms only at the end when annotating the events in a human-readable way.
 
 
 \section{Word embeddings} \label{word-embeddings}
 Next, we train the previously mentioned Word2Vec model. Although the training is time-consuming \footnote{See \autoref{chap:evaluation} for computation times.}, the word vectors can be pre-trained on a large document collection and then reused in following runs, even on different documents as long as the vocabulary is similar.
 
-For the training, we only discard punctuation marks and word denoted as unknown parts of speech by the tagger. Such unknown words are mostly typos not important for our analysis. Furthermore, we discard all words appearing in less than 10 documents.
+For the training, we only discard punctuation marks and words denoted as unknown parts of speech by the tagger. Such words are mostly typos not important for our analysis. We also discard words appearing in less than 10 documents.
 
 The thesis was implemented using the Gensim \cite{gensim} library. The project contains memory efficient, easy to use Python implementations of various topic modeling algorithms, Word2Vec included. In addition, we used the SciPy toolkit \cite{scipy} and Scikit-Learn \cite{scikit-learn} for various machine learning-related computations.
 
