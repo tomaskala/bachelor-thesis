@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE ipe SYSTEM "ipe.dtd">
 <ipe version="70206" creator="Ipe 7.2.7">
-<info created="D:20170501212726" modified="D:20170502000252"/>
+<info created="D:20170501212726" modified="D:20170503233154"/>
 <ipestyle name="basic">
 <symbol name="arrow/arc(spx)">
 <path stroke="sym-stroke" fill="sym-stroke" pen="sym-pen">
@@ -367,11 +367,11 @@ h
 Raw documents</text>
 <text matrix="1 0 0 1 -160.216 -51.5013" transformations="translations" pos="464 624" stroke="black" type="minipage" width="96" height="32.029" depth="27.11" valign="top" size="LARGE">\centering
 Word trajectories and analysis</text>
-<path stroke="black" pen="fat" arrow="normal/large">
+<path stroke="black" pen="fat" arrow="pointed/large">
 176 432 m
 64 432 l
-64 320 l
-112 320 l
+64 208 l
+112 208 l
 </path>
 </page>
 </ipe>
