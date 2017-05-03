@@ -152,9 +152,9 @@ We only describe the process for aperiodic events. The method is similar for per
 
 We need to measure the relevance of individual documents published within an event's bursty period to the event. The only measure of semantics for an event we have is the event's keyword set $\kw{e}$. If we interpret $\kw{e}$ as a keyword query for the document collection, we arrive at the classical task of information retrieval. That is, to rate the documents in a given corpus by their relevance to the query \cite{information-retrieval}.
 
-In the original method by \cite{event-detection}, the task was simple due to the cost function used. The only measure of semantic similarity was the degree of document overlap between all words in $\kw{e}$. If two words had no document overlap, they would not get assigned in the same event. That way, there was always at least one document in which all of the event's keywords appeared. This is not the case in our method, and we will need to measure the semantic similarity in a more sophisticated way.
+In the original method by \cite{event-detection}, the task was simple due to the cost function used. The only measure of semantic similarity was the degree of document overlap between all words in $\kw{e}$. If two words had no document overlap, they would not get assigned in the same event. That way, there was always at least one document in which all of the event's keywords appeared. It was a simple matter to compute the intersection of all documents containing either keyword within the bursty period. This is not the case in our method, and we will need to measure the document relevance in a more sophisticated way.
 
-There are a few approaches we could take, such as project all documents and queries to a TFIDF space \cite{information-retrieval} and sort the documents by their cosine similarity to the query. This simple approach does not go beyond a trivial keyword occurrence comparison, though after applying some weighting scheme. We could enrich it using Latent Semantic Indexing \cite{lsi} to also take the document topics into account. This would however require us to compute yet another model to be used for this part only, which would be computationally and memory-intensive.
+There are a few approaches we could take, such as project all documents and queries to a TFIDF (Term Frequency-Inverse Document Frequency) space \cite{information-retrieval} and sort the documents by their cosine similarity to the query. This simple approach does not go beyond a trivial keyword occurrence comparison, though after applying some weighting scheme. We could enrich it using Latent Semantic Indexing \cite{lsi} to also take the document topics into account. This would however require us to compute yet another model to be used for this part only, which would be computationally and memory-intensive.
 
 Instead, we decided to further utilize the Word2Vec model and use the recently introduced Word Mover's Distance \cite{wmd}.
 
@@ -193,4 +193,4 @@ We now describe the algorithm to compute the document representation of an event
 \end{algorithmic}
 \end{algorithm}
 
-In our experiments, we chose the number of documents $n$ as the square root of the number of documents within each event burst.
+In our experiments, we chose the number of documents $n$ as the square root of total number of documents within the particular event burst.

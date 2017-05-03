@@ -144,7 +144,7 @@ The evaluation is similar to the standard measure of cluster purity in the sense
 
 We first assembled a list of 50 words from 1000 most often occurring Nouns and Verbs in document headlines. The words are \textit{Ukrajina (Ukraine), Rusko (Russia), policie (police), soud (court), Zeman, EU, Sparta, festival, Babiš, Putin, Google, ekonomika (economics), letadlo (airplane), východ (east), politika (politics), zabít (to kill), poslanec (deputy), armáda (army), Kyjev (Kiev), Škoda, hokejista (hockey player), fotbalista (football player), doprava (traffic), vražda (murder), Vánoce (Christmas), Francie (France), sport, NATO, Moskva (Moscow), ropa (petroleum), turnaj (tournament), Obama, referendum, ebola, parlament (parliament), koalice (coalition), Paříž (Paris), automobil, mistrovství (championship), elektrárna (power plant), Sýrie (Syria), islamista (islamist), Brusel (Brussels), olympiáda (olympics), sníh (snow), průmysl (industry), revoluce (revolution), výbuch (explosion), finance, terorista (terrorist)}. All documents that contained any of these words in their headline were tagged with the corresponding class label.
 
-Then, for each event, we computed the fraction of documents with the most frequently appearing class label out of all tagged documents. The measure is a weighted average of these values across all events, with weights being the number of tagged documents within each event.
+Then, for each event, we computed the fraction of documents tagged by the most frequently appearing class label out of all tagged documents. The purity measure is a weighted average of these values across all events, with weights being the number of tagged documents within each event.
 
 \hspace{\fill}
 
@@ -188,6 +188,8 @@ Event annotation & 3h 13min & {\color{red} TODO} & 7min 30s \\ \midrule
 \end{minipage}
 
 \hspace{\fill}
+
+The original method's document retrieval took considerably less time than the other two methods. The reason is that the original method does not use the Word Mover's Distance as a similarity measure. Due to word semantic similarity being measured only in terms of their document overlap, there is always at least one document containing all the event keywords. This means that it suffices to take the documents containing each keyword and intersect them.
 
 {\color{red} TODO: Write a conclusion of this evaluation once the results are known. Something about event annotation comparison being unfair, since greedy \& clusters discarded events with periods $\leq$ 7 days, unlike original (In original, it's no problem to retrieve documents for those, in the other two, documents would take eternity to get, summarization would still work).}
 
