@@ -42,6 +42,7 @@ The cost function is a combination of the trajectory distance and document overl
 
 Since the algorithm will attempt to minimize it, the intuitive result will be a set of words with with low trajectory distance and high document overlap. The algorithm will also prefer words of higher importance due to the last term of the denominator, counting in the power spectra.
 
+\newpage
 
 \subsection{Event detection algorithm}
 The algorithm, called \textit{unsupervised greedy event detection algorithm} in the original paper, is defined as follows.
@@ -211,6 +212,6 @@ The input and output of the event detection algorithm remains the same as in Alg
 \begin{figure}[H]
   \centering
   \includegraphics{cluster_event}  % cluster event
-  \caption{Example of an event detected using the cluster-based method. The event is related to the same real event as \autoref{fig:original-event} and \autoref{fig:greedy-event}. Note that the trajectories are clean of noise due to application of Algorithm \ref{alg:burst-filtering}}
+  \caption{Example of an event detected using the cluster-based method. The event is related to the same real event as \autoref{fig:original-event} and \autoref{fig:greedy-event}. Note that the trajectories are clear of noise due to application of Algorithm \ref{alg:burst-filtering}}
   \label{fig:cluster-event}
 \end{figure}
