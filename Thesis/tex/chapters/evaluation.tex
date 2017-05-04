@@ -132,7 +132,7 @@ Here, the cluster-based method performed the best, as the clustering algorithm c
 
 Poor performance of the original method is partially caused by its large redundancy. Even if a number of words with noisy trajectories appears in similar documents, the method would not group them together to a single event, but split into several noisy events. All of these noisy events then negatively contribute to the noisiness score.
 
-Surprisingly, the greedy method did not perform the worst even though manual check revealed poor keyword quality {\color{red} TODO: As can be seen from the purity evaluation?}. This can again be explained by larger keyword sets of the greedy method, which makes even the noisy words clustered together into a smaller number of noisy events.
+Surprisingly, the greedy method did not perform the worst even though manual check revealed poor keyword quality, as can be seen from the Purity evaluation later. This can again be explained by larger keyword sets of the greedy method, which makes even the noisy words clustered together into a smaller number of noisy events.
 
 \newpage
 
@@ -153,7 +153,7 @@ Then, for each event, we computed the fraction of documents tagged by the most f
 \begin{tabular}{ l c }\toprule[1.5pt]
 \bf Method 	 & \bf Purity \\ \midrule
 \bf Original &  30.53\% \\
-\bf Greedy   &  {\color{red} TODO} \\
+\bf Greedy   &  45.92\% \\
 \bf Cluster &  \bf 61.08\% \\ \bottomrule[1.25pt]
 \end {tabular}\par
 \captionof{table}{Purity comparison} \label{tab:title} 
@@ -179,9 +179,9 @@ Word2Vec embedding & --- & \multicolumn{2}{c}{3h 50min} \\
 Bag of words model construction & \multicolumn{3}{c}{37min} \\
 Word trajectories \& spectral analysis & \multicolumn{3}{c}{8s} \\
 Event detection & 2min 12s & 50s & 4min 50s \\
-Document retrieval & 7min 30s & {\color{red} TODO} & 7h 40min \\
-Event annotation & 3h 13min & {\color{red} TODO} & 7min 30s \\ \midrule
-\bf Total & 4h & & 12h 20min\\ \bottomrule[1.25pt]
+Document retrieval & 7min 30s & 6h 30min & 7h 40min \\
+Event annotation & 3h 13min & 8min 20s & 7min 30s \\ \midrule
+\bf Total & 4h & 11h 6min & 12h 20min\\ \bottomrule[1.25pt]
 
 \end{tabular}\par
 \captionof{table}{Computation time comparison} \label{tab:title}
@@ -189,7 +189,7 @@ Event annotation & 3h 13min & {\color{red} TODO} & 7min 30s \\ \midrule
 
 \hspace{\fill}
 
-The original method's document retrieval took considerably less time than the other two methods. The reason is that the original method does not use the Word Mover's Distance as a similarity measure. Due to word semantic similarity being measured only in terms of their document overlap, there is always at least one document containing all the event keywords. This means that it suffices to take the documents containing each keyword and intersect them.
+The original method's document retrieval took considerably less time than the other two methods. The reason is that the original method does not use the Word Mover's Distance as a similarity measure. Due to word semantic similarity being measured only in terms of their document overlap, there is always at least one document containing all the event keywords. It is sufficient to take the documents containing either of the event keywords and intersect these sets, which is much faster than calculating the distance.
 
-{\color{red} TODO: Write a conclusion of this evaluation once the results are known. Something about event annotation comparison being unfair, since greedy \& clusters discarded events with periods $\leq$ 7 days, unlike original (In original, it's no problem to retrieve documents for those, in the other two, documents would take eternity to get, summarization would still work).}
+The event annotation took longer in the original method due to higher number of events detected (217) compared to the other two methods (82, 77). In the original method, documents for all events were retrieved, including those with short period, and each of the periods was summarized independently. When we summarized only aperiodic events and those with period higher than 7 days, summarization took 1h 12min.
 
