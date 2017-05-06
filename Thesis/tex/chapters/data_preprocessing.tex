@@ -1,18 +1,18 @@
 The collection we work with comes directly from webscraping various Czech news servers, and does not have any special structure. The documents consist only of headlines, bodies and publication days. Furthermore, there are some noisy words such as residual HTML entities, typos, words cut in the middle, etc. To make the most of the collection, we preprocess the documents to remove as many of these errors as possible, and also to gain some additional information about the text.
 
-We will first employ some NLP (Natural Language Processing) methods to gain insight into the data. Then, we will train a model to obtain word embeddings, which we discuss next.
+We first employ some NLP (Natural Language Processing) methods to gain insight into the data. Then, we train a model to obtain word embeddings, which we discuss next.
 
-Since most machine learning and information retrieval methods rely on the data being represented numerically, usually in a vector space, it is necessary to obtain such representation from the plain text. Preferably, these vectors should retain as much information about the text as possible. There are many ways to do so --- a simple TFIDF (Term Frequency-Inverse Document Frequency) representation \cite{information-retrieval} which represents the words by weighted counts of their appearance in the document collection. More complicated methods, such as Latent Semantic Indexing \cite{lsi} attempt to discover latent structure within words to also reveal topical relations between them. This idea is further pursued by probabilistic topical models, such as Latent Dirichlet Allocation \cite{lda}.
+Since most machine learning and information retrieval methods rely on the data being represented numerically, usually in a vector space, it is necessary to obtain such a representation from the plain text. Preferably, these vectors should retain as much information about the text as possible. There are many ways to do so --- a simple TFIDF (Term Frequency-Inverse Document Frequency) representation \citep{information-retrieval} which represents the words by weighted counts of their appearance in the document collection. More complicated methods, such as Latent Semantic Indexing \citep{lsi} attempt to discover latent structure within words to also reveal topical relations between them. This idea is further pursued by probabilistic topical models, such as Latent Dirichlet Allocation \citep{lda}.
 
 In this thesis, we use the \textit{Word2Vec} model introduced by \cite{word2vec, distributed-representations, linguistic-regularities}, which uses a shallow neural network to project the words from a predetermined vocabulary into a vector space. Vectors in this space have interesting semantical properties, such as vector arithmetics preserving semantic relations, or semantically related words forming clusters.
 
-Later on, we will need some sort of word similarity measure. This will come up several times in the thesis --- in the event detection itself, later when querying the document collection to obtain document representation of the events detected, and finally to generate human-readable summaries. The Word2Vec models is fit for all of these uses, as opposed to the other mentioned approaches, some of which are designed only to measure document similarity, or, on the other hand, do not support document similarity queries very well.
+Later on, we will need some sort of word similarity measure. This will come up several times in the thesis --- in the event detection itself, later when querying the document collection to obtain document representation of the events detected, and finally to generate human-readable summaries. The Word2Vec model is fit for all of these uses, as opposed to the other approaches mentioned above, some of which are designed only to measure document similarity, or, on the other hand, do not support document similarity queries very well.
 
 
 \section{Preprocessing}
 Some of the documents contain residual HTML entities from errors during web scraping, which we filter out using a manually constructed stopwords list.
 
-We used the MorphoDiTa tagger \cite{morphodita} to perform tokenization, lemmatization and parts of speech tagging. Our whole analysis will be run on these lemmatized texts, and we will revert to the full forms only at the end when annotating the events in a human-readable way.
+We used the MorphoDiTa tagger \citep{morphodita} to perform tokenization, lemmatization and parts of speech tagging. Our whole analysis is applied to these lemmatized texts; we revert to the full forms only at the end when annotating the events in a human-readable way.
 
 
 \section{Word embeddings} \label{word-embeddings}
@@ -20,13 +20,17 @@ Next, we train the previously mentioned Word2Vec model. Although the training is
 
 For the training, we only discard punctuation marks and words denoted as unknown parts of speech by the tagger. Such words are mostly typos not important for our analysis. We also discard words appearing in less than 10 documents.
 
-The thesis was implemented using the Gensim \cite{gensim} library. The project contains memory efficient, easy to use Python implementations of various topic modeling algorithms, Word2Vec included. In addition, we used the SciPy toolkit \cite{scipy} and Scikit-Learn \cite{scikit-learn} for various machine learning-related computations.
+The thesis was implemented using the Gensim \citep{gensim} library. The project contains memory efficient, easy to use Python implementations of various topic modeling algorithms, Word2Vec included. In addition, we used the SciPy toolkit \citep{scipy} and Scikit-Learn \citep{scikit-learn} for various machine learning-related computations.
 
-We embed the words in a 100-dimensional vector space using the skip-gram model, as defined in \cite{word2vec} with 5 passes over the collection.
+We use the skip-gram model defined in \cite{word2vec}, which was shown in \cite{distributed-representations} to learn high quality word embeddings well capturing semantic properties. After experimenting with different settings on a smaller subset of the documents, we decided to embed the words in a 100-dimensional vector space and to allow 5 passes over the document collection. Allowing more passes slows down the training, while not improving the quality very much. Setting higher dimensionality also does not lead to significant quality improvement, and slows down the training as well as requires more memory.
+
+In the thesis, we refer to the vector embedding of a word $w$ as $\embed_{w} \in \R^{100}$.
 
 
 \section{Document collection}
-The dataset used is a collection of Czech news documents from various sources collected over a period from January 1, 2014 to January 31, 2015. The collection contains 2,078,774 documents averaging at 260 words each, with 2,058,316 unique word tokens in total. However, majority of the words are rare words or typos of no importance, so the number of unique real words is much lower. This is confirmed after discarding the words appearing in less than 10 documents, with only 351,136 unique words remaining.
+The dataset used is a collection of Czech news documents from various sources accumulated over a period from January 1, 2014 to January 31, 2015. The collection contains 2,078,774 documents averaging at 260 words each, with 2,058,316 unique word tokens in total. However, majority of the words are rare words or typos of no importance, so the number of unique real words is much lower. This is confirmed after discarding the words appearing in less than 10 documents, with only 351,136 unique words remaining.
+
+These words are further processed in the following chapter, where we uncover a small subset of words possibly representative of an event, and discard the rest.
 
 
 \section{Document stream formally}
