@@ -8,6 +8,7 @@
 
 \usepackage{epstopdf}
 
+\usepackage[nottoc]{tocbibind}
 \usepackage[authoryear,round]{natbib}
 \bibliographystyle{abbrvnat}
 
@@ -169,6 +170,10 @@ These are my acknowledgements.
 \input{tex/chapters/conclusion}
 
 
+% Bibliography
+\bibliography{tex/references}
+
+
 % Appendices
 \appendix
 \chapter{List of real events used for evaluation}
@@ -179,8 +184,5 @@ These are my acknowledgements.
 \label{app:clusters-events}
 \input{tex/chapters/appendix_clusters_events}
 
-
-% Bibliography
-\bibliography{tex/references}
 
 \end{document}
