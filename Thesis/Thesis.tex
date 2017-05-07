@@ -1,6 +1,6 @@
 \documentclass[12pt,twoside]{report}
 
-
+\usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage[a4paper,width=150mm,top=25mm,bottom=25mm,bindingoffset=6mm]{geometry}
 \usepackage{graphicx}
@@ -38,6 +38,10 @@
 \usepackage{multirow}
 
 \renewcommand{\tabularxcolumn}[1]{>{\small}m{#1}}
+
+\addto\extrasenglish{%
+  \renewcommand{\chapterautorefname}{Chapter}%
+}
 
 
 %% Definitions %%
@@ -87,7 +91,7 @@
 
 \newcommand{\bowmat}{\mat{B}}  % Bag of Words matrix
 \newcommand{\dtdmat}{\mat{D}}  % Document to Day matrix
-\newcommand{\trajmat}{\mat{T}}  % Trajectory matrix
+\newcommand{\trajmat}{\mat{Y}}  % Trajectory matrix
 \newcommand{\distmat}{\mat{Dist}}  % Distance matrix
 
 \DeclarePairedDelimiterX{\cost}[2]{\text{C}(}{)}{#1, #2}  % Cost function
