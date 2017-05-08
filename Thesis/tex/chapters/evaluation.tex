@@ -1,6 +1,6 @@
-In this chapter, we compare the three methods for event detection from various standpoints. We will compare the original method (``original''), its modification based on greedy optimization of a different cost function (``greedy'') and the method using clustering algorithm to group similar words together (``cluster'').
+In this chapter, we compare the three event detection methods from various standpoints. We will compare the original method (``original''), its modification based on greedy optimization of a different cost function (``greedy'') and the method using clustering algorithm to group similar words together (``cluster'').
 
-Most of these evaluations rate the detected events on the keyword level. We will be referring to the average number of keywords per event, which we provide in the following table.
+Most of these evaluations rate the quality of the detected events on the keyword level. We will be referring to the average number of keywords per event, which we provide in an overview in \autoref{tab:events-overview}.
 
 We discarded trivial events only consisting of a single keyword.
 
@@ -11,13 +11,19 @@ We discarded trivial events only consisting of a single keyword.
 \begin{tabular}{ l c c c }\toprule[1.5pt]
 \bf Method 	 & \bf Events detected & \bf Keywords & \bf Keywords per event \\ \midrule
 \bf Original & 217 & 451 & 2.08 \\
-\bf Greedy   & 82 & 583 & 7.11 \\
+\bf Greedy   & 46 & 473 & 10.28 \\
 \bf Cluster & 77 & 761 & 9.88 \\ \bottomrule[1.25pt]
 \end {tabular}\par
-\captionof{table}{Average number of keywords per event} \label{tab:title}
+\captionof{table}{Overview of the detected events} \label{tab:events-overview}
 \end{minipage}
 
 \hspace{\fill}
+
+As we can see from the table, the original method's events are not very rich, majority of them consisting of only 2 keywords. Since the original method is applied to the same words as the other methods detecting fewer events, we can expect a considerable level of redundancy, as we will see in \autoref{sec:redundancy}.
+
+Furthermore, the keywords are used to query the document collection for event documents. Having only a few keywords makes it difficult to unambiguously retrieve related documents, leading to a poor document set. This will become clear in \autoref{sec:purity}.
+
+The other two methods detect considerably fewer events which generally consist of a higher number of keywords. We can expect these methods to rank higher in the evaluations, provided that the events themselves are meaningful and not comprising of noisy words. This is an issue we will address in \autoref{sec:noise-evaluation}.
 
 \section{Precision, Recall, F-measure}
 
@@ -32,7 +38,7 @@ We manually inspected the detected events and matched them with real world event
 \begin{tabular}{ l c c c }\toprule[1.5pt]
 \bf Method 	 & \bf Precision & \bf Recall & \bf F-measure \\ \midrule
 \bf Original &  16.35\%     & \bf 28.57\%     &  20.80\% \\
-\bf Greedy   &  20.73\%     & 16.33\%      &  18.27\% \\
+\bf Greedy   &  8.70\%     & 10.20\%      &  9.39\% \\
 \bf Cluster &  \bf 25.97\%     & \bf 28.57\%      & \bf 27.21\% \\ \bottomrule[1.25pt]
 \end {tabular}\par
 \captionof{table}{Precision, Recall and F-measure comparison (manual evaluation)} \label{tab:title}
@@ -40,7 +46,7 @@ We manually inspected the detected events and matched them with real world event
 
 \hspace{\fill}
 
-The original method's precision was poor due to high duplicity of events not appearing in the reference list, which will be more clear in redundancy evaluation later. As the average number of keywords per event is low, the real events are scattered among many detected events. On the other hand, the cluster-based method attained the highest precision due to events consisting of more keywords, meaning lower duplicity.
+The original method's precision was poor due to high recurrence of events not appearing in the reference list, which will be more clear in redundancy evaluation later. As the average number of keywords per event is low, the real events are scattered among many detected events. On the other hand, the cluster-based method attained the highest precision due to events consisting of more keywords, meaning lower recurrence.
 
 The greedy method's recall was poor, as the events often consist of unrelated keywords, making them difficult to assign to their real world counterparts.\\
 
@@ -55,8 +61,8 @@ A real event, consisting of occurrence date and a headline, was considered detec
 \begin{tabular}{ l c c c }\toprule[1.5pt]
 \bf Method 	 & \bf Precision & \bf Recall & \bf F-measure \\ \midrule
 \bf Original &  7.14\%     & 16.33\%     &  9.94\% \\
-\bf Greedy   &  \bf 28.05\%     & \bf 36.73\%      &  \bf 31.81\% \\
-\bf Cluster &  20.78\%     & 28.57\%      &  24.06\% \\ \bottomrule[1.25pt]
+\bf Greedy   &  \bf 26.09\%     & 22.45\%      &  \bf 24.13\% \\
+\bf Cluster &  20.78\%     & \bf 28.57\%      &  24.06\% \\ \bottomrule[1.25pt]
 \end {tabular}\par
 \captionof{table}{Precision, Recall and F-measure comparison (automatic evaluation)} \label{tab:title} 
 \end{minipage}
@@ -67,7 +73,7 @@ This method of evaluation favors the greedy approach whose keyword sets are less
 
 The cluster-based method's results are similar to the manual evaluation.
 
-\section{Redundancy}
+\section{Redundancy} \label{sec:redundancy}
 
 Next, we evaluate redundancy --- the tendency to scatter a real event among several detected events. We manually collected occurrences of the same real event into groups, and computed the redundancy as $1 - (\left| \text{groups} \right| / \left| \text{events} \right|)$.
 
@@ -80,7 +86,7 @@ If it was unclear which real event does a detected event refer to, we considered
 \begin{tabular}{ l c }\toprule[1.5pt]
 \bf Method 	 & \bf Redundancy \\ \midrule
 \bf Original &  77.99\% \\
-\bf Greedy   &  75.61\% \\
+\bf Greedy   &  65.22\% \\
 \bf Cluster &  \bf 42.86\% \\ \bottomrule[1.25pt]
 \end {tabular}\par
 \captionof{table}{Redundancy comparison} \label{tab:title} 
@@ -120,8 +126,8 @@ Next, we evaluate the event noisiness. An event is considered noisy if its traje
 \begin{tabular}{ l c }\toprule[1.5pt]
 \bf Method 	 & \bf Noisiness \\ \midrule
 \bf Original &  50.94\% \\
-\bf Greedy   &  37.80\% \\
-\bf Cluster &  \bf 19.48\% \\ \bottomrule[1.25pt]
+\bf Greedy   &  \bf 13.04\% \\
+\bf Cluster &  19.48\% \\ \bottomrule[1.25pt]
 \end {tabular}\par
 \captionof{table}{Noisiness comparison} \label{tab:title} 
 \end{minipage}
@@ -134,17 +140,23 @@ Poor performance of the original method is partially caused by its large redunda
 
 Surprisingly, the greedy method did not perform the worst even though manual check revealed poor keyword quality, as can be seen from the Purity evaluation later. This can again be explained by larger keyword sets of the greedy method, which makes even the noisy words clustered together into a smaller number of noisy events.
 
-\newpage
+\section{Purity} \label{sec:purity}
 
-\section{Purity}
+All previous evaluations concerned the events on the keyword level. The purity measure will evaluate the event document sets in terms of topical consistency. This is a metric used by \cite{document-purity} and the definition can be found in \cite{information-retrieval}.
 
-All previous evaluations concerned the events on the keyword level. The purity measure will evaluate the event document sets in terms of topical consistency. This is a metric used by \cite{document-purity}.
+The evaluation is an application of the standard measure of cluster purity in the sense that we measure the consistency of class labelling within each cluster. Each event is interpreted as a cluster of documents. Clearly, a high quality event should contain documents concerning similar topics. The problem is that our documents do not have any notion of class labels denoting their topics, which we will have to supplement.
 
-The evaluation is similar to the standard measure of cluster purity in the sense that we measure the consistency of class labelling within each cluster. Each event is interpreted as a cluster of documents. Clearly, a high quality event should contain documents concerning similar topics. The problem is that our documents do not have any notion of class labels, which we will have to supplement.
+Similarly to \cite{document-purity}, we first assembled a list of 50 words from 1000 most often occurring Nouns and Verbs in document headlines. The words are \textit{Ukrajina (Ukraine), Rusko (Russia), policie (police), soud (court), Zeman, EU, Sparta, festival, Babiš, Putin, Google, ekonomika (economics), letadlo (airplane), východ (east), politika (politics), zabít (to kill), poslanec (deputy), armáda (army), Kyjev (Kiev), Škoda, hokejista (hockey player), fotbalista (football player), doprava (traffic), vražda (murder), Vánoce (Christmas), Francie (France), sport, NATO, Moskva (Moscow), ropa (petroleum), turnaj (tournament), Obama, referendum, ebola, parlament (parliament), koalice (coalition), Paříž (Paris), automobil, mistrovství (championship), elektrárna (power plant), Sýrie (Syria), islamista (islamist), Brusel (Brussels), olympiáda (olympics), sníh (snow), průmysl (industry), revoluce (revolution), výbuch (explosion), finance, terorista (terrorist)}. All documents that contained any of these words in their headline were tagged with the corresponding class label.
 
-We first assembled a list of 50 words from 1000 most often occurring Nouns and Verbs in document headlines. The words are \textit{Ukrajina (Ukraine), Rusko (Russia), policie (police), soud (court), Zeman, EU, Sparta, festival, Babiš, Putin, Google, ekonomika (economics), letadlo (airplane), východ (east), politika (politics), zabít (to kill), poslanec (deputy), armáda (army), Kyjev (Kiev), Škoda, hokejista (hockey player), fotbalista (football player), doprava (traffic), vražda (murder), Vánoce (Christmas), Francie (France), sport, NATO, Moskva (Moscow), ropa (petroleum), turnaj (tournament), Obama, referendum, ebola, parlament (parliament), koalice (coalition), Paříž (Paris), automobil, mistrovství (championship), elektrárna (power plant), Sýrie (Syria), islamista (islamist), Brusel (Brussels), olympiáda (olympics), sníh (snow), průmysl (industry), revoluce (revolution), výbuch (explosion), finance, terorista (terrorist)}. All documents that contained any of these words in their headline were tagged with the corresponding class label.
+Then, for each event, we computed the number of documents tagged by the most frequent label in the event. These values are then summed over all events and divided by the total number of tagged documents from all events.
 
-Then, for each event, we computed the fraction of documents tagged by the most frequently appearing class label out of all tagged documents. The purity measure is a weighted average of these values across all events, with weights being the number of tagged documents within each event.
+Mathematically, this is formulated as
+
+\begin{equation}
+	\text{Purity} = \frac{1}{\left| \text{Tagged} \right|} \sum_{e \in \text{Events}}{\max_{t \in \text{Tags}} {\left| \{ d \in \doc{e} \mid d.\mathit{tag} = t \} \right|} },
+\end{equation}
+
+where $\text{Tagged} = \bigcup_{e \in \text{Events}}{\{ d \in \doc{e} \mid d.\mathit{tag} \text{ is defined} \}}$ and $\text{Tags}$ is a set containing the 50 manually selected words. The results are shown in \autoref{tab:purity}.
 
 \hspace{\fill}
 
@@ -156,7 +168,7 @@ Then, for each event, we computed the fraction of documents tagged by the most f
 \bf Greedy   &  45.92\% \\
 \bf Cluster &  \bf 61.08\% \\ \bottomrule[1.25pt]
 \end {tabular}\par
-\captionof{table}{Purity comparison} \label{tab:title} 
+\captionof{table}{Purity comparison} \label{tab:purity} 
 \end{minipage}
 
 \hspace{\fill}
@@ -165,7 +177,7 @@ Then, for each event, we computed the fraction of documents tagged by the most f
 
 Finally, we evaluate the computation time. We measure the execution time of the individual detection steps, so it is clear which parts are the bottlenecks. All experiments were performed on a laptop computer with a 64bit operating system, quad-core processor and 8GB RAM.
 
-In the greedy and cluster-based methods, we did not retrieve documents for events with a period of 7 days or lower. The reason is that such short periods will essentialy cover the entire stream with short bursts and the Word Mover's Distance, computationally expensive on its own, will need to be computed to almost all documents. This might take a day's worth of time, and the short period events mostly concern unineresting events such as sport matches, weather forecasts, etc.
+In the greedy and cluster-based methods, we did not retrieve documents for periodic events with a period of 7 days or lower. The reason is that such short periods will essentialy cover the entire stream with short bursts and the Word Mover's Distance, computationally expensive on its own, will need to be computed to almost all documents. This might take a day's worth of time, and the short period events mostly concern unineresting events such as sport matches, weather forecasts, etc.
 
 In addition, the summaries were extracted only using 50 most relevant documents, so that the overall process would not take too long.
 
@@ -178,7 +190,7 @@ In addition, the summaries were extracted only using 50 most relevant documents,
 Word2Vec embedding & --- & \multicolumn{2}{c}{3h 50min} \\
 Bag of words model construction & \multicolumn{3}{c}{37min} \\
 Word trajectories \& spectral analysis & \multicolumn{3}{c}{8s} \\
-Event detection & 2min 12s & 50s & 4min 50s \\
+Event detection & 2min 12s & 38s & 4min 50s \\
 Document retrieval & 7min 30s & 6h 30min & 7h 40min \\
 Event annotation & 3h 13min & 8min 20s & 7min 30s \\ \midrule
 \bf Total & 4h & 11h 6min & 12h 20min\\ \bottomrule[1.25pt]
@@ -191,5 +203,5 @@ Event annotation & 3h 13min & 8min 20s & 7min 30s \\ \midrule
 
 The original method's document retrieval took considerably less time than the other two methods. The reason is that the original method does not use the Word Mover's Distance as a similarity measure. Due to word semantic similarity being measured only in terms of their document overlap, there is always at least one document containing all the event keywords. It is sufficient to take the documents containing either of the event keywords and intersect these sets, which is much faster than calculating the distance.
 
-The event annotation took longer in the original method due to higher number of events detected (217) compared to the other two methods (82, 77). In the original method, documents for all events were retrieved, including those with short period, and each of the periods was summarized independently. When we summarized only aperiodic events and those with period higher than 7 days, summarization took 1h 12min.
+The event annotation took longer in the original method due to higher number of events detected (217) compared to the other two methods (46, 77). In the original method, documents for all events were retrieved, including those with short period, and each of the periods was summarized independently. When we summarized only aperiodic events and those with period higher than 7 days, summarization took 1h 12min.
 
