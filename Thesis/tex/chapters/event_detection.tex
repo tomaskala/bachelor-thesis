@@ -93,7 +93,10 @@ We were unable to precisely determine the cost function's complexity with respec
 The resulting complexity of the algorithm is therefore $\mathcal{O}(|\text{EW}|^{3} \cdot c)$, where $c$ is the complexity of the cost function.
 
 
-\begin{figure}[H]
+In \autoref{fig:original-event}, we show an example of an event detected by the original method. We can see that it consists of four keywords with overlapping trajectories, sharing a common burst of activity around day 210 and seemingly corresponding to the tension in the Middle East. The keywords themselves do not allow any closer interpretation, which is the reason we provide longer annotations in \autoref{chap:event-annotation}.
+
+
+\begin{figure}
   \centering
   \includegraphics{original_event}  % original event
   \caption{Example of an event detected using the original method. The event consists of the words \textit{palestinian}, \textit{israeli}, \textit{Palestinian} and \textit{Israel}, respectively.}
@@ -132,11 +135,12 @@ In the original method, \cite{event-detection} defined the cost function \eqref{
 
 Having constructed the cost function, we use Algorithm \ref{alg:greedy-event-detection} to detect events once again.
 
+In \autoref{fig:greedy-event}, we show an event detected using the greedy method. It is related to the same real-world event as the event in \autoref{fig:original-event}, though it consists of more keywords. Generally, events detected by the greedy method contain more keywords, as we will see in \autoref{tab:events-overview}.
 
-\begin{figure}[H]
+\begin{figure}
   \centering
   \includegraphics{greedy_event}  % greedy event
-  \caption{Example of an event detected using the greedy method. The event consists of the words \textit{to shoot}, \textit{missile}, \textit{Israel} and \textit{israeli}, and is related to the same real event as \autoref{fig:original-event}.}
+  \caption{Example of an event detected using the greedy method. The event consists of the words \textit{rebel, missile, Israel, israeli, American} and \textit{humanitarian}, and is related to the same real event as \autoref{fig:original-event}.}
   \label{fig:greedy-event}
 \end{figure}
 
@@ -215,10 +219,11 @@ Now, we describe the cluster-based event detection algorithm, which is a direct 
 \end{algorithmic}
 \end{algorithm}
 
+In \autoref{fig:cluster-event}, we show an event detected using the cluster-based method. It is again related to the same real event as those in \autoref{fig:original-event} and \autoref{fig:greedy-event}. The main thing to note is that the word trajectories are clear of noise due to application of Algorithm \ref{alg:burst-filtering}. This made it possible to match words only based on their bursts, not any underlying noise.
 
-\begin{figure}[H]
+\begin{figure}
   \centering
   \includegraphics{cluster_event}  % cluster event
-  \caption{Example of an event detected using the cluster-based method. The event is related to the same real event as \autoref{fig:original-event} and \autoref{fig:greedy-event}. Note that the trajectories are clear of noise due to application of Algorithm \ref{alg:burst-filtering}}
+  \caption{Example of an event detected using the cluster-based method. The event is related to the same real event as \autoref{fig:original-event} and \autoref{fig:greedy-event}.}
   \label{fig:cluster-event}
 \end{figure}

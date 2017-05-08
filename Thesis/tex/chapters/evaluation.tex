@@ -48,7 +48,7 @@ We manually inspected the detected events and matched them with real world event
 
 The original method's precision was poor due to high recurrence of events not appearing in the reference list, which will be more clear in redundancy evaluation later. As the average number of keywords per event is low, the real events are scattered among many detected events. On the other hand, the cluster-based method attained the highest precision due to events consisting of more keywords, meaning lower recurrence.
 
-The greedy method's recall was poor, as the events often consist of unrelated keywords, making them difficult to assign to their real world counterparts.\\
+The greedy method's precision and recall were poor both for the same reason as the original method, as well as some events consisting of keywords unrelated to each other. This made them difficult to assign to their real world counterparts.\\
 
 We also attempted to measure precision and recall in a more automatic way, so that the evaluation does not entirely depend on a manual input.
 
@@ -69,7 +69,9 @@ A real event, consisting of occurrence date and a headline, was considered detec
 
 \hspace{\fill}
 
-This method of evaluation favors the greedy approach whose keyword sets are less coherent. This allows to intersect a headline more often due to seemingly random words appearing among the keywords. On the other hand, the original method's keyword sets usually consist of only two words that may not appear in the headlines at all.
+This method of evaluation favors the greedy approach whose keyword sets are richer and less coherent. This allows to intersect a headline more often due to seemingly random words appearing among the keywords.
+
+On the other hand, the original method's keyword sets usually consist of only two words that may not appear in the headlines at all.
 
 The cluster-based method's results are similar to the manual evaluation.
 
@@ -98,25 +100,33 @@ Large redundancy of the original method is to be expected with events consisting
 
 \section{Noisiness} \label{sec:noise-evaluation}
 
-Next, we evaluate the event noisiness. An event is considered noisy if its trajectory does not contain any distinguishable burst of activity, or if it consists of keywords unrelated to each other. The score is then a fraction of noisy events detected.
+When we checked the detected events manually, we noticed that some events are formed of keywords unrelated to each other, or do not show any clear bursts in their trajectory. Outputting such events is clearly undesirable, as they are difficult to make sense of.
+
+Motivated by this, we seeked to evaluate the methods in terms of how many events they output share such noisy characteristic. We manually examined the events detected for signs of noise in trajectories or keyword sets. An event is considered noisy if its trajectory does not contain any distinguishable burst of activity, or if it consists of keywords unrelated of each other.
+
+We realize that this examination is largely subjective. However, we did not find any simple way of automating the evaluation without losing interpretability of the results. It would be possible to impose a threshold on the overall event trajectory variance or keyword similarity, under which the event would be considered noisy. Such threshold would be an arbitrary value though, and the method could misclassify some events.
+
+In \autoref{fig:noisy-event}, we show a typical noisy event that comes from the greedy algorithm. Not only are the keywords mostly unrelated to each other, they also do not carry much information about what real event could possibly be happening. The event trajectory does not contain many notable bursts. Perhaps except around day 290, the overall trajectory value does not vary greatly to reveal any burst of interest.
+
+Although the keyword trajectories are not all similar, there could be an overlap high enough for them to be put together. We suspect that the main level of similarity comes from the Word2Vec model, though. It is well possible that these words appeared in similar context, even though they are not representative of any real event. The Word2Vec model would then rate them similar, and they would end up in one event.
 
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \begin{subfigure}{.5\textwidth}
   \centering
-  \includegraphics[width=\linewidth]{19_trajectory}  % noisy trajectory
-  \caption{Event trajectory}
-  \label{fig:noisy-trajectory}
+  \includegraphics[width=\linewidth]{12_words}  % noisy keywords
+  \caption{Event keyword trajectories}
+  \label{fig:noisy-keywords}
 \end{subfigure}%
 \begin{subfigure}{.5\textwidth}
   \centering
-  \includegraphics[width=\linewidth]{17_words}  % noisy keywords
-  \caption{Event keywords}
-  \label{fig:noisy-keywords}
+  \includegraphics[width=\linewidth]{12_trajectory}  % noisy trajectory
+  \caption{Trajectory of the same event}
+  \label{fig:noisy-trajectory}
 \end{subfigure}
-\caption{(a) Event with noisy trajectory. (b) Event with noisy keywords \textit{to make, to utilize, type, program, different, interesting, to discover, directly, basic, area, to concern}.}
-\end{figure}
+\caption{(a) Event with noisy keywords and trajectory. The keywords are \textit{top, autor (author), podnik (business), test, fotogalerie (photogallery), reklama (advertisement), výsledek (result), komentář (commentary), zpravodajství (reporting), hra (game), informace (information), novinka (hot news), akce (action), návrh (proposition), Martin, klíčový (key, adj.), vedení (leadership), projekt (project), program, účast (participation), ČTK (Czech News Agency)}. (b) Trajectory of the same event constructed from the keywords.}
+\end{figure} \label{fig:noisy-event}
 
 
 \hspace{\fill}
@@ -126,8 +136,8 @@ Next, we evaluate the event noisiness. An event is considered noisy if its traje
 \begin{tabular}{ l c }\toprule[1.5pt]
 \bf Method 	 & \bf Noisiness \\ \midrule
 \bf Original &  50.94\% \\
-\bf Greedy   &  \bf 13.04\% \\
-\bf Cluster &  19.48\% \\ \bottomrule[1.25pt]
+\bf Greedy   &  19.57\% \\
+\bf Cluster &  \bf 19.48\% \\ \bottomrule[1.25pt]
 \end {tabular}\par
 \captionof{table}{Noisiness comparison} \label{tab:title} 
 \end{minipage}
@@ -136,9 +146,9 @@ Next, we evaluate the event noisiness. An event is considered noisy if its traje
 
 Here, the cluster-based method performed the best, as the clustering algorithm chosen (DBSCAN) is capable of automatic filtering of noisy samples. With the distance function measuring both trajectory and keyword similarity, it filters out words unrelated to any event.
 
-Poor performance of the original method is partially caused by its large redundancy. Even if a number of words with noisy trajectories appears in similar documents, the method would not group them together to a single event, but split into several noisy events. All of these noisy events then negatively contribute to the noisiness score.
+Surprisingly, the greedy method performed only slighly worse than the cluster-based method. Although the greedy method reached considerable redundancy, manual check revealed that the events mostly consist of important keywords, and most of the trajectories contain distinguiushable bursts.
 
-Surprisingly, the greedy method did not perform the worst even though manual check revealed poor keyword quality, as can be seen from the Purity evaluation later. This can again be explained by larger keyword sets of the greedy method, which makes even the noisy words clustered together into a smaller number of noisy events.
+Poor performance of the original method is partially caused by its large redundancy. Even if a number of words with noisy trajectories appears in similar documents, the method would not group them together to a single event, but split into several noisy events. All of these noisy events then negatively contribute to the noisiness score.
 
 \section{Purity} \label{sec:purity}
 
@@ -165,13 +175,17 @@ where $\text{Tagged} = \bigcup_{e \in \text{Events}}{\{ d \in \doc{e} \mid d.\ma
 \begin{tabular}{ l c }\toprule[1.5pt]
 \bf Method 	 & \bf Purity \\ \midrule
 \bf Original &  30.53\% \\
-\bf Greedy   &  45.92\% \\
+\bf Greedy   &  44.42\% \\
 \bf Cluster &  \bf 61.08\% \\ \bottomrule[1.25pt]
 \end {tabular}\par
 \captionof{table}{Purity comparison} \label{tab:purity} 
 \end{minipage}
 
 \hspace{\fill}
+
+Poor performance of the original method can be explained by the events consisting mostly of 2 keywords. Such short query for the document collection does not distinguish the documents very well, often retrieving unrelated texts.
+
+The other two methods yield events generally containing more keywords, so the queries are more specific. This allowed the Word Mover's Distance to retrieve more related documents.
 
 \section{Computation time}
 
@@ -191,9 +205,9 @@ Word2Vec embedding & --- & \multicolumn{2}{c}{3h 50min} \\
 Bag of words model construction & \multicolumn{3}{c}{37min} \\
 Word trajectories \& spectral analysis & \multicolumn{3}{c}{8s} \\
 Event detection & 2min 12s & 38s & 4min 50s \\
-Document retrieval & 7min 30s & 6h 30min & 7h 40min \\
+Document retrieval & 7min 30s & 6h & 7h 40min \\
 Event annotation & 3h 13min & 8min 20s & 7min 30s \\ \midrule
-\bf Total & 4h & 11h 6min & 12h 20min\\ \bottomrule[1.25pt]
+\bf Total & 4h & 10h 36min & 12h 20min\\ \bottomrule[1.25pt]
 
 \end{tabular}\par
 \captionof{table}{Computation time comparison} \label{tab:title}
@@ -203,5 +217,5 @@ Event annotation & 3h 13min & 8min 20s & 7min 30s \\ \midrule
 
 The original method's document retrieval took considerably less time than the other two methods. The reason is that the original method does not use the Word Mover's Distance as a similarity measure. Due to word semantic similarity being measured only in terms of their document overlap, there is always at least one document containing all the event keywords. It is sufficient to take the documents containing either of the event keywords and intersect these sets, which is much faster than calculating the distance.
 
-The event annotation took longer in the original method due to higher number of events detected (217) compared to the other two methods (46, 77). In the original method, documents for all events were retrieved, including those with short period, and each of the periods was summarized independently. When we summarized only aperiodic events and those with period higher than 7 days, summarization took 1h 12min.
+This is also the reason why the event annotation took longer in the original method. Having also retrieved documents for events with short period (7 days and less), it is necessary to summarize each period independently. When we summarized only aperiodic events and those with period higher than 7 days, summarization took 1h 12min.
 
