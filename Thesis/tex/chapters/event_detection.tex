@@ -20,7 +20,7 @@ In the original paper, the authors first defined the distance between trajectori
 
 Then, the distance is generalized to a whole set of words $\featset$ as
 
-\begin{equation}
+\begin{equation} \label{eq:trajectory-distance}
 	\text{Dist}( \featset ) = \max_{v, w \in \featset} \trajdist{\vect{\trajn}_{v}}{\vect{\trajn}_{w}}.
 \end{equation}
 
@@ -29,7 +29,7 @@ The document overlap is again first defined for a pair of words $v$ and $w$ as $
 
 The overlap is again generalized to a set of words $\featset$ as
 
-\begin{equation}
+\begin{equation} \label{eq:document-overlap}
 	\text{DO}( \featset ) = \min_{v, w \in \featset} \text{DO}( v, w ).
 \end{equation}
 
@@ -80,7 +80,7 @@ The algorithm, called \textit{unsupervised greedy event detection algorithm} in 
 \end{algorithmic}
 \end{algorithm}
 
-The algorithm works by greedily minimizing the cost function \ref{eq:cost-function-original}. Once it is minimized, an event is produced, consisting of all the words found since last event.
+The algorithm works by greedily minimizing the cost function \eqref{eq:cost-function-original}. Once it is minimized, an event is produced, consisting of all the words found since last event.
 
 The words are sorted in descending DPS order before entering the minimization loop, so that the most important words are processed first. This assures that the most eventful words are assigned together, without wasting them to appear with low quality words.
 
@@ -102,42 +102,33 @@ The resulting complexity of the algorithm is therefore $\mathcal{O}(|\text{EW}|^
 
 
 \section{Greedy approach}
-Here, we describe the modifications done to the original method. We change the semantic similarity measure to take advantage of the Word2Vec model, and also redefine the trajectory distance accordingly, so it takes a similar form.
-
-Both measures are defined directly between a set of words $\featset$ and another word $w \notin \featset$.
-
-\subsection{Trajectory distance}
-We assume that the trajectories have been normalized to unit sum, as in the original method. The trajectory distance of $w$ to $\featset$ is again defined in terms of the Kullback-Leibler divergence as
-
-\begin{equation}
-	\trajdist{\featset}{w} = \kl{\vect{\bar{\traj}}_{\featset}}{\vect{\traj}_{w}},
-\end{equation}
-
-where $\vect{\bar{\traj}}_{\featset}$ is the mean of all trajectories of $\featset$ and $\vect{\traj}_{w}$ is the trajectory of $w$. The advantage is that, unlike in the original method, the divergences do not need to be precomputed between all pairs of words. The distance between a set and another word can be computed directly during the detection process, saving computation time.
+In this section, we modify the original method to use the Word2Vec model to measure semantic similarity between words. Unlike the document overlap \eqref{eq:document-overlap}, this new similarity measure is able to distinguish semantically similar words even when they do not appear in the same documents. This may happen, for instance, when different authors each use distinct vocabulary when referring to the same event.
 
 
 \subsection{Semantic similarity}
 Some of the astounding results of the Word2Vec model arise from semantically similar words forming clusters \citep{linguistic-regularities} in terms of cosine similarity, which is a standard measure used in information retrieval \citep{information-retrieval, cosine-similarity}.
 
-The semantic similarity of $\featset$ and $w$ is defined in terms of cosine similarity as
+We replace the document overlap in the cost function \eqref{eq:cost-function-original} by cosine similarity between Word2Vec embeddings, though with a small modification. The cosine similarity is bounded in $[-1, 1]$ with -1 denoting the least degree of similarity. This means that the cost function would reach negative values for highly dissimilar words. This would be a problem, as Algorithm \ref{alg:greedy-event-detection} attempts to minimize it. Consequently, we will transform the cosine similarity into $[0, 1]$, just like the document overlap \eqref{eq:document-overlap}.
+
+The similarity between a set of words $\featset$ and a word $w \notin \featset$ is defined as
 
 \begin{equation}
-	\semsim{\featset}{w} = \frac{\inp[\big]{\bar{\embed}_{\featset}}{\embed_{w}}}{\| \bar{\embed}_{\featset} \| \cdot \| \embed_{w} \|},
+	\semsim{\featset}{w} = \left( \frac{\inp[\big]{\bar{\embed}_{\featset}}{\embed_{w}}}{\| \bar{\embed}_{\featset} \| \cdot \| \embed_{w} \|} + 1 \right) /\ 2,
 \end{equation}
 
 where $\bar{\embed}_{\featset}$ is the mean of all vector embeddings of $\featset$ and $\embed_{w}$ is the vector embedding of $w$. Here, the mean vector virtually represents the central topic of words in $\featset$.
 
 
 \subsection{Cost function}
-The cost function is defined similarly as in the original method:
+We redefine the cost function \eqref{eq:cost-function-original} as
 
 \begin{equation} \label{eq:cost-function}
-	\cost{\featset}{w} = \frac{\trajdist{\featset}{w}}{\exp(\semsim{\featset}{w}) \cdot \sum_{g \in \featset \cup w}{\text{DPS}_{g}}},
+	\cost{\featset}{w} = \frac{\text{Dist}( \featset \cup w )}{\semsim{\featset}{w} \cdot \sum_{u \in \featset \cup w}{\text{DPS}_{u}}},
 \end{equation}
 
-Since the cosine similarity is bounded in $[-1, 1]$, we exponentiate it so that it is always positive. Otherwise, the cost function would reach negative values for highly dissimilar words, which would minimize it more than for similar ones.
+where $\text{Dist}(\cdot)$ is the original trajectory distance function \eqref{eq:trajectory-distance}.
 
-In the original method, \cite{event-detection} defined the cost function \ref{eq:cost-function-original} for a set of words. However, in Algorithm \ref{alg:greedy-event-detection}, it was always applied on a union of an event constructed so far, and a newly added word. The function \ref{eq:cost-function} is now applied on such event and word separately due to the nature of Word2Vec similarity definition.
+In the original method, \cite{event-detection} defined the cost function \eqref{eq:cost-function-original} for a set of words. However, in Algorithm \ref{alg:greedy-event-detection}, it is always applied on a union of an event constructed so far, and a newly added word. The new cost function must now be applied on such event and word separately due to the nature of Word2Vec similarity definition.
 
 Having constructed the cost function, we use Algorithm \ref{alg:greedy-event-detection} to detect events once again.
 
@@ -185,9 +176,11 @@ We want to keep only those trajectory parts exceeding a certain frequency level,
 
 
 \subsection{Distance function}
-We now define the distance function used by DBSCAN. It conveys similar information as the cost function in the previous two algorithms. We still need to measure the trajectory distance as well as semantic similarity between two words.
+We now define the distance function used by DBSCAN. It conveys similar information as the cost function in the previous two algorithms. We still need to measure the trajectory distance as well as semantic similarity between words, though the distance will now be defined strictly pairwise.
 
-For a measure of trajectory distance, we replace the Kullback-Leibler divergence by the Jensen-Shannon divergence JSD, which is symmetric in its arguments. This is a necessary property of the distance function.
+For a measure of trajectory distance, we replace the Kullback-Leibler divergence by the Jensen-Shannon divergence JSD \citep{js-divergence-1}, which is symmetric in its arguments. This is a necessary property of the distance function.
+
+Although \cite{event-detection} did symmetrize the Kullback-Leibler divergence, they did not provide any source for their symmetrization form. We were unable to find a case where that particular form was used, though we discovered the Jensen-Shannon divergence, which comes from stronger mathematical background \citep{js-divergence-1, js-divergence-2}. It also tended to improve the clustering quality during our experimentation, as opposed to the original symmetrization. We then decided to replace the original paper's KL-divergence symmetrization by the JS-divergence.
 
 Instead of semantic \textit{similarity}, we measure semantic \textit{distance} as the Euclidean distance between two word vector embeddings. The reason is that Euclidean distance is unbounded, which makes it possible for the samples to be spread farther apart. Since DBSCAN is a density-based clustering algorithm, having high density areas consisting of words with low trajectory distance and similar cosine similarities would cause them to appear in the same cluster. This would cluster the words only in terms of their trajectories, not semantics.
 
