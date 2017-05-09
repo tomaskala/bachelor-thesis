@@ -114,7 +114,7 @@ If an event consisted of only one or two documents, it would make sense to use a
 
 Now, we can define the diversity function, which will positively reward a summary consisting of non-redundant sentences. \cite{multi-summarization-2} again defined the function in terms of a simple TFIDF similarity. We only redefine the function to accept the custom similarity function built in the previous steps.
 
-The diversity of a summary $S$ is based on clustering the sentences by their similarity $\semsim{\cdot}{\cdot}$ and then preferrably choosing sentences from different clusters not similar to each other. Formally, the function is defined as
+The diversity of a summary $S$ is based on clustering the sentences by their similarity $\semsim{\cdot}{\cdot}$ and then preferably choosing sentences from different clusters not similar to each other. Formally, the function is defined as
 
 \begin{equation}
 	\diversity{S} = \sum_{k = 1}^{K} \sqrt{\sum_{j \in S \cap P_{k}} r_{j}},

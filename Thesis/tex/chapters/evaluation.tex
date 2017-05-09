@@ -27,16 +27,33 @@ The other two methods detect considerably fewer events which generally consist o
 
 \section{Precision, Recall, F-measure}
 
-First, we evaluate precision and recall with respect to a list of real events which occurred during the examined period. The list can be found in \autoref{app:real-events}.
+First, we evaluate the precision and recall, which are metrics commonly used in information retrieval \citep{information-retrieval, information-retrieval-2}. The evaluation is done with respect to a reference set of real events that occurred during the examined period. The list can be found in \autoref{app:real-events}.
 
-We manually inspected the detected events and matched them with real world events. Out of this assignment, we calculated the precision, recall and F-measure. The results are shown in the table below.
+Given a set of detected events $\mathit{Detected}$ and the set of reference events $\mathit{Reference}$, the Precision (P) and Recall (R) are defined as
+
+\begin{equation}
+\begin{alignedat}{-1}
+	P = \frac{\left| \text{Detected} \cap \text{Reference} \right|}{\left| \text{Detected} \right|}\\
+	R = \frac{\left| \text{Detected} \cap \text{Reference} \right|}{\left| \text{Reference} \right|}.
+\end{alignedat}
+\end{equation}
+
+The Precision and Recall scores are then merged together using the $F_{1}$ score, which is their harmonic mean scaled into $[0, 1]$:
+
+\begin{equation}
+	F_{1} = 2 \cdot \frac{P \cdot R}{P + R}.
+\end{equation}
+
+Although the reference list of real events is not exhaustive, it does provide a way to objectively compare the individual event detection methods. While there are many more events that happened during the examined time period, a sample of events important enough provides a picture of the methods performance.
+
+We manually inspected the detected events and matched them with the reference events. Out of this assignment, we calculated the precision, recall and F-measure. The results are shown in the table below.
 
 \hspace{\fill}
 
 \begin{minipage}{\linewidth}
 \centering
 \begin{tabular}{ l c c c }\toprule[1.5pt]
-\bf Method 	 & \bf Precision & \bf Recall & \bf F-measure \\ \midrule
+\bf Method 	 & \bf Precision & \bf Recall & \bf $\mathbf{F_{1}}$ score \\ \midrule
 \bf Original &  16.35\%     & \bf 28.57\%     &  20.80\% \\
 \bf Embedded-greedy   &  8.70\%     & 10.20\%      &  9.39\% \\
 \bf Cluster-based &  \bf 25.97\%     & \bf 28.57\%      & \bf 27.21\% \\ \bottomrule[1.25pt]
@@ -50,7 +67,7 @@ The original method's precision was poor due to high recurrence of events not ap
 
 The embedded greedy method's precision and recall were poor both for the same reason as the original method, as well as some events consisting of keywords unrelated to each other. This made them difficult to assign to their real world counterparts.\\
 
-We also attempted to measure precision and recall in a more automatic way, so that the evaluation does not entirely depend on a manual input.
+In addition, we attempted to measure precision and recall in a more automatic way, so that the evaluation does not entirely depend on a manual input.
 
 A real event, consisting of occurrence date and a headline, was considered detected if its date was found within a bursty period of some detected event, and if its headline had nonzero intersection with the detected event's keyword set.
 
@@ -59,7 +76,7 @@ A real event, consisting of occurrence date and a headline, was considered detec
 \begin{minipage}{\linewidth}
 \centering
 \begin{tabular}{ l c c c }\toprule[1.5pt]
-\bf Method 	 & \bf Precision & \bf Recall & \bf F-measure \\ \midrule
+\bf Method 	 & \bf Precision & \bf Recall & \bf $\mathbf{F_{1}}$ score \\ \midrule
 \bf Original &  7.14\%     & 16.33\%     &  9.94\% \\
 \bf Embedded-greedy   &  \bf 26.09\%     & 22.45\%      &  \bf 24.13\% \\
 \bf Cluster-based &  20.78\%     & \bf 28.57\%      &  24.06\% \\ \bottomrule[1.25pt]
@@ -69,17 +86,38 @@ A real event, consisting of occurrence date and a headline, was considered detec
 
 \hspace{\fill}
 
-This method of evaluation favors the embedded greedy approach whose keyword sets are richer and less coherent. This allows to intersect a headline more often due to seemingly random words appearing among the keywords.
+Unlike the manual evaluation, the automatic one favors the embedded greedy approach. The reason is that its events generally contain more keywords, so there is a higher chance the keywords intersect a headline of some real event, marking the event as detected.
 
-On the other hand, the original method's keyword sets usually consist of only two words that may not appear in the headlines at all.
+On the other hand, the original method's keyword sets usually consist of only two words that may not appear in the real event headlines at all.
 
 The cluster-based method's results are similar to the manual evaluation.
 
 \section{Redundancy} \label{sec:redundancy}
 
-Next, we evaluate redundancy --- the tendency to scatter a real event among several detected events. We manually collected occurrences of the same real event into groups, and computed the redundancy as $1 - (\left| \text{groups} \right| / \left| \text{events} \right|)$.
+Next, we evaluate redundancy --- the tendency to scatter a real event among several detected events. We noticed that the original method tends to scatter a real event among several detected events. This is an undesirable behavior which we attempt to suppress in the other two methods by using a less-strict word similarity measure. This is an evaluation that must be performed manually, since if we had an automatic way of recognizing redundancy, we would be able to avoid it entirely.
 
-If it was unclear which real event does a detected event refer to, we considered it to be equal to some other event if they had similar burst characteristics and semantically similar keywords.
+We assembled the detected events into groups, where each group is a set of events related to the same real-world event. If it was unclear which real event does a detected event refer to, we considered two events equal if they had similar burst characteristics and semantically similar keywords.
+
+The redundancy is then computed as $1 - (\left| \text{groups} \right| / \left| \text{events} \right|)$. An ideal event detection method would result in singleton groups, where each real-world event was covered precisely by one detected event. This would result in numerator being the same as the denominator, and the total redundancy of 0.
+
+In Figure 7.1, we show an example of two redundant events which should be merged into one. They were detected using the original method. The main burst around day 290 is related to elections to the Czech senate (events 36 and 40 in \autoref{app:real-events}). It is reasonable to assume that the four words appeared in some documents together, so their document overlap must have been nonzero, and they should comprise one event only.
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{redundant_1}  % redundant keywords 1
+  \caption{An event with keywords \textit{election-related, voter}}
+  \label{fig:redundant-1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{redundant_2}  % redundant keywords 2
+  \caption{An event with keywords \textit{vote, political party}}
+  \label{fig:redundant-2}
+\end{subfigure}
+\caption{Example of two redundant events detected by the original method.}
+\end{figure} \label{fig:redundant-events}
 
 \hspace{\fill}
 
@@ -106,7 +144,7 @@ Motivated by this, we seeked to evaluate the methods in terms of how many events
 
 We realize that this examination is largely subjective. However, we did not find any simple way of automating the evaluation without losing interpretability of the results. It would be possible to impose a threshold on the overall event trajectory variance or keyword similarity, under which the event would be considered noisy. Such threshold would be an arbitrary value though, and the method could misclassify some events.
 
-In \autoref{fig:noisy-event}, we show a typical noisy event that comes from the embedded greedy algorithm. Not only are the keywords mostly unrelated to each other, they also do not carry much information about what real event could possibly be happening. The event trajectory does not contain many notable bursts. Perhaps except around day 290, the overall trajectory value does not vary greatly to reveal any burst of interest.
+In Figure 7.2, we show a typical noisy event that comes from the embedded greedy algorithm. Not only are the keywords mostly unrelated to each other, they also do not carry much information about what real event could possibly be happening. The event trajectory does not contain many notable bursts. Perhaps except around day 290, the overall trajectory value does not vary greatly to reveal any burst of interest.
 
 Although the keyword trajectories are not all similar, there could be an overlap high enough for them to be put together. We suspect that the main level of similarity comes from the Word2Vec model, though. It is well possible that these words appeared in similar context, even though they are not representative of any real event. The Word2Vec model would then rate them similar, and they would end up in one event.
 
@@ -185,7 +223,7 @@ where $\text{Tagged} = \bigcup_{e \in \text{Events}}{\{ d \in \doc{e} \mid d.\ma
 
 Poor performance of the original method can be explained by the events consisting mostly of 2 keywords. Such short query for the document collection does not distinguish the documents very well, often retrieving unrelated texts.
 
-The other two methods yield events generally containing more keywords, so the queries are more specific. This allowed the Word Mover's Distance to retrieve more related documents.
+The other two methods produce events generally containing more keywords, so the queries are more specific. This allows us to retrieve more relevant documents and reach higher purity. The better results may also be caused by the Word Mover's Distance used as the document similarity metric. However, it is arguable whether the WMD could beat the selection of precisely those documents that contain all the event keywords, provided there were more than 2 keywords in general.
 
 \section{Computation time}
 
@@ -193,7 +231,7 @@ Finally, we evaluate the computation time. We measure the execution time of the 
 
 In the embedded-greedy and cluster-based methods, we did not retrieve documents for periodic events with a period of 7 days or lower. The reason is that such short periods will essentialy cover the entire stream with short bursts and the Word Mover's Distance, computationally expensive on its own, will need to be computed to almost all documents. This might take a day's worth of time, and the short period events mostly concern unineresting events such as sport matches, weather forecasts, etc.
 
-In addition, the summaries were extracted only using 50 most relevant documents, so that the overall process would not take too long.
+In addition, the summaries were extracted only using 50 most relevant documents instead of all documents retrieved, so that the overall process would not take too long.
 
 \hspace{\fill}
 
@@ -201,9 +239,9 @@ In addition, the summaries were extracted only using 50 most relevant documents,
 \centering
 \begin{tabular}{ r c c c }\toprule[1.5pt]
 \bf Unit & \bf Original & \bf Embedded & \bf Cluster \\ \midrule
-Word2Vec embedding & --- & \multicolumn{2}{c}{3h 50min} \\
-Bag of words model construction & \multicolumn{3}{c}{37min} \\
-Word trajectories \& spectral analysis & \multicolumn{3}{c}{8s} \\
+Word2Vec embedding & N/A & \multicolumn{2}{c}{3h 50min} \\
+Bag of words model construction & $\longleftarrow$ & 37min & $\longrightarrow$ \\
+Word trajectories \& spectral analysis & $\longleftarrow$ & 8s & $\longrightarrow$ \\
 Event detection & 2min 12s & 38s & 4min 50s \\
 Document retrieval & 7min 30s & 6h & 7h 40min \\
 Event annotation & 3h 13min & 8min 20s & 7min 30s \\ \midrule
