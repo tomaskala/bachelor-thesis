@@ -2,7 +2,7 @@ In this chapter, we define the actual event detection algorithm. First, we descr
 
 The original algorithm creates events as sets of related keywords by greedily minimizing a cost function combining temporal and semantical distance between words. However, the paper used only a simple notion of semantical distance, namely the document overlap between words. This demands that there exists at least one document containing all the words used to represent an event. This is a strong requirement, since the documents may use different vocabularies while conveying similar information.  As a result, the events are split into multiple keyword sets, leading to redundancy.
 
-In an attempt to solve this problem, we modify the cost function, replacing the document overlap by Word2Vec-based similarity. This does not require the words to appear in exactly the same documents, only that they have similar semantics. We refer to this method as \textit{greedy approach}.
+In an attempt to solve this problem, we modify the cost function, replacing the document overlap by Word2Vec-based similarity. This does not require the words to appear in exactly the same documents, only that they have similar semantics. We refer to this method as \textit{embedded greedy approach}, as it is a modification to make the original greedy algorithm utilize word embeddings.
 
 Realizing that the task of constructing keyword sets resembles the task of word clustering, we propose an alternative algorithm. Here, we apply a clustering algorithm to the words, using a modification of the cost function as a distance measure. This is a method referred to as \textit{cluster-based approach}.
 
@@ -42,7 +42,6 @@ The cost function is a combination of the trajectory distance and document overl
 
 Since the algorithm attempts to minimize it, the intuitive result is a set of words with low trajectory distance and high document overlap. The algorithm will also prefer words of higher importance due to the last term of the denominator, counting in the power spectra.
 
-\newpage
 
 \subsection{Event detection algorithm}
 The algorithm, called \textit{unsupervised greedy event detection algorithm} in the original paper, is defined as follows.
@@ -93,7 +92,7 @@ We were unable to precisely determine the cost function's complexity with respec
 The resulting complexity of the algorithm is therefore $\mathcal{O}(|\text{EW}|^{3} \cdot c)$, where $c$ is the complexity of the cost function.
 
 
-In \autoref{fig:original-event}, we show an example of an event detected by the original method. We can see that it consists of four keywords with overlapping trajectories, sharing a common burst of activity around day 210 and seemingly corresponding to the tension in the Middle East. The keywords themselves do not allow any closer interpretation, which is the reason we provide longer annotations in \autoref{chap:event-annotation}.
+In \autoref{fig:original-event}, we show an example of an event detected by the original method. We can see that it consists of four keywords with overlapping trajectories, sharing a common burst of activity around day 210. The event is likely related to the tension in the Middle East, though the keywords themselves do not allow any closer interpretation. For this reason, we provide longer annotations in \autoref{chap:event-annotation}, so that we can examine the event more closely.
 
 
 \begin{figure}
@@ -104,7 +103,7 @@ In \autoref{fig:original-event}, we show an example of an event detected by the 
 \end{figure}
 
 
-\section{Greedy approach}
+\section{Embedded greedy approach}
 In this section, we modify the original method to use the Word2Vec model to measure semantic similarity between words. Unlike the document overlap \eqref{eq:document-overlap}, this new similarity measure is able to distinguish semantically similar words even when they do not appear in the same documents. This may happen, for instance, when different authors each use distinct vocabulary when referring to the same event.
 
 
@@ -135,12 +134,12 @@ In the original method, \cite{event-detection} defined the cost function \eqref{
 
 Having constructed the cost function, we use Algorithm \ref{alg:greedy-event-detection} to detect events once again.
 
-In \autoref{fig:greedy-event}, we show an event detected using the greedy method. It is related to the same real-world event as the event in \autoref{fig:original-event}, though it consists of more keywords. Generally, events detected by the greedy method contain more keywords, as we will see in \autoref{tab:events-overview}.
+In \autoref{fig:greedy-event}, we show an event detected using the embedded greedy method. It is related to the same real-world event as the event in \autoref{fig:original-event}, though it consists of more keywords. Generally, events detected by the embedded greedy method contain more keywords, as we will see in \autoref{tab:events-overview}.
 
 \begin{figure}
   \centering
   \includegraphics{greedy_event}  % greedy event
-  \caption{Example of an event detected using the greedy method. The event consists of the words \textit{rebel, missile, Israel, israeli, American} and \textit{humanitarian}, and is related to the same real event as \autoref{fig:original-event}.}
+  \caption{Example of an event detected using the embedded greedy method. The event consists of the words \textit{rebel, missile, Israel, israeli, American} and \textit{humanitarian}, and is related to the same real event as \autoref{fig:original-event}.}
   \label{fig:greedy-event}
 \end{figure}
 
