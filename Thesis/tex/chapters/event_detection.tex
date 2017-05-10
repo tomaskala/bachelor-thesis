@@ -134,7 +134,7 @@ In the original method, \cite{event-detection} defined the cost function \eqref{
 
 Having constructed the cost function, we use Algorithm \ref{alg:greedy-event-detection} to detect events once again.
 
-In \autoref{fig:greedy-event}, we show an event detected using the embedded greedy method. It is related to the same real-world event as the event in \autoref{fig:original-event}, though it consists of more keywords. Generally, events detected by the embedded greedy method contain more keywords, as we will see in \autoref{tab:events-overview}.
+In \autoref{fig:greedy-event}, we show an event detected using the embedded greedy method. It is related to the same real-world event as the event in \autoref{fig:original-event}, though it consists of more keywords. Generally, events detected by the embedded greedy method contain more keywords, as we will see in \autoref{tab:events-overview}. The trajectory overlap is not perfect, the burst of the word \textit{American} being off compared to the rest of the words. It is possible that the semantic similarity of the word was so high that the word was deemed relevant nonetheless.
 
 \begin{figure}
   \centering
@@ -218,7 +218,7 @@ Now, we describe the cluster-based event detection algorithm, which is a direct 
 \end{algorithmic}
 \end{algorithm}
 
-In \autoref{fig:cluster-event}, we show an event detected using the cluster-based method. It is again related to the same real event as those in \autoref{fig:original-event} and \autoref{fig:greedy-event}. The main thing to note is that the word trajectories are clear of noise due to application of Algorithm \ref{alg:burst-filtering}. This made it possible to match words only based on their bursts, not any underlying noise.
+In \autoref{fig:cluster-event}, we show an event detected using the cluster-based method. It is again related to the same real event as those in \autoref{fig:original-event} and \autoref{fig:greedy-event}. The main thing to note is that the word trajectories are clear of noise due to application of Algorithm \ref{alg:burst-filtering}. This made it possible to match words only based on their bursts, not any underlying noise. Compared to the event depicted in \autoref{fig:greedy-event}, the cleaned trajectories overlap almost perfectly.
 
 \begin{figure}
   \centering

@@ -2,7 +2,9 @@ Word-level analysis is the first phase of the event detection algorithm, focused
 
 Here we work with the assumption that an event can be detected by observing the frequencies of individual words over time and grouping together those words which appear in similar documents during similar time periods \citep{event-detection, parameter-free}. This corresponds to an event being often mentioned in the text stream around the period when it actually occurred. Of course, not all words are representative of an event, so we will have to impose a criterion of a ``word eventness''.
 
-\cite{event-detection} also distinguished between periodic and aperiodic words, where periodic words are mentioned with a certain period (these words are related for example to sport matches played every weekend, weather forecasts reported every day, etc.) Consequently, the authors divided the words into two groups by their periodicity, and detected events from each group separately. However, during our evaluation, some word periodicities were misclassified. This would cause an event represented by those words to be split into a ``periodic part'' and an ``aperiodic part''. Therefore, we detect events from all ``eventful'' words at once, and examine the periodicities of the events later on.
+\cite{event-detection} also distinguished between periodic and aperiodic words, where periodic words are mentioned with a certain period (these words are related for example to sport matches played every weekend, weather forecasts reported every day, etc.) Consequently, the authors divided the words into two groups by their periodicity, and detected events from each group separately. However, during our evaluation, some word periodicities were misclassified. This would cause an event represented by those words to be split into a ``periodic part'' and an ``aperiodic part''. Therefore, we detect events from all ``eventful'' words at once, and examine the periodicities of the events later on in \autoref{chap:document-retrieval}.
+
+We show an example of such periodicity misclassification in \autoref{fig:misclassified}. There are two words representing the same real world event, the first of which in \autoref{fig:hebdo} being correctly classified as aperiodic. The word in \autoref{fig:islam} also has a distinct burst of activity typical for aperiodic words, though it is labeled periodic due to the noise present in the trajectory. If we detected the events separately from the aperiodic and periodic categories, these two words could not be assigned together, even though they concern the same event.
 
 \begin{figure}
 \centering
@@ -19,6 +21,7 @@ Here we work with the assumption that an event can be detected by observing the 
   \label{fig:islam}
 \end{subfigure}
 \caption{Trajectories of the words \textit{Hebdo} and \textit{Islam}, respectively. Both of these words are related to the shooting in Charlie Hebdo offices in Paris on January 7, 2015. However, the original method classifies the word \textit{Islam} as periodic with period of 198 days. If we detected events separately from periodic and aperiodic words, the event ``Charlie Hebdo attack'' would be split into at least two, causing redundancy.}
+\label{fig:misclassified}
 \end{figure}
 
 
@@ -28,6 +31,8 @@ These word trajectories will then be examined for so called ``bursts'' in freque
 
 One thing to note is that the frequency of a word is, by itself, not a good indicator of a word importance.
 Stopwords appearing in most documents, such as conjunctions, prepositions, etc. do not carry any information and should be ignored. Therefore, we utilize the parts of speech tagging performed earlier and limit our analysis to Nouns, Verbs, Adjectives and Adverbs only. This limits the number of stopwords appearing in the stream, though some remain. These will need to be filtered by other means, as we will see in this chapter.
+
+We compare the trajectories of a typical eventful word and a stopword in \autoref{fig:eventful-vs-stopword}. The trajectory of the eventful word contains a distinct burst of activity, indicating a possible event happening. The stopword, on the other hand, does not contain such bursts, its trajectory oscillating as the word is mentioned in many documents over time. Although there are eventful \textit{periodic} words with multiple bursts as well, as shown in \autoref{fig:letadlo}, their trajectories generally reach higher values than those of stopwords. This difference in values will be used to distinguish stopwords from eventful words in \autoref{sec:spectral-analysis}.
 
 \begin{figure}
 \centering
@@ -43,10 +48,11 @@ Stopwords appearing in most documents, such as conjunctions, prepositions, etc. 
   \caption{Stopword}
   \label{fig:patek}
 \end{subfigure}
-\caption{(a) Trajectory of an eventful word \textit{Christmas}. (b) Trajectory of a stopword \textit{Friday} with period of 7 days.}
+\caption{(a) Trajectory of an eventful word \textit{Christmas}. (b) Trajectory of a stopword \textit{Friday} with a period of 7 days.}
+\label{fig:eventful-vs-stopword}
 \end{figure}
 
-We ignore the documents and focus entirely on word analysis up until \autoref{chap:document-retrieval}. There, we use the words assembled into events to query the document collection, obtaining the event-related documents. The core of this algorithm is taken from \cite{event-detection}.
+We ignore the documents and focus entirely on word analysis up until \autoref{chap:document-retrieval}. There, we use the words assembled into events to query the document collection, obtaining the event-related documents. The core of the word analysis algorithm is taken from \cite{event-detection}.
 
 
 \section{Binary bag of words model}
@@ -106,7 +112,7 @@ The matrix $\trajmat$ is computed as follows:
 Now, having trained the Word2Vec model in \autoref{chap:data-preprocessing} and constructed the word trajectories, we obtained temporal and semantic representation of the words. Every word $w$ is represented by two vectors: $\embed_{w} \in \R^{100}$ being its Word2Vec embedding, and $\vect{\traj}_{w} \in \R^{\streamlen}$ its time trajectory. The trajectories will be further analyzed in this chapter, while both trajectories and Word2Vec embeddings will be used in \autoref{chap:event-detection} to group words into events.
 
 
-\section{Spectral analysis}
+\section{Spectral analysis} \label{sec:spectral-analysis}
 Having constructed the word trajectories, we still need to decide which words are eventful enough. \cite{event-detection} interpreted the word trajectories as time signals, which allowed them to analyze the trajectories using signal processing techniques. They performed the analysis both to decide word eventness and to discover the word periodicity.
 
 Unlike the original paper, we only analyze the signal power to decide which words are eventful enough. We will detect events from both periodic and aperiodic words at once, and decide the periodicity of the whole events in \autoref{chap:document-retrieval}.
@@ -125,6 +131,7 @@ To measure the overall signal power, we define the dominant power spectrum of th
 	\text{DPS}_{w} = \max\limits_{k \leq \ceil{\streamlen / 2}}{\|X_{k}\|^{2}}.
 \end{equation}
 
+In \autoref{fig:trajectory-and-periodogram}, we show the trajectory and periodogram of a periodic word \textit{airplane}. In the periodogram plot, the DPS value of approximately 0.1192 is highlighted. This value is attained at frequency of about 0.0076, making the dominant period of the word $1/0.0076 \approx 132$. Although \cite{event-detection} further utilized these dominant periods to categorize the words by their periodicities, we postpone the periodicity analysis to \autoref{chap:document-retrieval} and analyze the trajectories of the whole events.
 
 \begin{figure}[H]
 \centering
@@ -140,7 +147,8 @@ To measure the overall signal power, we define the dominant power spectrum of th
   \caption{Periodogram with indicated DPS}
   \label{fig:letadlo-periodogram}
 \end{subfigure}
-\caption{Trajectory and periodogram of the word \textit{airplane}.}
+\caption{Trajectory and periodogram of the word \textit{airplane} with a period of 132 days.}
+\label{fig:trajectory-and-periodogram}
 \end{figure}
 
 Finally, \cite{event-detection} define the set of all eventful words (EW) as those words whose trajectory signal is powerful enough. This corresponds to their occurrence in a large number of documents in a noiseless pattern:
