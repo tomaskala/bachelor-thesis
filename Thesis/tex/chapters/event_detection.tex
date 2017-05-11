@@ -44,7 +44,19 @@ Since the algorithm attempts to minimize it, the intuitive result is a set of wo
 
 
 \subsection{Event detection algorithm}
-The algorithm, called \textit{unsupervised greedy event detection algorithm} in the original paper, is defined as follows.
+The algorithm, called \textit{unsupervised greedy event detection algorithm} in the original paper, produces events as structured objects $e$ consisting of:
+
+\begin{itemize}
+	\item $\kw{e}$: The event keyword set.
+	\item $\doc{e}$: Documents concerning the event.
+	\item $\bursts{e}$: Bursty periods of the event.
+	\item $\domper{e}$: Dominant period of the event.
+	\item $\annot{e}$: Human-readable annotation of the event.
+\end{itemize}
+
+Only the event keyword set $\kw{e}$ is initialized in this section. The other fields will be properly defined and filled in the rest of the thesis.
+
+The algorithm itself is defined as follows:
 
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
@@ -58,16 +70,16 @@ The algorithm, called \textit{unsupervised greedy event detection algorithm} in 
 
 \ForEach{$w \in \text{EW}$}
 	\State $k = k + 1$	
-	\State $e_{k} = \{ w \}$
+	\State $\kw{e_{k}} = \{ w \}$
 	\State $cost_{e_{k}} = \frac{1}{DPS_{w}}$
 	\State $\text{EW} = \text{EW} \setminus w$
 	
 	\While{$\text{EW} \neq \emptyset$}
-		\State $m = \argmin\limits_{m}{\text{C}( e_{k} \cup w_{m} )}$
+		\State $m = \argmin\limits_{m}{\text{C}( \kw{e_{k}} \cup w_{m} )}$
 
-		\If{$\text{C}( e_{k} \cup w_{m} ) < cost_{e_{k}}$}
-			\State $cost_{e_{k}} = \text{C}( e_{k} \cup w_{m} )$
-			\State $e_{k} = e_{k} \cup w_{m}$
+		\If{$\text{C}( \kw{e_{k}} \cup w_{m} ) < cost_{e_{k}}$}
+			\State $cost_{e_{k}} = \text{C}( \kw{e_{k}} \cup w_{m} )$
+			\State $\kw{e_{k}} = \kw{e_{k}} \cup w_{m}$
 			\State $\text{EW} = \text{EW} \setminus w_{m}$
 		\Else
 			\Break
@@ -92,7 +104,7 @@ We were unable to precisely determine the cost function's complexity with respec
 The resulting complexity of the algorithm is therefore $\mathcal{O}(|\text{EW}|^{3} \cdot c)$, where $c$ is the complexity of the cost function.
 
 
-In \autoref{fig:original-event}, we show an example of an event detected by the original method. We can see that it consists of four keywords with overlapping trajectories, sharing a common burst of activity around day 210. The event is likely related to the tension in the Middle East, though the keywords themselves do not allow any closer interpretation. For this reason, we provide longer annotations in \autoref{chap:event-annotation}, so that we can examine the event more closely.
+In \autoref{fig:original-event}, we show an example of an event detected by the original method. We can see that it consists of four keywords with overlapping trajectories, sharing a common burst of activity around day 210. The event is likely related to the tension in the Middle East, though the keywords by themselves do not allow any closer interpretation. For this reason, we provide longer annotations in \autoref{chap:event-annotation}, so that we can examine the event more closely.
 
 
 \begin{figure}
@@ -130,7 +142,7 @@ We redefine the cost function \eqref{eq:cost-function-original} as
 
 where $\text{Dist}(\cdot)$ is the original trajectory distance function \eqref{eq:trajectory-distance}.
 
-In the original method, \cite{event-detection} defined the cost function \eqref{eq:cost-function-original} for a set of words. However, in Algorithm \ref{alg:greedy-event-detection}, it is always applied on a union of an event constructed so far, and a newly added word. The new cost function must now be applied on such event and word separately due to the nature of Word2Vec similarity definition.
+In the original method, \cite{event-detection} defined the cost function \eqref{eq:cost-function-original} for a set of words. However, in Algorithm \ref{alg:greedy-event-detection}, it is always applied on the union of the keywords of an event constructed so far, and a newly added word. The new cost function must now be applied on such keyword set and word separately due to the nature of Word2Vec similarity definition.
 
 Having constructed the cost function, we use Algorithm \ref{alg:greedy-event-detection} to detect events once again.
 
@@ -145,7 +157,7 @@ In \autoref{fig:greedy-event}, we show an event detected using the embedded gree
 
 
 \section{Cluster-based approach}
-Realizing that the keyword-based event detection resembles word clustering, we decided to investigate this idea. In the final method, we apply a clustering algorithm equipped with a custom distance function to the set of eventful words. The distance function is actually a modification of the cost function yet again, though some means have to be taken to make it usable in this context. First, we need to consider a proper clustering algorithm.
+Realizing that the keyword-based event detection resembles word clustering and could be solved by an application of a clustering algorithm, we decided to investigate this idea. In the final method, we apply a clustering algorithm equipped with a custom distance function to the set of eventful words. The distance function is actually a modification of the cost function yet again, though some means have to be taken to make it usable in this context. First, we need to consider a proper clustering algorithm.
 
 The obvious requirement for the clustering algorithm is that it must require no prior knowledge of the desired number of clusters. Another requirement is that the algorithm must accept a custom distance measure.
 
@@ -156,7 +168,7 @@ During our experimentation, Affinity propagation performed poorly, its clusters 
 In addition to the previously stated requirements, DBSCAN is also capable of filtering out noisy samples (in our case words), not fit for any of the clusters. This property will prove advantageous for our task, as will become clear during the evaluation in \autoref{sec:noise-evaluation}.
 
 
-\subsection{Noise filtering}
+\subsection{Noise filtering} \label{subsec:noise-filtering}
 Before we apply clustering, we filter out the noisy parts from the word trajectories. Most words are on some level reported all the time, though only a fraction of these reportings corresponds to notable events. Unlike the greedy optimization described previously, clustering is prone to such noise, and would yield clusters of poor quality, often with trajectories being put together only due to their noisy parts being similar. Additionaly, with DBSCAN capable of filtering out noisy samples, some high quality words could be discarded precisely due to this noise in their (otherwise eventful) trajectories.
 
 We want to keep only those trajectory parts exceeding a certain frequency level, distinguishing notable bursts from the general noise. We do this by computing a cutoff value for each event trajectory and discarding the sectors falling under this cutoff. This procedure is adopted from \cite{online-search-queries}. The algorithm is based on computing a moving average along the trajectory, and works as follows:
@@ -165,7 +177,7 @@ We want to keep only those trajectory parts exceeding a certain frequency level,
 \begin{algorithmic}[1]
 \caption{Burst filtering}
 \label{alg:burst-filtering}
-\Input $\text{window-length} \ l,\ \text{word trajectory} \ \vect{\traj_{w}}$
+\Input $\text{Window-length} \ l,\ \text{word trajectory} \ \vect{\traj_{w}}$
 
 \State $\vect{MA}_{l} = \text{Moving Average of length} ~ l ~ \text{for} ~ \vect{\traj}_{w} = \left[ \traj_{w}(1), \traj_{w}(2), \dots, \traj_{w}(\streamlen) \right]$
 
@@ -210,7 +222,7 @@ Now, we describe the cluster-based event detection algorithm, which is a direct 
 
 \ForEach{$(w, cluster) \in \text{DBSCAN.clusters}$}
 	\If{$cluster \neq noise$}
-		\State $e_{cluster} = e_{cluster} \cup w$
+		\State $\kw{e_{cluster}} = \kw{e_{cluster}} \cup w$
 	\EndIf
 \EndFor
 

@@ -101,8 +101,11 @@
 \DeclarePairedDelimiterX{\trajdist}[2]{\text{Dist}(}{)}{#1, #2}  % Trajectory distance
 \DeclarePairedDelimiterX{\semsim}[2]{\text{Sim}(}{)}{#1, #2}  % Semantic similarity
 \DeclarePairedDelimiterX{\distfunc}[2]{\text{d}(}{)}{#1, #2}  % Distance function
-\DeclarePairedDelimiterX{\kw}[1]{\text{KW}(}{)}{#1}  % Keywords representation
-\DeclarePairedDelimiterX{\doc}[1]{\text{Doc}(}{)}{#1}  % Documents representation
+\DeclarePairedDelimiterX{\kw}[1]{#1\textit{.KW}}{}{}  % Keywords representation
+\DeclarePairedDelimiterX{\doc}[1]{#1\textit{.Docs}}{}{}  % Documents representation
+\DeclarePairedDelimiterX{\bursts}[1]{#1\textit{.Bursts}}{}{}  % Bursts
+\DeclarePairedDelimiterX{\domper}[1]{#1\textit{.DP}}{}{}  % Dominant period
+\DeclarePairedDelimiterX{\annot}[1]{#1\textit{.Annotation}}{}{}  % Annotation
 \DeclarePairedDelimiterX{\wmd}[2]{\text{WMD}(}{)}{#1, #2}  % WMD
 \DeclarePairedDelimiterX{\wmdsim}[2]{\text{Sim}_{\mathit{WMD}}(}{)}{#1, #2}  % WMD similarity
 

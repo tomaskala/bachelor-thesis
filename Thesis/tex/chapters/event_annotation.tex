@@ -131,7 +131,7 @@ This function positively rewards diverse sentences in a sense that once an eleme
 
 
 \section{Optimization}
-Having defined the cost function $\quality{\cdot}$, we can use the greedy algorithm defined in \cite{multi-summarization-1} to obtain the desired summary.
+Having defined the cost function $\quality{\cdot}$, we can use the greedy algorithm defined in \cite{multi-summarization-1} to obtain the desired summary $\annot{e}$ for an event $e$.
 
 For the experiments, we set a budget of 50 words. In the diversity function the number of clusters $K$ was set to $\frac{\left| U \right|}{10}$, putting 10 sentences into each cluster on average. As for the other parameters, we used the values from the original papers \citep{multi-summarization-1, multi-summarization-2}. Additionally, we need to specify which documents we will use for the summarization. In theory, there is no limit to the number of documents, though it would make sense to use only a few most-relevant documents. In \autoref{chap:evaluation}, we will limit the number of documents for efficiency reasons.
 
