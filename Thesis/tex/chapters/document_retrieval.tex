@@ -55,7 +55,7 @@ We aim to fit a probability density function to the event trajectory. The noisy 
 \begin{figure}
   \centering
   \includegraphics{41_trajectory_cutoff}  % Vrbetice trajectory with cutoff
-  \caption{An event with some noise and mild bursts. The dashed red line is the cutoff value computed using window length 7. The parts of the trajectory under the cutoff will be discarded. The keywords are \textit{Vrbětice, muniční (ammunition), sklad (storage)}.}
+  \caption{An event with some noise and mild bursts. The dashed red line is the cutoff value computed using window length 7. The parts of the trajectory under the cutoff will be discarded. The keywords are \textit{Vrbětice, muniční (ammunition), sklad (storage)}. It is related to the explosions of the ammunition storage in Vrbětice on October 16 and December 3, 2014 (events 38 and 47 in \autoref{app:real-events}}
   \label{fig:vrbetice-trajectory}
 \end{figure}
 
@@ -78,7 +78,7 @@ We describe aperiodic and periodic events separately, as different probability d
 
 \item \textbf{Aperiodic events}
 
-An aperiodic event trajectory $\vect{\trajn}_{e}$ is modeled by a Gaussian distribution $\mathcal{N}(\mu,\,\sigma^{2})$. We fit the Gaussian function to the trajectory $\vect{\trajn}_{e}$ and estimate the parameters $\mu$ and $\sigma$. \cite{event-detection} did not mention the method they used for aperiodic trajectories. As we are fitting the density to probabilities rather than observations, Maximum Likelihood Estimate of the parameters is not applicable. We decided to use non-linear least squares, namely the Levenberg-Marquardt method \citep{least-squares} to estimate $\mu$ and $\sigma$.
+An aperiodic event trajectory $\vect{\trajn}_{e}$ is modeled by a Gaussian distribution $\mathcal{N}(\mu,\,\sigma^{2})$. We fit the Gaussian function to the trajectory $\vect{\trajn}_{e}$ and estimate the parameters $\mu$ and $\sigma$. \cite{event-detection} did not mention the method they used for aperiodic trajectories. As we are fitting the density to probabilities rather than observations, Maximum Likelihood Estimate of the parameters is not applicable. We decided to use non-linear least squares, namely the Levenberg-Marquardt method \citep{least-squares} to estimate $\mu$ and $\sigma$. An example of the Gaussian distribution fit to an event trajectory is shown in \autoref{fig:aperiodic-density}.
 
 \item \textbf{Periodic events}
 
@@ -90,44 +90,28 @@ A periodic event trajectory $\vect{\trajn}_{e}$ is modeled using a mixture of $K
 
 The mixing parameters $\alpha_{k} \geq 0,\ \sum_{k = 1}^{K}{\alpha_{k}} = 1$, location parameters $\mu_{k}$ and scale parameters $\gamma_{k}$ are estimated using the EM algorithm.
 
-The Cauchy distribution has a narrower peak and thicker tails than the Gaussian distribution, which models the periodic bursts more closely. The individual bursts of a periodic event tend to be quite short, but even between two consecutive bursts, the frequency remains at a non-negligible level, which makes the Cauchy distribution a somewhat better choice.
+The Cauchy distribution has a narrower peak and thicker tails than the Gaussian distribution, which models the periodic bursts more closely. The individual bursts of a periodic event tend to be quite short, but even between two consecutive bursts, the frequency remains at a non-negligible level, which makes the Cauchy distribution a somewhat better choice. \autoref{fig:periodic-density} shows an example of such fit.
 
 \end{enumerate}
 
+\begin{figure}
+  \centering
+  \includegraphics{39_density_fit}  % aperiodic event (olympiada)
+  \caption{An aperiodic event consisting of the keywords \textit{Sochi, ZOH (Winter Olympic Games), olympijský (olympic), olympiáda (olympiad)}. The Gaussian function modeling the trajectory is shown in red as well as the event bursty period.}
+  \label{fig:aperiodic-density}
+\end{figure}
+
 
 \begin{figure}
-  \begin{subfigure}[b]{0.5\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{39_trajectory} 
-    \caption{An aperiodic event} 
-    \label{fig:aperiodic-trajectory} 
-    \vspace{4ex}
-  \end{subfigure}%% 
-  \begin{subfigure}[b]{0.5\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{39_periodogram} 
-    \caption{The aperiodic event's periodogram} 
-    \label{fig:aperiodic-periodogram} 
-    \vspace{4ex}
-  \end{subfigure} 
-  \begin{subfigure}[b]{0.5\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{63_trajectory} 
-    \caption{A periodic event} 
-    \label{fig:periodic-trajectory} 
-  \end{subfigure}%%
-  \begin{subfigure}[b]{0.5\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{63_periodogram} 
-    \caption{The periodic event's periodogram} 
-    \label{fig:periodic-periodogram} 
-  \end{subfigure} 
-  \caption{Examples of event periodicities. (a) \textit{Sochi, ZOH (Winter Olympic Games), olympijský (olympic), olympiáda (olympiad)}. (c) \textit{volba (election), volební (electoral), volič (voter)} with period of 132 days.}
+  \centering
+  \includegraphics{63_density_fit}  % periodic event
+  \caption{A periodic event with keywords \textit{volba (election), volební (electoral), volič (voter)} and a period of 132 days. The event is modeled by a mixture of $\floor{396/132} = 3$ Cauchy distributions. Each of the event's bursty periods is highlighted.}
+  \label{fig:periodic-density}
 \end{figure}
 
 
 \subsection{Burst detection}
-Using the fitted probability density functions, we define the bursty period(s) as the regions with the highest density. The bursty period of an aperiodic event $e$ is now defined as $\bursts{e} = \left\{ \interval{\mu - \sigma}{\mu + \sigma} \right\}$. For a periodic event, there are $K = \floor{\streamlen / \domper{e}}$ bursty periods defined as $\bursts{e} = \left\{ \interval{\mu_{k} - \gamma_{k}}{\mu_{k} + \gamma_{k}} \mid k = 1, \dots, K \right\}$.
+Using the fitted probability density functions, we define the bursty period(s) as the regions with the highest density. The bursty period of an aperiodic event $e$ is now defined as $\bursts{e} = \left\{ \interval{\mu - \sigma}{\mu + \sigma} \right\}$. For a periodic event, there are $K = \floor{\streamlen / \domper{e}}$ bursty periods defined as $\bursts{e} = \left\{ \interval{\mu_{k} - \gamma_{k}}{\mu_{k} + \gamma_{k}} \mid k = 1, \dots, K \right\}$. The burst of an aperiodic event is highlighted in \autoref{fig:aperiodic-density}, while a periodic event's bursts are shown in \autoref{fig:periodic-density}.
 
 
 \section{Document retrieval}
