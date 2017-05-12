@@ -117,7 +117,7 @@ This tradeoff between fluency and quality is more worth it when summarizing a la
 If an event consisted of only one or two documents, it would make sense to use a different measure to reach better fluency.
 
 \section{Diversity function}
-Now, we can define the diversity function, which will positively reward a summary consisting of non-redundant sentences. \cite{multi-summarization-2} first applied the K-Means clustering algorithm to the TFIDF vectors of the sentences in $U$. The diversity function then positively rewards summaries whose sentences come from different clusters. If the clustering well separates the sentences in the semantic sense, the sentences in different clusters will not carry redundant information.
+Now, we can define the diversity function, which will positively reward a summary consisting of non-redundant sentences. \cite{multi-summarization-2} first applied the K-Means clustering algorithm to the TFIDF vectors of the sentences in $U$. The diversity function then positively rewards summaries whose sentences come from different clusters. If the clustering well separates the sentences in the semantic sense, the sentences chosen from different clusters will not carry redundant information.
 
 The diversity function is defined as
 
