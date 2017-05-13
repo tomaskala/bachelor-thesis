@@ -1,0 +1,27 @@
+\section{Word embedding}
+Recently, a number of neural network models for vector space word embedding have been proposed. Perhaps the best known model is Word2Vec \citep{word2vec} by Tomáš Mikolov. Additional methods include Stanford GloVe \citep{glove}, WordRank \citep{wordrank} and FastText \citep{fasttext}.
+
+In this thesis, we use the Word2Vec model. The learned word vectors have useful semantical properties \citep{distributed-representations, linguistic-regularities}, an efficient implementation exists \citep{gensim}, and it is a well documented and accepted method.
+
+The Word2Vec model has additionally been modified to support embedding whole documents \citep{doc2vec}.
+
+\section{Event detection} \label{sec:related-event-detection}
+Although our method is evaluated on a news collection, the documents do not necessarily have to come from a formal news source. A lot of work has also been published in event detection by analyzing tweets, an overview can be found in \cite{twitter-survey}, other examples being \cite{ifrim} and \cite{brigadir}. \cite{twitter-survey} also distinguish between \textit{retrospective} and \textit{online} event detection. The former analyzes a given collection of documents to discover past events, the latter (also known as \textit{First Story Detection}) tries to classify continuously incoming texts into ``old'' documents concerning events already known, and ``new'' documents concerning events not yet seen.
+
+Further distinction can be made based on event representation. Some methods directly compare documents by their content and temporal similarity \citep{document-bursty-representation}, outputting an event as a set of documents. Others, such as \cite{parameter-free, event-detection, health-events} and our method included, represent the events by clusters of keywords related semantically and temporarily to each other.
+
+Additional work has also been done in event detection through topic modeling \citep{chaney, keane}. Topic modeling will be briefly addressed in the next section.
+
+\section{Document retrieval}
+Retrieving relevant documents from a large corpus based on a user-given query is the main concern of Information Retrieval \citep{information-retrieval-2, information-retrieval}. A number of methods comparing similarity of document representation through vectors has been created. These methods range from a simple, yet precise binary weighting \citep{luhn, salton, information-retrieval}, to those utilizing term weighting to diminish common words \citep{tfidf} and approaches that attempt to discover a latent structure behind the documents, such as Latent Semantic Indexing \citep{lsi}.
+
+Further work has been done in topic modeling, where the focus is to discover abstract topics behind the documents. Latent Semantic Indexing belongs to topic modeling as well. More complex methods, such as Latent Dirichlet Allocation \citep{lda} employ a generative probabilistic model to discover the topical structure. Document can then be compared in terms of their topical similarity.
+
+Recently, a new similarity measure utilizing the Word2Vec model, an extension of \cite{emd}, called Word Mover's Distance \citep{wmd} was introduced. This is a measure we are going to use and discuss in \autoref{chap:document-retrieval} in more detail.
+
+\section{Event annotation}
+For annotating the detected events, we consulted \cite{summarization-survey-1} and \cite{summarization-survey-2}. We aim to obtain a short summary for each event using the documents retrieved as relevant. The task of document summarization can be divided into \textit{abstractive}, where the task is to generate new sentences from the documents, and \textit{extractive}, where the task is to choose existing sentences from the document into the summary.
+
+An example of the abstractive approach is \cite{heady}, extractive approach is addressed by e.g. \cite{sum-multi, multi-summarization-1, multi-summarization-2}. The abstractive methods are much more complex and still an active area of research, as it is necessary to generate sentences with a logical structure. For a highly inflective language such as Czech, these methods would get even more complicated, so we decided to employ the extractive approach.
+
+The method introduced by \cite{multi-summarization-1, multi-summarization-2} supports multi-document summarization, which is suitable for our task, as we have multiple documents relevant to each event. Additionally, \cite{mogren-1} examined various ways of how this method could be improved by word embeddings. Their work led to a system presented in \cite{mogren-2} which aggregates multiple similarity measures to perform summarization. We decided to adapt this system for our task.

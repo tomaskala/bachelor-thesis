@@ -19,11 +19,11 @@ First, we need to detect the period when the particular event happened, so that 
 \subsection{Event trajectory construction}
 We first need to construct an \textit{event trajectory} out of its \textit{keyword trajectories}. We do this by computing a weighted average of the event's keyword trajectories, with weights being the keyword DPS. This ensures that less important words with slightly different time characteristic will not shift the trajectory away from the actual burst.
 
-An example of an event trajectory constructed from its keywords trajectories can be found in \autoref{fig:kw-event-trajectories}.
-
 \begin{equation}
 	\vect{\traj_{e}} = \frac{1}{\sum_{k \in \kw{e}}{\text{DPS}_{k}}} \sum_{k \in \kw{e}}{\text{DPS}_{k} \cdot \vect{\traj}_{k}}
 \end{equation}
+
+An example of such event trajectory can be found in \autoref{fig:kw-event-trajectories}.
 
 
 \begin{figure}
@@ -55,7 +55,7 @@ We aim to fit a probability density function to the event trajectory. The noisy 
 \begin{figure}
   \centering
   \includegraphics{41_trajectory_cutoff}  % Vrbetice trajectory with cutoff
-  \caption{An event with some noise and mild bursts. The dashed red line is the cutoff value computed using window length 7. The parts of the trajectory under the cutoff will be discarded. The keywords are \textit{Vrbětice, muniční (ammunition), sklad (storage)}. It is related to the explosions of the ammunition storage in Vrbětice on October 16 and December 3, 2014 (events 38 and 47 in \autoref{app:real-events}}
+  \caption{An event with a noisy trajectory and keywords \textit{Vrbětice, muniční (ammunition), sklad (storage)} related to the explosions of the ammunition storage in Vrbětice on October 16 and December 3, 2014 (events 38 and 47 in \autoref{app:real-events}. The dashed red line is the cutoff value computed using window length 7. The parts of the trajectory under the cutoff will be discarded.}
   \label{fig:vrbetice-trajectory}
 \end{figure}
 
@@ -78,7 +78,7 @@ We describe aperiodic and periodic events separately, as different probability d
 
 \item \textbf{Aperiodic events}
 
-An aperiodic event trajectory $\vect{\trajn}_{e}$ is modeled by a Gaussian distribution $\mathcal{N}(\mu,\,\sigma^{2})$. We fit the Gaussian function to the trajectory $\vect{\trajn}_{e}$ and estimate the parameters $\mu$ and $\sigma$. \cite{event-detection} did not mention the method they used for aperiodic trajectories. As we are fitting the density to probabilities rather than observations, Maximum Likelihood Estimate of the parameters is not applicable. We decided to use non-linear least squares, namely the Levenberg-Marquardt method \citep{least-squares} to estimate $\mu$ and $\sigma$. An example of the Gaussian distribution fit to an event trajectory is shown in \autoref{fig:aperiodic-density}.
+An aperiodic event trajectory $\vect{\trajn}_{e}$ is modeled by a Gaussian distribution $\mathcal{N}(\mu,\,\sigma^{2})$. We fit the Gaussian function to the trajectory $\vect{\trajn}_{e}$ and estimate the parameters $\mu$ and $\sigma$. \cite{event-detection} did not mention the method they used for aperiodic trajectories. As we are fitting the density to probabilities rather than observations, Maximum Likelihood Estimate of the parameters is not applicable. We decided to use non-linear least squares, namely the Trust Region Reflective algorithm \citep{trust-region-reflective} to estimate $\mu$ and $\sigma$ bounded within the document stream. An example of the Gaussian distribution fit to an event trajectory is shown in \autoref{fig:aperiodic-density}.
 
 \item \textbf{Periodic events}
 
@@ -97,7 +97,7 @@ The Cauchy distribution has a narrower peak and thicker tails than the Gaussian 
 \begin{figure}
   \centering
   \includegraphics{39_density_fit}  % aperiodic event (olympiada)
-  \caption{An aperiodic event consisting of the keywords \textit{Sochi, ZOH (Winter Olympic Games), olympijský (olympic), olympiáda (olympiad)}. The Gaussian function modeling the trajectory is shown in red as well as the event bursty period.}
+  \caption{An aperiodic event consisting of the keywords \textit{Sochi, ZOH (Winter Olympic Games), olympijský (olympic), olympiáda (olympiad)}. The Gaussian function modeling the trajectory and the event bursty period are shown in red.}
   \label{fig:aperiodic-density}
 \end{figure}
 
@@ -123,13 +123,9 @@ In the original method by \cite{event-detection}, the task was simple due to the
 
 There are a few approaches we could take, such as project all documents and queries to a TFIDF (Term Frequency-Inverse Document Frequency) space \citep{information-retrieval} and sort the documents by their cosine similarity to the query. This simple approach does not go beyond a trivial keyword occurrence comparison, though after applying some weighting scheme. We could enrich it using Latent Semantic Indexing \citep{lsi} to also take the document topics into account. This would require us to compute yet another model to be used for this part only, which would be computationally and memory-intensive.
 
-Instead, we decided to further utilize the Word2Vec model and use the recently introduced Word Mover's Distance \citep{wmd}.
+Instead, we decided to further utilize the Word2Vec model and use the recently introduced Word Mover's Distance \citep{wmd}, which is an application of the better known measure of Earth Mover's Distance \citep{emd} to word embeddings.
 
-The Word Mover's Distance (WMD) is a novel measure of document similarity based on Word2Vec embeddings of the document words. The similarity of two documents is measured as the minimum distance the word vectors of one document need to ``travel'' to reach the word vectors of the second document. The WMD is an application of the better known measure of Earth Mover's Distance \citep{emd} to word embeddings.
-
-The formal definition is rather lengthy, so we refer the reader to the original paper \citep{wmd} for the full derivation.
-
-Since more similar words are embedded close to each other \citep{linguistic-regularities}, the farther apart the words lie, the less similar they are semantically.
+The Word Mover's Distance (WMD) measures the similarity of two documents as the minimum distance the word vectors of one document need to ``travel'' to reach the word vectors of the second document. Since more similar words are embedded close to each other \citep{linguistic-regularities}, the farther apart the words lie, the less similar they are semantically. The formal definition of the WMD is rather lengthy, so we refer the reader to the original paper \citep{wmd} for the full derivation.
 
 The WMD discards word order, which makes it suitable for our keyword queries. As the authors note, it achieves best results for short documents, in part due to the method being computationally expensive for larger pieces of text. Therefore, we apply the WMD to document headlines only.
 

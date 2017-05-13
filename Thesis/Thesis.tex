@@ -36,6 +36,7 @@
 \usepackage{subcaption}
 
 \usepackage{multirow}
+\usepackage{pdfpages}
 
 \renewcommand{\tabularxcolumn}[1]{>{\small}m{#1}}
 
@@ -128,28 +129,32 @@
 % Title page
 \input{tex/titlepage}
 
-
-% Abstract
-\input{tex/abstract}
+% Assignment
+\includepdf{tex/assignment}
 
 
 % Declaration
-\chapter*{Declaration}
-This is my declaration.
+\chapter*{Author statement for undergraduate thesis:}
+\input{tex/chapters/declaration}
 
 
-% Acknowledgements
-\chapter*{Acknowledgements}
-These are my acknowledgements.
+% Abstract
+\newpage
+\input{tex/abstract}
 
 
 % Table of contents
 \tableofcontents
 
 % Chapters
-\chapter{Introduction and related work}
+\chapter{Introduction}
+\label{chap:introduction}
 %\addcontentsline{toc}{chapter}{Introduction}
 \input{tex/chapters/introduction}
+
+\chapter{Related work}
+\label{chap:related-work}
+\input{tex/chapters/related_work}
 
 \chapter{Document stream and preprocessing}
 \label{chap:data-preprocessing}

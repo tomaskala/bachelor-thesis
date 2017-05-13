@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE ipe SYSTEM "ipe.dtd">
 <ipe version="70206" creator="Ipe 7.2.7">
-<info created="D:20170501212726" modified="D:20170503233154"/>
+<info created="D:20170501212726" modified="D:20170513114211"/>
 <ipestyle name="basic">
 <symbol name="arrow/arc(spx)">
 <path stroke="sym-stroke" fill="sym-stroke" pen="sym-pen">
@@ -254,124 +254,137 @@ h
 <page>
 <layer name="alpha"/>
 <view layers="alpha" active="alpha"/>
-<path layer="alpha" matrix="1 0 0 0.5 96 288" stroke="black" pen="fat">
+<path layer="alpha" matrix="1 0 0 0.5 96 256" stroke="black" pen="fat">
 192 576 m
 192 448 l
 320 448 l
 320 576 l
 h
 </path>
-<text matrix="1 0 0 1 -144 -144" transformations="translations" pos="272 368" stroke="black" type="minipage" width="96" height="19.319" depth="14.36" halign="center" valign="top" size="LARGE">\centering
+<text matrix="1 0 0 1 -144 -176" transformations="translations" pos="272 368" stroke="black" type="minipage" width="96" height="19.319" depth="14.36" halign="center" valign="top" size="LARGE">\centering
 Event annotation</text>
-<path matrix="1.14286 0 0 1 -198.857 -144" stroke="black" pen="fat">
+<path matrix="1.14286 0 0 1 -198.857 -176" stroke="black" pen="fat">
 272 384 m
 272 320 l
 384 320 l
 384 384 l
 h
 </path>
-<text matrix="1 0 0 1 -352 -80" transformations="translations" pos="480 752" stroke="black" type="minipage" width="96" height="21.082" depth="16.14" halign="center" valign="top" size="LARGE">\centering
+<text matrix="1 0 0 1 -352 -112" transformations="translations" pos="480 752" stroke="black" type="minipage" width="96" height="21.082" depth="16.14" halign="center" valign="top" size="LARGE">\centering
 Word embedding</text>
-<text matrix="1 0 0 1 -176 -16" transformations="translations" pos="480 688" stroke="black" type="minipage" width="96" height="20.988" depth="16.04" halign="center" valign="top" size="LARGE">\centering
+<text matrix="1 0 0 1 -176 -48" transformations="translations" pos="480 688" stroke="black" type="minipage" width="96" height="20.988" depth="16.04" halign="center" valign="top" size="LARGE">\centering
 Document preprocessing</text>
-<path matrix="1.33333 0 0 1 -96 -80" stroke="black" pen="fat">
+<path matrix="1.33333 0 0 1 -96 -112" stroke="black" pen="fat">
 384 768 m
 384 704 l
 288 704 l
 288 768 l
 h
 </path>
-<text matrix="1 0 0 1 192 -112" transformations="translations" pos="112 560" stroke="black" type="minipage" width="96" height="19.319" depth="14.36" halign="center" valign="top" size="LARGE">\centering
+<text matrix="1 0 0 1 192 -144" transformations="translations" pos="112 560" stroke="black" type="minipage" width="96" height="19.319" depth="14.36" halign="center" valign="top" size="LARGE">\centering
 Event detection</text>
-<path matrix="1.33333 0 0 1 160 -112" stroke="black" pen="fat">
+<path matrix="1.33333 0 0 1 160 -144" stroke="black" pen="fat">
 96 576 m
 96 512 l
 192 512 l
 192 576 l
 h
 </path>
-<path matrix="1.14286 0 0 1 -107.429 -64" stroke="black" pen="fat">
+<path matrix="1.14286 0 0 1 -107.429 -96" stroke="black" pen="fat">
 192 752 m
 192 688 l
 304 688 l
 304 752 l
 h
 </path>
-<path matrix="1 0 0 1 96 -32" stroke="black" pen="fat">
+<path matrix="1 0 0 1 96 -64" stroke="black" pen="fat">
 192 832 m
 192 768 l
 320 768 l
 320 832 l
 h
 </path>
-<text matrix="1 0 0 1 -32 -96" transformations="translations" pos="336 432" stroke="black" type="minipage" width="96" height="19.413" depth="14.46" halign="center" valign="top" size="LARGE">\centering
+<text matrix="1 0 0 1 -32 -128" transformations="translations" pos="336 432" stroke="black" type="minipage" width="96" height="19.413" depth="14.46" halign="center" valign="top" size="LARGE">\centering
 Event burst detection</text>
-<text matrix="1 0 0 1 -16 -128" transformations="translations" pos="144 464" stroke="black" type="minipage" width="96" height="19.319" depth="14.36" halign="center" valign="top" size="LARGE">\centering
+<text matrix="1 0 0 1 -16 -160" transformations="translations" pos="144 464" stroke="black" type="minipage" width="96" height="19.319" depth="14.36" halign="center" valign="top" size="LARGE">\centering
 Document retrieval</text>
-<path matrix="1.14286 0 0 1 -77.7143 -96" stroke="black" pen="fat">
+<path matrix="1.14286 0 0 1 -77.7143 -128" stroke="black" pen="fat">
 320 448 m
 320 384 l
 432 384 l
 432 448 l
 h
 </path>
-<path matrix="1.14286 0 0 1 38.8571 -16" stroke="black" pen="fat">
+<path matrix="1.14286 0 0 1 38.8571 -48" stroke="black" pen="fat">
 64 368 m
 64 304 l
 176 304 l
 176 368 l
 h
 </path>
-<path matrix="1 0 0 1.21429 32 -192" stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1 0 0 1.21429 32 -224" stroke="black" pen="fat" arrow="pointed/large">
 144 672 m
 144 448 l
 </path>
-<path matrix="1 0 0 1.5 32 -288" stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1 0 0 1.5 32 -320" stroke="black" pen="fat" arrow="pointed/large">
 144 384 m
 144 352 l
 </path>
-<path matrix="1 0 0 1.5 48 -320" stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1 0 0 1.5 48 -352" stroke="black" pen="fat" arrow="pointed/large">
 304 480 m
 304 448 l
 </path>
-<path matrix="1 0 0 1.5 48 -352" stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1 0 0 1.5 48 -384" stroke="black" pen="fat" arrow="pointed/large">
 304 576 m
 304 544 l
 </path>
-<path matrix="1 0 0 1.5 48 -384" stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1 0 0 1.5 48 -416" stroke="black" pen="fat" arrow="pointed/large">
 304 672 m
 304 640 l
 </path>
-<path matrix="1 0 0 1.5 48 -416" stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1 0 0 1.5 48 -448" stroke="black" pen="fat" arrow="pointed/large">
 304 768 m
 304 736 l
 </path>
-<path matrix="1.5 0 0 1 -72 -48" stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1.5 0 0 1 -72 -80" stroke="black" pen="fat" arrow="pointed/large">
 240 704 m
 208 704 l
 </path>
-<path matrix="1.5 0 0 1 -72 -96" stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1.5 0 0 1 -72 -128" stroke="black" pen="fat" arrow="pointed/large">
 240 416 m
 208 416 l
 </path>
-<text matrix="1 0 0 1 96 -64" transformations="translations" pos="400 720" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 2</text>
-<text matrix="1 0 0 1 96 -80" transformations="translations" pos="400 624" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 3</text>
-<text matrix="1 0 0 1 96 -96" transformations="translations" pos="400 528" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 4</text>
-<text matrix="1 0 0 1 80 -112" transformations="translations" pos="416 432" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 5</text>
-<text matrix="1 0 0 1 112 -128" transformations="translations" pos="384 336" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 6</text>
-<path matrix="1 0 0 1 32 -32" stroke="black" pen="fat" arrow="pointed/large">
+<text matrix="1 0 0 1 96 -96" transformations="translations" pos="400 720" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 3</text>
+<text matrix="1 0 0 1 96 -112" transformations="translations" pos="400 624" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 4</text>
+<text matrix="1 0 0 1 96 -128" transformations="translations" pos="400 528" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 5</text>
+<text matrix="1 0 0 1 80 -144" transformations="translations" pos="416 432" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 6</text>
+<text matrix="1 0 0 1 112 -160" transformations="translations" pos="384 336" stroke="black" type="label" width="69.259" height="11.954" depth="3.35" halign="center" valign="center" size="LARGE">Chapter 7</text>
+<path matrix="1 0 0 1 32 -64" stroke="black" pen="fat" arrow="pointed/large">
 144 464 m
 256 464 l
 </path>
-<text matrix="1 0 0 1 -144 0" transformations="translations" pos="448 784" stroke="black" type="minipage" width="96" height="19.319" depth="14.36" valign="top" size="LARGE">\centering
+<text matrix="1 0 0 1 -144 -32" transformations="translations" pos="448 784" stroke="black" type="minipage" width="96" height="19.319" depth="14.36" valign="top" size="LARGE">\centering
 Raw documents</text>
-<text matrix="1 0 0 1 -160.216 -51.5013" transformations="translations" pos="464 624" stroke="black" type="minipage" width="96" height="32.029" depth="27.11" valign="top" size="LARGE">\centering
+<text matrix="1 0 0 1 -160.216 -83.5013" transformations="translations" pos="464 624" stroke="black" type="minipage" width="96" height="32.029" depth="27.11" valign="top" size="LARGE">\centering
 Word trajectories and analysis</text>
-<path stroke="black" pen="fat" arrow="pointed/large">
+<path matrix="1 0 0 1 0 -32" stroke="black" pen="fat" arrow="pointed/large">
 176 432 m
 64 432 l
 64 208 l
 112 208 l
+</path>
+<path matrix="1 0 0 1.5 32 -432" stroke="black" pen="fat" arrow="pointed/large">
+144 384 m
+144 352 l
+</path>
+<text matrix="1 0 0 1 -16 -384" transformations="translations" pos="144 464" stroke="black" type="minipage" width="96" height="19.413" depth="14.46" halign="center" valign="top" size="LARGE">\centering
+Processed events</text>
+<path matrix="1.14286 0 0 1 38.8571 -272" stroke="black" pen="fat">
+64 368 m
+64 304 l
+176 304 l
+176 368 l
+h
 </path>
 </page>
 </ipe>
