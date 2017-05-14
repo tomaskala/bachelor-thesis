@@ -49,7 +49,7 @@ An example of such event trajectory can be found in \autoref{fig:kw-event-trajec
 
 Now, a typical event (shown in \autoref{fig:vrbetice-trajectory}) usually has a number of dominant bursts corresponding to the period(s) when the event actually occurred. Additionally, there are some milder, noisy bursts due to the keywords appearing elsewhere, independently of that particular event.
 
-We aim to fit a probability density function to the event trajectory. The noisy bursts would behave as outliers, shifting the fitted function away from the main event bursts. Once again, we apply the Burst filtering algorithm described in \autoref{subsec:noise-filtering} to filter out noise, this time from the event trajectories. The cutoff value computed by the Burst filtering algorithm is shown in \autoref{fig:vrbetice-trajectory} as well.
+We aim to fit a probability density function to the event trajectory, as in \cite{event-detection}. The noisy bursts would behave as outliers, shifting the fitted function away from the main event bursts. Once again, we apply the Burst filtering algorithm from \autoref{subsec:noise-filtering} to filter out noise, this time from the event trajectories. The cutoff value computed by the Burst filtering algorithm is shown in \autoref{fig:vrbetice-trajectory} as well.
 
 
 \begin{figure}
@@ -78,7 +78,7 @@ We describe aperiodic and periodic events separately, as different probability d
 
 \item \textbf{Aperiodic events}
 
-An aperiodic event trajectory $\vect{\trajn}_{e}$ is modeled by a Gaussian distribution $\mathcal{N}(\mu,\,\sigma^{2})$. We fit the Gaussian function to the trajectory $\vect{\trajn}_{e}$ and estimate the parameters $\mu$ and $\sigma$. \cite{event-detection} did not mention the method they used for aperiodic trajectories. As we are fitting the density to probabilities rather than observations, Maximum Likelihood Estimate of the parameters is not applicable. We decided to use non-linear least squares, namely the Trust Region Reflective algorithm \citep{trust-region-reflective} to estimate $\mu$ and $\sigma$ bounded within the document stream. An example of the Gaussian distribution fit to an event trajectory is shown in \autoref{fig:aperiodic-density}.
+An aperiodic event trajectory $\vect{\trajn}_{e}$ is modeled by a Gaussian distribution $\mathcal{N}(\mu,\,\sigma^{2})$. We fit the Gaussian function to the trajectory $\vect{\trajn}_{e}$ and estimate the parameters $\mu$ and $\sigma$. \cite{event-detection} did not mention the method they used for aperiodic trajectories. As we are fitting the density to probabilities rather than observations, Maximum Likelihood Estimate of the parameters is not applicable. We decided to use non-linear least squares, namely the Trust Region Reflective algorithm \citep{trust-region-reflective} to estimate $\mu$ and $\sigma$ bounded within the document stream period. An example of the Gaussian distribution fit to an event trajectory is shown in \autoref{fig:aperiodic-density}.
 
 \item \textbf{Periodic events}
 

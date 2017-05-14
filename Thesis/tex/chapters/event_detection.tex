@@ -1,8 +1,8 @@
-In this chapter, we define the actual event detection algorithm. First, we describe the original method used by \cite{event-detection}. Then, we make a change to incorporate semantic similarity through the word embeddings obtained in \autoref{chap:data-preprocessing}. Finally, we introduce an alternative algorithm that depends on word clustering using a custom distance function.
+In this chapter, we define the actual event detection algorithm. First, we describe the original method used by \cite{event-detection}. Then, we make a change to incorporate semantic similarity through the word embeddings obtained in \autoref{chap:data-preprocessing}. Finally, we introduce an alternative algorithm that utilizes word clustering using a custom distance function.
 
 The original algorithm creates events as sets of related keywords by greedily minimizing a cost function combining temporal and semantical distance between words. However, the paper used only a simple notion of semantical distance, namely the document overlap between words. This demands that there exists at least one document containing all the words used to represent an event. This is a strong requirement, since the documents may use different vocabularies while conveying similar information.  As a result, the events are split into multiple keyword sets, leading to redundancy.
 
-In an attempt to solve this problem, we modify the cost function, replacing the document overlap by Word2Vec-based similarity. This does not require the words to appear in exactly the same documents, only that they have similar semantics. We refer to this method as \textit{embedded greedy approach}, as it is a modification to make the original greedy algorithm utilize word embeddings.
+In an attempt to solve this problem, we modify the cost function, replacing the document overlap by a Word2Vec-based similarity. This does not require the words to appear in exactly the same documents, only that they have similar semantics. We refer to this method as \textit{embedded greedy approach}, as it is a modification to make the original greedy algorithm utilize word embeddings.
 
 Realizing that the task of constructing keyword sets resembles the task of word clustering, we propose an alternative algorithm. Here, we apply a clustering algorithm to the words, using a modification of the cost function as a distance measure. This is a method referred to as \textit{cluster-based approach}.
 
@@ -14,7 +14,7 @@ As stated in the introduction, the original method performs greedy minimization 
 \subsection{Trajectory distance}
 Before measuring the trajectory distance, the trajectories are smoothened by fitting a probability density function to them. We adapt a similar technique in \autoref{chap:document-retrieval} where it is described in more detail. Our event detection modifications do not use the original smoothing though, and we refer the reader to the original paper for more details.
 
-After normalization to unit sum, the (smoothened) trajectory $\vect{\trajn}_{w}$ of a word $w$ can be interpreted as a probability distribution over the stream days. The element $\trajn_{w}(i)$ then denotes the probability that $w$ appears on day $i$. This interpretation allows to compare the trajectories using information-theoretic techniques, notably the information divergence \citep{information-theory}.
+After normalization to unit sum, the (smoothened) trajectory $\vect{\trajn}_{w}$ of a word $w$ can be interpreted as a probability distribution over the stream days. The element $\trajn_{w}(i)$ then denotes the probability that $w$ appears in a random document published on day $i$. This interpretation allows to compare the trajectories using information-theoretic techniques, notably the information divergence \citep{information-theory}.
 
 In the original paper, the authors first defined the distance between trajectories of two words $v$ and $w$ as $\trajdist{\vect{\trajn}_{v}}{\vect{\trajn}_{w}} = \max \left\{ \kl{\vect{\trajn}_{v}}{\vect{\trajn}_{w}}, \kl{\vect{\trajn}_{w}}{\vect{\trajn}_{v}} \right\}$, symmetrizing the Kullback-Leibler divergence KL \citep{kl-divergence}.
 
@@ -34,7 +34,7 @@ The overlap is again generalized to a set of words $\featset$ as
 \end{equation}
 
 \subsection{Cost function}
-The cost function is a combination of the trajectory distance and document overlap of a set of words. It is defined as
+The cost function is a combination of the trajectory distance and document overlap of a set of words $\featset$. It is defined as
 
 \begin{equation} \label{eq:cost-function-original}
 	\text{C}( \featset ) = \frac{\text{Dist}( \featset )}{\text{DO}( \featset ) \cdot \sum_{w \in \featset} \text{DPS}_{w}}.
@@ -122,7 +122,7 @@ In this section, we modify the original method to use the Word2Vec model to meas
 \subsection{Semantic similarity}
 Some of the astounding results of the Word2Vec model arise from semantically similar words forming clusters \citep{linguistic-regularities} in terms of cosine similarity, which is a standard measure used in information retrieval \citep{information-retrieval, cosine-similarity}.
 
-We replace the document overlap in the cost function \eqref{eq:cost-function-original} by cosine similarity between Word2Vec embeddings, though with a small modification. The cosine similarity is bounded in $[-1, 1]$ with -1 denoting the least degree of similarity. This means that the cost function would reach negative values for highly dissimilar words. This would be a problem, as Algorithm \ref{alg:greedy-event-detection} attempts to minimize it. Consequently, we will transform the cosine similarity into $[0, 1]$, just like the document overlap \eqref{eq:document-overlap}.
+We replace the document overlap in the cost function \eqref{eq:cost-function-original} by cosine similarity between Word2Vec embeddings, though with a small modification. The cosine similarity is bounded in $[-1, 1]$ with -1 denoting the least degree of similarity. This means that the cost function would reach negative values for highly dissimilar words. This would mean a problem, as Algorithm \ref{alg:greedy-event-detection} attempts to minimize it. Consequently, we will transform the cosine similarity into $[0, 1]$, just like the document overlap \eqref{eq:document-overlap}.
 
 The similarity between a set of words $\featset$ and a word $w \notin \featset$ is defined as
 
@@ -157,11 +157,11 @@ In \autoref{fig:greedy-event}, we show an event detected using the embedded gree
 
 
 \section{Cluster-based approach}
-Realizing that the keyword-based event detection resembles word clustering and could be solved by an application of a clustering algorithm, we decided to investigate this idea. In the final method, we apply a clustering algorithm equipped with a custom distance function to the set of eventful words. The distance function is actually a modification of the cost function yet again, though some means have to be taken to make it usable in this context. First, we need to consider a proper clustering algorithm.
+Realizing that the keyword-based event detection resembles word clustering and could be solved by an application of a clustering algorithm, we decided to investigate this idea. In the final method, we apply a clustering algorithm equipped with a custom distance function to the set of eventful words. The distance function is actually a modification of the cost function yet again, though some means have to be taken to make it usable in this context. First though, we need to consider a proper clustering algorithm.
 
 The obvious requirement for the clustering algorithm is that it must require no prior knowledge of the desired number of clusters. Another requirement is that the algorithm must accept a custom distance measure.
 
-We considered three candidate algorithms: Affinity propagation \citep{affinity-propagation}, DBSCAN \citep{dbscan} and its modification, HDBSCAN \citep{hdbscan}.
+We considered three candidate algorithms, all satisfying these requirements: Affinity propagation \citep{affinity-propagation}, DBSCAN \citep{dbscan} and its modification, HDBSCAN \citep{hdbscan}.
 
 During our experimentation, Affinity propagation performed poorly, its clusters being often seemingly random and of low quality. The quality of HDBSCAN clusters was considerably better, though the algorithm took longer to converge as the number of eventful words grew. It also required to tune multiple parameters, which was difficult to do without any annotated data. We decided to use the DBSCAN algorithm, which outperformed Affinity propagation as well, and does not require to tune as many parameters as HDBSCAN.
 
@@ -188,6 +188,8 @@ We want to keep only those trajectory parts exceeding a certain frequency level,
 \Output $\vect{bursts}_{w}$
 \end{algorithmic}
 \end{algorithm}
+
+We use the window length $l = 7$, looking 1 week back in the trajectory.
 
 
 \subsection{Distance function}
