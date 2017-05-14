@@ -4,11 +4,11 @@ import math
 from time import time
 
 import numpy as np
+from sklearn.cluster import MiniBatchKMeans
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
-from event_detection.k_medoids import KMedoids
+from sklearn.preprocessing import normalize
 
 
 class LemmatizedDocument:
@@ -168,7 +168,7 @@ class Summarizer:
             self.n_clusters = 1
         else:
             self.alpha_ = self.a / self.n_sentences
-            self.n_clusters = self.n_sentences // self.avg_cluster_size
+            self.n_clusters = max(1, self.n_sentences // self.avg_cluster_size)
 
         assert 0 <= self.alpha_ <= 1, 'The parameter `alpha` = `a/N` must be in [0,1]'
 
@@ -176,9 +176,9 @@ class Summarizer:
         self._precompute_similarities(event_keywords, sentences_lemma, sentences_pos)
         logging.info('Precomputed similarities in %fs.', time() - t)
 
-        t = time()
-        self._cluster_similarities()
-        logging.info('Clustered %d sentences into %d clusters in %fs.', self.n_sentences, self.n_clusters, time() - t)
+        # t = time()
+        # self._cluster_similarities()
+        # logging.info('Clustered %d sentences into %d clusters in %fs.', self.n_sentences, self.n_clusters, time() - t)
 
         if constraint_type == 'words':
             constraints = np.fromiter(map(len, sentences_forms), dtype=int, count=self.n_sentences)
@@ -229,29 +229,24 @@ class Summarizer:
 
         return sentences_forms, sentences_lemma, sentences_pos
 
-    def _cluster_similarities(self):
+    def _cluster_similarities(self, sentence_vectors):
         """
         Cluster the sentences into `self.n_clusters` clusters after converting the similarity matrix to a
         distance matrix.
         The clusters will be represented by a matrix `self.sentence_cluster_similarities` mapping sentences to
         their similarities to each cluster. This is useful to quickly compute the current summary diversity.
+        :param sentence_vectors: TFIDF vectors of the sentences
         """
-        distance_matrix = 1.0 - self.similarity_matrix
-
-        # To avoid floating point precision errors.
-        np.clip(distance_matrix, 0, 1, out=distance_matrix)
-        distance_matrix[np.diag_indices_from(distance_matrix)] = 0.0
-
-        k_medoids = KMedoids(n_clusters=self.n_clusters, distance_metric='precomputed', random_state=1)
-        distance_matrix[distance_matrix > 1e9] = 1e9
-        distance_matrix[np.isnan(distance_matrix)] = 1e9
-        labels = k_medoids.fit_predict(distance_matrix)
+        k_means = MiniBatchKMeans(n_clusters=self.n_clusters, random_state=1)
+        normalized_vectors = normalize(sentence_vectors)
+        labels = k_means.fit_predict(normalized_vectors)
 
         sentence_ids = np.arange(self.n_sentences)
         cluster_adjacency = np.zeros(shape=(self.n_sentences, self.n_clusters), dtype=int)
         cluster_adjacency[sentence_ids, labels] = 1
 
-        self.sentence_cluster_similarities = self.similarity_matrix @ cluster_adjacency
+        cosine_similarity_matrix = cosine_similarity(sentence_vectors)
+        self.sentence_cluster_similarities = cosine_similarity_matrix @ cluster_adjacency
 
     def _precompute_similarities(self, event_keywords, sentences_lemma, sentences_pos):
         """
@@ -268,10 +263,10 @@ class Summarizer:
         np.multiply(self.similarity_matrix, w2v_similarities, out=self.similarity_matrix)
         del w2v_similarities
 
-        # LSI similarity
-        lsi_similarities = self._lsi_similarity(sentence_vectors, k=50)
-        np.multiply(self.similarity_matrix, lsi_similarities, out=self.similarity_matrix)
-        del lsi_similarities
+        # TR similarity
+        tr_similarities = self._tr_similarity(sentences_lemma, sentences_pos)
+        np.multiply(self.similarity_matrix, tr_similarities, out=self.similarity_matrix)
+        del tr_similarities
 
         # KeyWord similarity
         kw_similarities = self._kw_similarity(sentences_lemma, event_keywords)
@@ -287,6 +282,9 @@ class Summarizer:
 
         # To avoid floating point precision errors.
         self.similarity_matrix[np.diag_indices_from(self.similarity_matrix)] = 1.0
+
+        # Perform sentence clustering.
+        self._cluster_similarities(sentence_vectors)
 
     @staticmethod
     def _sents2vecs(sentences):

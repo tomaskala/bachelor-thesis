@@ -2,6 +2,7 @@ import logging
 import math
 import os
 import pickle
+from datetime import datetime, timedelta
 from time import time
 
 import numpy as np
@@ -132,6 +133,17 @@ def heuristic_stopwords_detection(feature_trajectories, dps, seed_sw_indices):
     return stopwords_indices, udps
 
 
+def set_similarity(feature_indices, divergences):
+    """
+    Compute the similarity of a set of features using the precomputed KL-divergences. Set similarity is defined as
+    the maximum of divergences between all pairs of features from the set.
+    :param feature_indices: indices of the features from the set
+    :param divergences: precomputed matrix of feature trajectory divergences
+    :return: similarity of the set
+    """
+    return np.max(divergences[np.ix_(feature_indices, feature_indices)])
+
+
 def event_detection_greedy(global_indices, w2v_model, feature_trajectories, dps, id2word):
     """
     The main event detection method with explicit cost function minimization.
@@ -144,13 +156,11 @@ def event_detection_greedy(global_indices, w2v_model, feature_trajectories, dps,
     """
 
     def cost_function(old_indices, new_index):
-        old_traj = np.mean(feature_trajectories[old_indices], axis=0)
-        new_traj = feature_trajectories[new_index]
-        trajectory_divergence = entropy(old_traj, new_traj, base=2)
+        trajectory_divergence = set_similarity(old_indices + [new_index], similarities)
 
         old_words = [id2word[global_indices[word_ix]] for word_ix in old_indices]
         new_word = id2word[global_indices[new_index]]
-        semantic_similarity = math.exp(w2v_model.n_similarity(old_words, [new_word]))
+        semantic_similarity = (w2v_model.n_similarity(old_words, [new_word]) + 1) / 2
 
         dps_score = np.sum(dps[old_indices + [new_index]])
         return trajectory_divergence / (semantic_similarity * dps_score)
@@ -170,8 +180,17 @@ def event_detection_greedy(global_indices, w2v_model, feature_trajectories, dps,
     logging.info('Detecting events using the greedy approach.')
     logging.info('Examining %d features.', len(feature_trajectories))
 
-    # Sort feature indices by DPS in ascending order.
-    indices = list(sorted(range(len(feature_trajectories)), key=lambda i: dps[i]))
+    # Sort feature indices by DPS in descending order.
+    indices = list(sorted(range(len(feature_trajectories)), key=lambda k: dps[k], reverse=True))
+    n_features = feature_trajectories.shape[0]
+
+    similarities = np.zeros((n_features, n_features), dtype=float)
+
+    for i, f1 in enumerate(feature_trajectories):
+        for j, f2 in enumerate(feature_trajectories):
+            if i < j:
+                similarities[i, j] = max(entropy(f1, f2, base=2), entropy(f2, f1, base=2))
+                similarities[j, i] = similarities[i, j]
 
     t = time()
     events = []
@@ -324,8 +343,111 @@ def detect_events(w2v_model, feature_trajectories, dps, dp, id2word, which, clus
                            event_detection_greedy(feature_indices, w2v_model, trajectories_slice, dps_slice, id2word)))
 
 
-# DPS_BOUNDARY pre-clustering => 0.25, otherwise 0.05.
-DPS_BOUNDARY = 0.01  # Dominant power spectrum boundary between high and low power features.
+def summarize_events(events, events_docids_repr, id2word, w2v_model, cluster_based):
+    """
+    Perform multi-document summarization on documents retrieved for the events detected. The summaries will be
+    output to a file based on the `cluster_based` parameter.
+    :param events: the detected events
+    :param events_docids_repr: document ID representation of the events retrieved using functions in `postprocessing.py`
+    :param id2word: mapping from IDs to words
+    :param w2v_model: trained Word2Vec model
+    :param cluster_based: whether to use the cluster-based algorithm or the one with explicit minimization
+    """
+    summarization_fetcher = data_fetchers.CzechSummarizationTexts(dataset=DATASET)
+
+    if cluster_based:
+        if os.path.exists(EVENT_SUMM_DOCS_CLUSTERS_PATH):
+            logging.info('Deserializing full documents.')
+
+            with open(EVENT_SUMM_DOCS_CLUSTERS_PATH, mode='rb') as f:
+                events_docs_repr = pickle.load(f)
+
+            logging.info('Deserialized full documents.')
+        else:
+            logging.info('Retrieving full documents.')
+            t = time()
+
+            events_docs_repr = annotations.docids2documents(events_docids_repr, summarization_fetcher)
+
+            with open(EVENT_SUMM_DOCS_CLUSTERS_PATH, mode='wb') as f:
+                pickle.dump(events_docs_repr, f)
+
+            logging.info('Retrieved and serialized full documents in %fs.', time() - t)
+    else:
+        if os.path.exists(EVENT_SUMM_DOCS_GREEDY_PATH):
+            logging.info('Deserializing full documents.')
+
+            with open(EVENT_SUMM_DOCS_GREEDY_PATH, mode='rb') as f:
+                events_docs_repr = pickle.load(f)
+
+            logging.info('Deserialized full documents.')
+        else:
+            logging.info('Retrieving full documents.')
+            t = time()
+
+            events_docs_repr = annotations.docids2documents(events_docids_repr, summarization_fetcher)
+
+            with open(EVENT_SUMM_DOCS_GREEDY_PATH, mode='wb') as f:
+                pickle.dump(events_docs_repr, f)
+
+            logging.info('Retrieved and serialized full documents in %fs.', time() - t)
+
+    file_path = './cluster_summaries.txt' if cluster_based else './greedy_summaries.txt'
+    summarize_inner(events_docs_repr, events, id2word, w2v_model, file_path)
+
+
+def summarize_inner(events_docs_repr, events, id2word, w2v_model, file_path):
+    """
+    Do the actual summarization with the retrieved documents.
+    :param events_docs_repr: document representation of the events retrieved using functions in `postprocessing.py`
+    :param events: the detected events
+    :param id2word: mapping from IDs to words
+    :param w2v_model: trained Word2Vec model
+    :param file_path: where to store the summaries
+    """
+    summarizer = annotations.Summarizer(w2v_model)
+    constraint_type = 'words'
+    budget = 60
+
+    t = time()
+
+    with open(file_path, 'w', encoding='utf8') as f:
+        for i, event in enumerate(events_docs_repr):
+            event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
+
+            if len(event_keywords) <= 8:
+                keywords_out = ', '.join(event_keywords)
+            else:
+                keywords_out = ', '.join(event_keywords[:8]) + '...'
+
+            event_out = '{:d} - {:s}\n'.format(i + 1, keywords_out)
+
+            for burst in event:
+                burst_start, burst_end, burst_docs = burst
+
+                burst_start_date = datetime(year=2014, month=1, day=1) + timedelta(days=burst_start)
+                burst_end_date = datetime(year=2014, month=1, day=1) + timedelta(days=burst_end)
+
+                burst_start_out = f'{burst_start_date:%b} {burst_start_date.day}'
+                burst_end_out = f'{burst_end_date:%b} {burst_end_date.day}, {burst_end_date:%Y}'
+
+                if len(burst_docs) == 0:
+                    event_out += 'burst {:s} - {:s} CONTAINS NO DOCUMENTS\n'.format(burst_start_out, burst_end_out)
+                    continue
+
+                sentences = summarizer.summarize(event_keywords, burst_docs[:50], budget, constraint_type)
+                sentences_out = ' '.join(map(lambda sentence: ' '.join(sentence), sentences))
+                headline_out = ' '.join(burst_docs[0].document.name_forms)
+                event_out += 'burst {:s} - {:s}\n{:s}\n{:s}\n'.format(burst_start_out, burst_end_out, headline_out,
+                                                                      sentences_out)
+
+            print(event_out, file=f)
+            print(file=f)
+
+    print('Summarized the events in {:f}s.'.format(time() - t))
+
+
+DPS_BOUNDARY = 0.05  # Boundary between eventful and non-eventful words.
 DATASET = 'full'  # Dataset is shared across all document fetchers.
 # Embeddings generally need all POS tags, this removes only punctuation (Z) and unknowns (X).
 POS_EMBEDDINGS = ('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T')
@@ -338,7 +460,7 @@ ID2WORD_PATH = os.path.join(PICKLE_PATH, 'id2word.pickle')
 BOW_MATRIX_PATH = os.path.join(PICKLE_PATH, 'term_document.npz')
 RELATIVE_DAYS_PATH = os.path.join(PICKLE_PATH, 'relative_days.pickle')
 
-# [[(burst_start, burst_end, [(doc_id, doc_sim)] ... event_bursts] ... events] (load this to save memory)
+# [[(burst_start, burst_end, [(doc_id, doc_sim)] ... event_bursts] ... events]
 EVENT_DOCIDS_GREEDY_PATH = os.path.join(PICKLE_PATH, 'event_docids_greedy.pickle')
 EVENT_DOCIDS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_docids_clusters.pickle')
 
@@ -348,6 +470,13 @@ EVENT_SUMM_DOCS_CLUSTERS_PATH = os.path.join(PICKLE_PATH, 'event_summ_docs_clust
 
 
 def main(cluster_based):
+    global DPS_BOUNDARY
+
+    if cluster_based:
+        DPS_BOUNDARY = 0.01
+    else:
+        DPS_BOUNDARY = 0.04
+
     total_time = time()
     embedding_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_EMBEDDINGS)
     keyword_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_KEYWORDS)
@@ -410,44 +539,39 @@ def main(cluster_based):
     trajectories = construct_feature_trajectories(bow_matrix, relative_days)
 
     # Bag of Words matrix is no longer needed -> delete it to free some memory.
-    # del bow_matrix
+    del bow_matrix
 
     dps, dp = postprocessing.spectral_analysis(trajectories)
-
-    plotting.plot_aperiodic_words(trajectories, dps, dp, 0.05, stream_length, id2word, '../APERIODIC_WORDS')
-    plotting.plot_periodic_words(trajectories, dps, dp, 0.05, stream_length, id2word, '../PERIODIC_WORDS')
-    exit()
-
     w2v_model = preprocessing.perform_word2vec(embedding_fetcher, NAMES_SEPARATELY)
 
     # Step 2: Detect events
     # ---------------------
 
     # All events
-    # events = detect_events(w2v_model, trajectories, dps, dp, id2word, which='all', cluster_based=cluster_based)
+    events = detect_events(w2v_model, trajectories, dps, dp, id2word, which='all', cluster_based=cluster_based)
 
     # Step 2.5: Discard low period events
     # -----------------------------------
-    # event_trajectories, event_periods = postprocessing.create_events_trajectories(events, trajectories, dps)
-    # kept_events = []
+    event_trajectories, event_periods = postprocessing.create_events_trajectories(events, trajectories, dps)
+    kept_events = []
 
-    # for event, period in zip(events, event_periods):
-    #     if period > 7:
-    #         kept_events.append(event)
+    for event, period in zip(events, event_periods):
+        if period > 7:
+            kept_events.append(event)
 
-    # events = kept_events
-    # del kept_events
-    # del event_trajectories
-    # del event_periods
+    events = kept_events
+    del kept_events
+    del event_trajectories
+    del event_periods
 
-    # plotting.plot_events(trajectories, events, id2word, dps,
-    #                      dirname='./events_clusters' if cluster_based else './events_greedy')
-    # logging.info('Events detected')
+    plotting.plot_events(trajectories, events, id2word, dps,
+                         dirname='./events_clusters' if cluster_based else './events_greedy')
+    logging.info('Events detected')
 
     # Step 3: Obtain IDs of documents related to each event.
     # ------------------------------------------------------
 
-    # dtd = construct_doc_to_day_matrix(n_docs, relative_days, names_separately=NAMES_SEPARATELY)
+    dtd = construct_doc_to_day_matrix(n_docs, relative_days, names_separately=NAMES_SEPARATELY)
 
     # Relative days are no longer needed -> delete them to free some memory.
     del relative_days
@@ -467,11 +591,11 @@ def main(cluster_based):
             logging.info('Retrieving event doc IDs.')
             t = time()
 
-            # all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
-            #                                                 w2v_model, id2word)
-            #
-            # with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='wb') as f:
-            #     pickle.dump(all_docids, f)
+            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
+                                                            w2v_model, id2word)
+
+            with open(EVENT_DOCIDS_CLUSTERS_PATH, mode='wb') as f:
+                pickle.dump(all_docids, f)
 
             logging.info('Retrieved and serialized event doc IDs in %fs.', time() - t)
     else:
@@ -486,11 +610,11 @@ def main(cluster_based):
             logging.info('Retrieving event doc IDs.')
             t = time()
 
-            # all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
-            #                                                 w2v_model, id2word)
+            all_docids = postprocessing.keywords2docids_wmd(keyword_fetcher, events, trajectories, dps, dtd,
+                                                            w2v_model, id2word)
 
-            # with open(EVENT_DOCIDS_GREEDY_PATH, mode='wb') as f:
-            #     pickle.dump(all_docids, f)
+            with open(EVENT_DOCIDS_GREEDY_PATH, mode='wb') as f:
+                pickle.dump(all_docids, f)
 
             logging.info('Retrieved and serialized event doc IDs in %fs.', time() - t)
 
@@ -501,84 +625,6 @@ def main(cluster_based):
     logging.info('All done in %fs.', time() - total_time)
 
 
-def summarize_events(events, events_docids_repr, id2word, w2v_model, cluster_based):
-    summarization_fetcher = data_fetchers.CzechSummarizationTexts(dataset=DATASET)
-
-    if cluster_based:
-        if os.path.exists(EVENT_SUMM_DOCS_CLUSTERS_PATH):
-            logging.info('Deserializing full documents.')
-
-            with open(EVENT_SUMM_DOCS_CLUSTERS_PATH, mode='rb') as f:
-                events_docs_repr = pickle.load(f)
-
-            logging.info('Deserialized full documents.')
-        else:
-            logging.info('Retrieving full documents.')
-            t = time()
-
-            events_docs_repr = annotations.docids2documents(events_docids_repr, summarization_fetcher)
-
-            with open(EVENT_SUMM_DOCS_CLUSTERS_PATH, mode='wb') as f:
-                pickle.dump(events_docs_repr, f)
-
-            logging.info('Retrieved and serialized full documents in %fs.', time() - t)
-    else:
-        if os.path.exists(EVENT_SUMM_DOCS_GREEDY_PATH):
-            logging.info('Deserializing full documents.')
-
-            with open(EVENT_SUMM_DOCS_GREEDY_PATH, mode='rb') as f:
-                events_docs_repr = pickle.load(f)
-
-            logging.info('Deserialized full documents.')
-        else:
-            logging.info('Retrieving full documents.')
-            t = time()
-
-            events_docs_repr = annotations.docids2documents(events_docids_repr, summarization_fetcher)
-
-            with open(EVENT_SUMM_DOCS_GREEDY_PATH, mode='wb') as f:
-                pickle.dump(events_docs_repr, f)
-
-            logging.info('Retrieved and serialized full documents in %fs.', time() - t)
-
-    summarize_inner(events_docs_repr, events, id2word, w2v_model)
-
-
-def summarize_inner(events_docs_repr, events, id2word, w2v_model):
-    summarizer = annotations.Summarizer(w2v_model)
-    constraint_type = 'words'
-    budget = 100
-
-    t = time()
-    logging.disable(logging.WARNING)
-
-    for i, event in enumerate(events_docs_repr):
-        event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
-        print('Event {:03d}: [{:s}]'.format(i, ', '.join(event_keywords)))
-
-        for burst in event:
-            burst_start, burst_end, burst_docs = burst
-            sentences = summarizer.summarize(event_keywords, burst_docs[:25], budget, constraint_type)
-
-            for j, sentence in enumerate(sentences):
-                print('{:02d}: {:s}'.format(j, str(sentence)))
-
-            print()
-
-        if len(event) > 1:
-            print()
-
-    print('Summarized the documents in {:f}s.'.format(time() - t))
-
-
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-
-    # logger = logging.getLogger()
-    # handler = logging.FileHandler('./documents_clusters_log.log')
-    # formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
-    # handler.setFormatter(formatter)
-    # logger.addHandler(handler)
-    # logger.setLevel(logging.INFO)
-
-    main(cluster_based=True)
+    main(cluster_based=False)

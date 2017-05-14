@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import pickle
+from datetime import datetime, timedelta
 from time import time
 
 import numpy as np
@@ -15,7 +16,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from event_detection import annotations, data_fetchers, plotting, preprocessing
 from event_detection.event_detector import construct_doc_to_day_matrix, construct_feature_trajectories
-from event_detection.postprocessing import spectral_analysis, keywords2docids_simple
+from event_detection.postprocessing import keywords2docids_simple, spectral_analysis
 
 
 def moving_average(vector, window):
@@ -266,6 +267,88 @@ def detect_events(bow_matrix, feature_trajectories, dps, dp, aperiodic):
                                                            dp_slice)))
 
 
+def summarize_events(events, events_docids_repr, id2word, w2v_model):
+    """
+    Perform multi-document summarization on documents retrieved for the events detected. The summaries will be
+    output to a file.
+    :param events: the detected events
+    :param events_docids_repr: document ID representation of the events retrieved using functions in `postprocessing.py`
+    :param id2word: mapping from IDs to words
+    :param w2v_model: trained Word2Vec model
+    """
+    summarization_fetcher = data_fetchers.CzechSummarizationTexts(dataset=DATASET)
+
+    if os.path.exists(EVENT_SUMM_DOCS_ORIGINAL_PATH):
+        logging.info('Deserializing full documents.')
+
+        with open(EVENT_SUMM_DOCS_ORIGINAL_PATH, mode='rb') as f:
+            events_docs_repr = pickle.load(f)
+
+        logging.info('Deserialized full documents.')
+    else:
+        logging.info('Retrieving full documents.')
+        t = time()
+
+        events_docs_repr = annotations.docids2documents(events_docids_repr, summarization_fetcher)
+
+        with open(EVENT_SUMM_DOCS_ORIGINAL_PATH, mode='wb') as f:
+            pickle.dump(events_docs_repr, f)
+
+        logging.info('Retrieved and serialized full documents in %fs.', time() - t)
+
+    summarize_inner(events_docs_repr, events, id2word, w2v_model)
+
+
+def summarize_inner(events_docs_repr, events, id2word, w2v_model):
+    """
+    Do the actual summarization with the retrieved documents.
+    :param events_docs_repr: document representation of the events retrieved using functions in `postprocessing.py`
+    :param events: the detected events
+    :param id2word: mapping from IDs to words
+    :param w2v_model: trained Word2Vec model
+    """
+    summarizer = annotations.Summarizer(w2v_model)
+    constraint_type = 'words'
+    budget = 60
+
+    t = time()
+
+    with open('./original_summaries.txt', 'w', encoding='utf8') as f:
+        for i, event in enumerate(events_docs_repr):
+            event_keywords = [id2word[keyword_id] for keyword_id in events[i]]
+
+            if len(event_keywords) <= 8:
+                keywords_out = ', '.join(event_keywords)
+            else:
+                keywords_out = ', '.join(event_keywords[:8]) + '...'
+
+            event_out = '{:d} - {:s}\n'.format(i + 1, keywords_out)
+
+            for burst in event:
+                burst_start, burst_end, burst_docs = burst
+
+                burst_start_date = datetime(year=2014, month=1, day=1) + timedelta(days=burst_start)
+                burst_end_date = datetime(year=2014, month=1, day=1) + timedelta(days=burst_end)
+
+                burst_start_out = f'{burst_start_date:%b} {burst_start_date.day}'
+                burst_end_out = f'{burst_end_date:%b} {burst_end_date.day}, {burst_end_date:%Y}'
+
+                if len(burst_docs) == 0:
+                    event_out += 'burst {:s} - {:s} CONTAINS NO DOCUMENTS\n'.format(burst_start_out, burst_end_out)
+                    continue
+
+                sentences = summarizer.summarize(event_keywords, burst_docs[:50], budget, constraint_type)
+                sentences_out = ' '.join(map(lambda sentence: ' '.join(sentence), sentences))
+                headline_out = ' '.join(burst_docs[0].document.name_forms)
+                event_out += 'burst {:s} - {:s}\n{:s}\n{:s}\n'.format(burst_start_out, burst_end_out, headline_out,
+                                                                      sentences_out)
+
+            print(event_out, file=f)
+            print(file=f)
+
+    print('Summarized the events in {:f}s.'.format(time() - t))
+
+
 DPS_BOUNDARY = 0.05
 WINDOW = 7
 
@@ -286,7 +369,6 @@ def main():
     total_time = time()
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
     keyword_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_KEYWORDS)
-    summarization_fetcher = data_fetchers.CzechSummarizationTexts(dataset=DATASET)
 
     if os.path.exists(ID2WORD_PATH) and os.path.exists(BOW_MATRIX_PATH) and os.path.exists(RELATIVE_DAYS_PATH):
         t = time()
@@ -344,12 +426,12 @@ def main():
 
     # Aperiodic events
     aperiodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=True)
-    # plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname='./original_aperiodic')
+    plotting.plot_events(trajectories, aperiodic_events, id2word, dps, dirname='./original_aperiodic')
     logging.info('Aperiodic done')
 
     # Periodic events
     periodic_events = detect_events(bow_matrix, trajectories, dps, dp, aperiodic=False)
-    # plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname='./original_periodic')
+    plotting.plot_events(trajectories, periodic_events, id2word, dps, dirname='./original_periodic')
     logging.info('Periodic done')
 
     events = aperiodic_events + periodic_events
@@ -380,33 +462,13 @@ def main():
 
     del bow_matrix
 
-    if os.path.exists(EVENT_SUMM_DOCS_ORIGINAL_PATH):
-        logging.info('Deserializing full documents.')
-
-        with open(EVENT_SUMM_DOCS_ORIGINAL_PATH, mode='rb') as f:
-            events_docs_repr = pickle.load(f)
-
-        logging.info('Deserialized full documents.')
-    else:
-        logging.info('Retrieving full documents.')
-        t = time()
-
-        events_docs_repr = annotations.docids2documents(all_docids, summarization_fetcher)
-
-        with open(EVENT_SUMM_DOCS_ORIGINAL_PATH, mode='wb') as f:
-            pickle.dump(events_docs_repr, f)
-
-        logging.info('Retrieved and serialized full documents in %fs.', time() - t)
-
+    POS_EMBEDDINGS = ('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T')
+    embedding_fetcher = data_fetchers.CzechLemmatizedTexts(dataset=DATASET, fetch_forms=False, pos=POS_EMBEDDINGS)
+    w2v_model = preprocessing.perform_word2vec(embedding_fetcher, NAMES_SEPARATELY)
+    summarize_events(events, all_docids, id2word, w2v_model)
     logging.info('All done in %fs.', time() - total_time)
 
 
 if __name__ == '__main__':
-    logger = logging.getLogger()
-    handler = logging.FileHandler('./docids_documents_original_log.log')
-    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
     main()

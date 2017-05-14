@@ -209,6 +209,334 @@ def cm2inch(*tupl):
         return tuple(i/inch for i in tupl)
 
 
+def plot_events_to_eps(trajectories, events, id2word, dps):
+    dirname = '../EVENTS_OUT_BIG'
+
+    # font = {'family': 'normal',
+    #         'size': 12}
+
+    # matplotlib.rc('font', **font)
+
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    events_indices = [11, 41, 39, 63, 42, 16, 18]  # For clusters
+    events_indices = [17, 19, 54]  # For greedy
+    e = [events[i] for i in events_indices]
+    events = e
+    n_days = trajectories.shape[1]
+    days = np.arange(n_days)
+    event_trajectories, event_periods = post.create_events_trajectories(events, trajectories, dps)
+
+    from scipy.signal import periodogram
+    freqs, pgram = periodogram(trajectories)
+
+    dps_indices = np.argmax(pgram, axis=1)
+    feature_indices = np.arange(trajectories.shape[0])
+
+    dps = pgram[feature_indices, dps_indices]
+
+    with np.errstate(divide='ignore'):
+        ffreqs = np.tile(freqs, (trajectories.shape[0], 1))
+
+    df = ffreqs[feature_indices, dps_indices]
+
+    for i, event, event_trajectory, event_period in zip(events_indices, events, event_trajectories, event_periods):
+        # 1. Event keywords
+        fig = plt.figure()
+        plt.xlim(0.0, n_days)
+
+        for feature in event:
+            y = trajectories[feature]
+            plt.plot(days, y, label=id2word[feature])
+
+        plt.xlabel('Days (relative to 1/1/2014)')
+        plt.ylabel('DFIDF')
+        plt.legend()
+        plt.tight_layout()
+
+        fig.set_size_inches(cm2inch(14, 8))
+        fig.savefig(os.path.join(dirname, '{:d}_words.eps'.format(i)), format='eps', dpi=1200, bbox_inches='tight')
+        plt.close(fig)
+        plt.clf()
+
+        # 2. Event trajectory
+        fig = plt.figure()
+        plt.xlim(0.0, n_days)
+        plt.plot(days, event_trajectory)
+        plt.xlabel('Days (relative to 1/1/2014)')
+        plt.ylabel('DFIDF')
+        plt.legend()
+        plt.tight_layout()
+
+        fig.set_size_inches(cm2inch(14, 8))
+        fig.savefig(os.path.join(dirname, '{:d}_trajectory.eps'.format(i)), format='eps', dpi=1200, bbox_inches='tight')
+        plt.close(fig)
+        plt.clf()
+
+        # 3. Event trajectory with bursty periods
+        fig = plt.figure()
+        plt.xlim(0.0, n_days)
+        plt.plot(days, event_trajectory)
+
+        if event_period > np.ceil(n_days / 2):
+            # Aperiodic
+            mean, std = post.estimate_distribution_aperiodic(event_trajectory)
+
+            burst_start = int(max(np.floor(mean - std), 0))
+            burst_end = int(min(np.ceil(mean + std), n_days - 1))
+            burst_loc = (burst_start + burst_end) / 2
+
+            xticks_pos = [burst_loc]
+            xticks = [('{:.01f}'.format(burst_loc))]
+            plt.axvline(burst_start, color='b')
+            plt.axvline(burst_end, color='b')
+            plt.xticks(xticks_pos, xticks)
+        else:
+            # Periodic
+            params = post.estimate_distribution_periodic(event_trajectory, event_period)
+
+            xticks_pos = []
+            xticks = []
+
+            for mean, std in params:
+                burst_start = int(max(np.floor(mean - std), 0))
+                burst_end = int(min(np.ceil(mean + std), n_days - 1))
+                burst_loc = (burst_start + burst_end) / 2
+
+                xticks_pos.extend([burst_loc])
+                xticks.extend([('{:.01f}'.format(burst_loc))])
+
+                where = np.zeros(n_days, dtype=bool)
+                where[burst_start:burst_end + 1] = True
+                plt.fill_between(days, event_trajectory, where=where, color='#2b93db')
+
+            plt.xticks(xticks_pos, xticks)
+
+        plt.xlabel('Days (relative to 1/1/2014)')
+        plt.ylabel('DFIDF')
+        plt.legend()
+        plt.tight_layout()
+
+        fig.set_size_inches(cm2inch(14, 8))
+        fig.savefig(os.path.join(dirname, '{:d}_trajectory_bursts.eps'.format(i)), format='eps', dpi=1200, bbox_inches='tight')
+        plt.close(fig)
+        plt.clf()
+
+        # 4. Event trajectory with cutoff
+        fig = plt.figure()
+        plt.xlim(0.0, n_days)
+        plt.plot(days, event_trajectory)
+
+        ma = moving_average(event_trajectory, 7)
+        ma_mean = np.mean(ma)
+        ma_std = np.std(ma)
+        cutoff = ma_mean + ma_std
+
+        plt.hlines(cutoff, 0, n_days, colors='red', linestyles='dashed', linewidth=1.5)
+
+        plt.xlabel('Days (relative to 1/1/2014)')
+        plt.ylabel('DFIDF')
+        plt.legend()
+        plt.tight_layout()
+
+        fig.set_size_inches(cm2inch(14, 8))
+        fig.savefig(os.path.join(dirname, '{:d}_trajectory_cutoff.eps'.format(i)), format='eps', dpi=1200, bbox_inches='tight')
+        plt.close(fig)
+        plt.clf()
+
+        # 5. Periodogram
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        plt.xlim(0.0, freqs[-1])
+        ax.plot(freqs, pgram[i])
+
+        plt.xlabel('Frequency')
+        plt.ylabel('Periodogram')
+        plt.legend()
+        plt.tight_layout()
+        import matplotlib.ticker as mtick
+        ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
+
+        fig.set_size_inches(cm2inch(14, 8))
+        fig.savefig(os.path.join(dirname, '{:d}_periodogram.eps'.format(i)), format='eps', dpi=1200, bbox_inches='tight')
+        plt.close(fig)
+        plt.clf()
+
+        # 6. Trajectory with density fit.
+        fig = plt.figure()
+        plt.xlim(0.0, n_days)
+        x = np.linspace(0.0, n_days, 1000)
+        normalized_trajectory = event_trajectory / np.sum(event_trajectory)
+
+        if event_period > np.ceil(n_days / 2):
+            # Aperiodic
+            mean, std = post.estimate_distribution_aperiodic(event_trajectory)
+
+            def gaussian_curve(value, loc, scale):
+                return norm.pdf(value, loc=loc, scale=scale)
+
+            burst_start = int(max(np.floor(mean - std), 0))
+            burst_end = int(min(np.ceil(mean + std), n_days - 1))
+            burst_loc = (burst_start + burst_end) / 2
+
+            pdf = gaussian_curve(x, mean, std)
+            plt.plot(days, normalized_trajectory)
+            plt.plot(x, pdf, 'r')
+
+            where = np.zeros(len(x), dtype=bool)
+            where[(x >= burst_start) & (x <= burst_end)] = True
+            plt.fill_between(x, pdf, where=where, color='#ff7f7f')
+
+            xticks_pos = [burst_loc]
+            xticks = ['{:.01f}'.format(mean)]
+            plt.xticks(xticks_pos, xticks)
+        else:
+            # Periodic
+            params = post.estimate_distribution_periodic(event_trajectory, event_period)
+
+            xticks_pos = []
+            xticks = []
+            where = np.zeros(len(x), dtype=bool)
+
+            for mean, std in params:
+                burst_start = int(max(np.floor(mean - std), 0))
+                burst_end = int(min(np.ceil(mean + std), n_days - 1))
+                burst_loc = (burst_start + burst_end) / 2
+
+                xticks_pos.append(burst_loc)
+                xticks.append('{:.01f}'.format(mean))
+
+                where[(x >= burst_start) & (x <= burst_end)] = True
+
+            plt.xticks(xticks_pos, xticks)
+
+            observations = np.hstack((days.reshape(-1, 1), event_trajectory.reshape(-1, 1)))
+            observations = observations[observations[:, 1] > cutoff, :]
+
+            n_components = int(min(np.floor(n_days / event_period), len(observations)))
+            g = gmm.GaussianMixture(n_components=n_components, covariance_type='diag')
+            g.fit(observations)
+
+            components = np.squeeze(np.array(
+                [cauchy.pdf(x, mean[0], np.sqrt(2 * np.log(2)) * np.sqrt(cov[0])) for mean, cov in
+                 zip(g.means_, g.covariances_)]))
+
+            pdf = g.weights_ @ components
+            plt.fill_between(x, pdf, where=where, color='#ff7f7f')
+
+            plt.plot(days, normalized_trajectory)
+            plt.plot(x, pdf, 'r')
+
+        plt.xlabel('Days (relative to 1/1/2014)')
+        plt.ylabel('DFIDF')
+        plt.legend()
+        plt.tight_layout()
+
+        fig.set_size_inches(cm2inch(14, 8))
+        fig.savefig(os.path.join(dirname, '{:d}_density_fit.eps'.format(i)), format='eps', dpi=1200,
+                    bbox_inches='tight')
+        plt.close(fig)
+        plt.clf()
+
+
+def plot_original_event(trajectories, word2id):
+    dirname = '../EVENTS_OUT'
+
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    # font = {'family': 'normal',
+    #         'size': 12}
+    #
+    # matplotlib.rc('font', **font)
+
+    words = ['palestinský', 'izraelský', 'Palestinec', 'Izrael']
+
+    fig = plt.figure()
+    n_days = trajectories.shape[1]
+    days = np.arange(n_days)
+
+    for word in words:
+        idx = word2id[word]
+
+        plt.plot(days, trajectories[idx], label=word, linewidth=1)
+
+    plt.xlim(0.0, n_days)
+    plt.xlabel('Days (relative to 1/1/2014)')
+    plt.ylabel('DFIDF')
+    plt.legend()
+    plt.tight_layout()
+
+    fig.set_size_inches(cm2inch(14, 8))
+    fig.savefig(os.path.join(dirname, 'original_event.eps'), format='eps', dpi=1200, bbox_inches='tight')
+
+
+def plot_greedy_event(trajectories, word2id):
+    dirname = '../EVENTS_OUT'
+
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    # font = {'family': 'normal',
+    #         'size': 12}
+    #
+    # matplotlib.rc('font', **font)
+
+    words = ['sestřelit', 'raketa', 'Izrael', 'izraelský']
+
+    fig = plt.figure()
+    n_days = trajectories.shape[1]
+    days = np.arange(n_days)
+
+    for word in words:
+        idx = word2id[word]
+
+        plt.plot(days, trajectories[idx], label=word, linewidth=1)
+
+    plt.xlim(0.0, n_days)
+    plt.xlabel('Days (relative to 1/1/2014)')
+    plt.ylabel('DFIDF')
+    plt.legend()
+    plt.tight_layout()
+
+    fig.set_size_inches(cm2inch(14, 8))
+    fig.savefig(os.path.join(dirname, 'greedy_event.eps'), format='eps', dpi=1200, bbox_inches='tight')
+
+
+def plot_cluster_event(trajectories, word2id):
+    dirname = '../EVENTS_OUT'
+
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    # font = {'family': 'normal',
+    #         'size': 12}
+    #
+    # matplotlib.rc('font', **font)
+
+    words = ['Gaza', 'Hamas', 'Izrael', 'Izraelec', 'Palestinec', 'izraelský', 'palestinský']
+
+    fig = plt.figure()
+    n_days = trajectories.shape[1]
+    days = np.arange(n_days)
+
+    for word in words:
+        idx = word2id[word]
+
+        plt.plot(days, trajectories[idx], label=word, linewidth=1)
+
+    plt.xlim(0.0, n_days)
+    plt.xlabel('Days (relative to 1/1/2014)')
+    plt.ylabel('DFIDF')
+    plt.legend()
+    plt.tight_layout()
+
+    fig.set_size_inches(cm2inch(14, 8))
+    fig.savefig(os.path.join(dirname, 'cluster_event.eps'), format='eps', dpi=1200, bbox_inches='tight')
+
+
 def plot_aperiodic_words(trajectories, dps, dp, dps_boundary, stream_length, id2word, dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
