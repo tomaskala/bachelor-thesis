@@ -9,3 +9,16 @@ We present an unsupervised framework for retrospective event detection from text
 \\
 \\
 \textbf{Keywords:} Document retrieval, event detection, multi-document summarization, word embedding.
+
+\hfill
+
+\begin{center}
+	\Large
+	\textbf{Abstrakt}
+\end{center}
+
+
+Popíšeme systém pro retrospektivní detekci událostí z kolekcí textových dokumentů fungující bez učitele. Proces detekce událostí je založen na předpokladu, že slova vyskytující se v podobných dokumentech a časových intervalech se pravděpodobně vztahují ke stejné události, která se udála ve světě. Metoda se tedy snaží shlukovat dohromady slova s podobnou časovou nebo sémantickou charakteristikou a zároveň ignorovat slova nenesoucí žádnou informaci. To vede k jednoduché reprezentaci událostí pomocí skupin klíčových slov. Tato klíčová slova jsou následně použita k dotazu do zkoumané kolekce a získání dokumentů vztahujících se k jednotlivým událostem. Z těchto dokumentů nakonec extrahujeme krátká shrnutí, pomocí kterých popíšeme události lidsky čitelným způsobem. Fáze získávání klíčových slov je založena na existujícím postupu který modifikujeme použitím modelu vnořování slov (word embedding) k měření sémantické podobnosti. Metoda je vyhodnocena na kolekci 2 milionů dokumentů z českých novinových serverů vydané za období 13 měsíců, a porovnána s původním postupem nevyžadujícím vnořování slov.
+\\
+\\
+\textbf{Klíčová slova:} Získávání dokumentů, detekce událostí, sumarizace více dokumentů, word embedding.

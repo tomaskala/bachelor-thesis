@@ -1,0 +1,141 @@
+Below are several examples of events detected by the three methods. For each method, we provide examples of well formed event summaries as well as those of poor quality. The full outputs for all detected events can be found on the DVD. These examples serve purely to illustrate the various events found using the individual methods.
+
+For each event, we provide the keyword set with only the first few keywords to save space. Then, for each event burst, we list its date, headline of the most similar document, and the generated summary with maximum length of 60 words.
+
+\section{Original method}
+\subsection*{Well formed events}
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+
+\bf 1. Charlie, Hebdo \\ \midrule
+\bf Jan 6 - Jan 16, 2015 \\ \midrule
+\bf V centru Paříže se střílelo ve jménu Mohameda, 10 mrtvých \\
+Nejméně deset mrtvých si dnes vyžádala střelba v pařížském sídle satirického týdeníku Charlie Hebdo, uvedla francouzská prokuratura. si dnes vyžádala střelba v pařížském sídle satirického týdeníku Charlie Hebdo. V redakci satirického listu Charlie Hebdo v Paříži se střílelo. Paříž - Francie se vzpamatovává z brutálního útoku na redakci satirického týdeníku Charlie Hebdo. \\ \bottomrule[1.25pt]
+\end{tabularx}
+
+\hspace{\fill}
+
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+\bf 2. KDU-ČSL, lidovec \\ \midrule
+\bf Jan 4 - Feb 22, 2014 \\ \midrule
+\bf Koalice Náměstci, třeste se! \\
+Vašimi koaličními partnery jsou ANO a KDU-ČSL. Vláda bude mít 17 členů. Již před Vánoci zveřejnili své nominanty lidovci. Kandidáti hnutí ANO a KDU-ČSL na ministry jsou již známi. KDU-ČSL je stranou, která se často ohání tradicí. ANO i KDU-ČSL budou mít po jenom vicepremiérovi. ANO: Lidovci, rozhodněte se! \\ \bottomrule[1.25pt]
+
+\bf May 16 - Jul 27, 2014 \\ \midrule
+\bf Eurovolby 2014 s Janem Kellerem (ČSSD) a Pavlem Svobodou (KDU-ČSL) \\
+KDU-ČSL zveřejnila program, se kterým jde do voleb. Proti návrhu je opozice i lidovci. Má podporu zelených a lidovců. To je ale podle lidovců málo. Nové slevy na druhé dítě jsou podle lidovců slabé. Pro lidovce je to však málo. Lidovci nepodpoří Babišovy daňové změny. Lidovcům se to ale zdá málo. \\ \bottomrule[1.25pt]
+
+\bf Oct 11 - Oct 31, 2014 \\ \midrule
+\bf SedmiDeník Uplynulý týden očima Kateřiny Perknerové \\
+KDU-ČSL kandidují v hlavním městě v Trojkoalici. Zvítězila zde jediná volební kandidátka KDU-ČSL. Věří, že lidovci v obou hlasováních posílí. Lidovci kandují ve dvaceti volebních obvodech. Kandidáti KDU-ČSL vítězili ve třech obvodech, ve dvou pak vedou společní kandidáti lidovců a Strany Zelených. Po sečtení poloviny hlasů vede v komunálních volbách KDU-ČSL. \\ \bottomrule[1.25pt]
+
+\end{tabularx}
+
+\hspace{\fill}
+
+\subsection*{Poor quality events}
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+
+\bf 1. bodovat, děkovat \\ \midrule
+\bf Oct 19 - Dec 31, 2014 \\ \midrule
+\bf Beránek Začali jsme hrozně. Nevěřil jsem vlastním očím \\
+Hemingway bar neboduje jen ve světě. Odpověď zní ``Ne děkuji. V anketě bodovalo divadlo všech žánrů. Pardubice naopak počtvrté za sebou nebodovaly. Východočeši nebodovali už počtvrté za sebou. Réway: Za výhru můžeme děkovat Rasťovi. Mají sílu a teď několikrát za sebou bodovali. JESENÍK BODOVAL V SOUTĚŽI ELEKTROOSKAR. \\ \bottomrule[1.25pt]
+\end{tabularx}
+
+\hspace{\fill}
+
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+\bf 2. Čína, čínský \\ \midrule
+\bf Apr 19 - Jun 11, 2014 \\ \midrule
+\bf Po přidružení k EU se Ukrajina stane jen vývozcem pracovní síly...? (Břetislav Olšer) \\
+Nad Čínou se stahují mračna. Na vině je dovoz z Číny. Výsledek je tedy čínskou kopii jiné čínské kopie amerického vozu. McLarenu se v Číně nedaří. V Číně začíná mezinárodní autosalon. Prodej aut v Číně dál poroste. V Číně v sobotu začal mezinárodní autosalon. Fiat bude vyrábět modely Jeep v Číně. \\ \bottomrule[1.25pt]
+
+\bf Oct 10 - Dec 23, 2014 \\ \midrule
+\bf Nobelovu cenu za literaturu získal francouzský spisovatel Patrick Modiano \\
+Ta bude pod čínskou dominancí a řízená z Pekingu. Vháníme Rusko do náruče Číny. Komunismus je i v Číně, proto je špatná. A doplatí na to výrobci. Ti všichni věří v potenciál růstu čínského akciového trhu. Tento problém už ale bude řešit čínská strana. Ta se v Číně odehraje již dnes. \\ \bottomrule[1.25pt]
+
+\end{tabularx}
+
+\hspace{\fill}
+
+
+\section{Embedded-greedy method}
+\subsection*{Well formed events}
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+
+
+\bf 1. předplatné, vložit, Václav, Havel, číslo, náměstí, pražský, výročí... \\ \midrule
+\bf Oct 26 - Dec 15, 2014 \\
+\bf Knihovna Václava Havla slaví 25. výročí sametové revoluce \\
+Pro mě to nebyla až taková událost. Hodnotí nejsoučasnější události v Evropě. StB navrhovala zabít Václava Havla. Knihovna Václava Havla slaví 25. výročí sametové revoluce. Oslavy sametové revoluce pohlídají v Praze stovky policistů. Kroměříž si na náměstí připomene výročí revoluce i Karla Kryla. Psali jsme: Čas pracuje pro Václava Havla. \\ \bottomrule[1.25pt]
+
+\end{tabularx}
+
+\hspace{\fill}
+
+\subsection*{Poor quality events}
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+
+\bf 1. únor, březen, loňský, vloni \\ \midrule
+\bf Feb 1 - Mar 25, 2014 \\ \midrule
+\bf V březnu \\
+Co se stalo 20. února? Při loňské razii u Nagyové našla policie šperky za miliony. Tak máme pomalu konec února, jemuž je autor těchto řádků zvyklý říkat úmor. Vyšlo nové vydání Solidarity na únor/březen. Podle nejnovějších zpráv (z 1. března) město Brno povolilo výstavbu skladu Amozonu. \\ \bottomrule[1.25pt]
+\end{tabularx}
+
+\hspace{\fill}
+
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+\bf 2. útok, oběť, zemřít, boj, těžký, dítě, skončit, Německo... \\ \midrule
+\bf Apr 2 - Nov 4, 2014 \\ \midrule
+\bf Příměří v Gaze vydrželo dvě hodiny, Izrael pokračuje v bojích. Zemřelo 27 Palestinců \\
+Bakterie mají hodiny, které je probudí, když skončí útok antibiotiky. Bakterie mají hodiny, jež je probudí, když skončí útok antibiotiky. Posádka druhého vozu skončila s těžkými zraněními v nemocnici. Těžká nehoda autobusu: Řidič zemřel, těhotná žena skončila popálená! V nemocnici skončilo 33 lidí, tři z nich jsou děti. \\ \bottomrule[1.25pt]
+
+\bf Jan 6 - Jan 26, 2015 \\ \midrule
+\bf OBRAZEM Francie vzpomíná na oběti útoků \\
+Podle informací deníku Le Monde zemřelo 12 lidí. Zemřelo nejméně 12 lidí, z toho dva policisté. Obama se poklonil obětem pařížského útoku. Útočníci byli Francouzi, narození ve Francii. Část z nich v bojích padla, ale asi 180 radikálů se vrátilo do Německa. Boj proti terorismu: Francie se zbláznila. \\ \bottomrule[1.25pt]
+
+\end{tabularx}
+\hspace{\fill}
+
+
+\section{Cluster-based method}
+\subsection*{Well formed events}
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+\bf 1. Gaza, Hamas, Izrael, Izraelec, Palestinec, izraelský, palestinský \\ \midrule
+\bf Apr 28 - Sep 20, 2014 \\ \midrule
+\bf Izrael vs. Hamás 3.0 \\
+Palestinský Hamas oznámí příměří s Izraelem. Izraelci zaútočili na deset cílů v palestinském Pásmu Gazy. Izraelské nálety na Gazu zabily devět Palestinců. Izraelské tanky vjely do Gazy. Hamas prý v pásmu Gazy zadržel izraelského vojáka. Podle Izraele padl do rukou palestinského Hamasu. Izraelci při útoku na Gazu zabili tři velitele Hamasu. \\ \bottomrule[1.25pt]
+
+\bf Dec 19 - Dec 21, 2014 \\ \midrule
+\bf Izrael v pásmu Gazy zaútočil na Hamas \\
+Izrael v pátek odpoledne oznámil, že Palestinci odpálili z Gazy raketu Kásam. GAZA - Izraelská armáda provedla letecký úder v pásmu Gazy, jehož cílem bylo palestinské hnutí Hamas. Autor: ČTK. Gaza - Izraelská armáda provedla letecký úder v pásmu Gazy, jehož cílem bylo palestinské hnutí Hamas. Přesto s Hamásem nic neudělá. \\ \bottomrule[1.25pt]
+\end{tabularx}
+
+\hspace{\fill}
+
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+\bf 2. Ebola, Guinea, Leone, Libérie, Sierra, ebola, epidemie \\ \midrule
+\bf Sep 28 - Oct 29, 2014 \\ \midrule
+\bf Epidemie eboly \\
+Ebola nejdříve propukla v Guineji. Nejvíce postižené země jsou Sierra Leone, Guinea a Libérie. Libérie je spolu se Sierrou Leone a Guineou nejpostiženější ze západoafrických zemí. Zatím epidemie eboly hlavně postihovala východ Sierra Leone. Libérie patří k zemím nejvíce zasaženým epidemií eboly. WHO: Epidemie eboly v Libérii začala ustupovat. \\ \bottomrule[1.25pt]
+\end{tabularx}
+\hspace{\fill}
+
+\subsection*{Poor quality events}
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+\bf 1. Adriano, Krnáčová, primátorka \\ \midrule
+\bf Oct 12 - Dec 1, 2014 \\ \midrule
+\bf Pražskou primátorkou bude Adriana Krnáčová z ANO \\
+Novou pražskou primátorkou bude Adriana Krnáčová. Primátorkou Prahy bude Adriana Krnáčová (ANO). Novou pražskou primátorkou bude Adriana Krnáčová z ANO. Novou pražskou primátorkou bude Adriana Krnáčová z ANO. Adriana Krnáčová je původem ze Slovenska. Pražskou primátorkou byla zvolena Adriana Krnáčová z hnutí ANO. Bratislavská rodačka Adriana Krnáčová je primátorkou Prahy. \\ \bottomrule[1.25pt]
+\end{tabularx}
+
+\hspace{\fill}
+
+\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
+\bf 2. extra, podnik, reklama, siga, zpravodajství \\ \midrule
+\bf Oct 10 - Dec 3, 2014 \\ \midrule
+\bf Maturus o. p. s. \\
+Jaké reklamy na vás působí nejvíce? Reklama na mě nemá téměř žádný vliv. Televize Barrandov v listopadu rozšíří zpravodajství. Některé reklamy jsou hodně odvážné. Jaké se ti líbí reklamy? 4. Jaké se ti líbí reklamy ? 9. Zajímavá jsou zjištění ohledně televizní reklamy. Tyto reklamy se mi líbí. 3. \\ \bottomrule[1.25pt]
+\end{tabularx}
+
+
+\hspace{\fill}
