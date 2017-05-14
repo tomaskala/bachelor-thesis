@@ -14,9 +14,19 @@ from sklearn.neighbors import NearestNeighbors
 
 import event_detection.postprocessing as post
 from event_detection import annotations, data_fetchers
-from event_detection.original_method import moving_average
 
 matplotlib.rc('font', family='DejaVu Sans')
+
+
+def moving_average(vector, window):
+    """
+    Compute the moving average along the given vector using a window of the given length.
+    :param vector: the vector whose moving average to compute
+    :param window: length of the window to use in the computation
+    :return: moving average of length len(vector) - window + 1
+    """
+    weights = np.ones(window) / window
+    return np.convolve(vector, weights, 'valid')
 
 
 def visualise_clusters(clusters, documents, output_dir='./wordcloud'):
