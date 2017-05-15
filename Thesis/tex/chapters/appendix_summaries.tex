@@ -1,18 +1,27 @@
-Below are several examples of events detected by the three methods. For each method, we provide examples of well formed event summaries as well as those of poor quality. The full outputs for all detected events can be found on the DVD. These examples serve purely to illustrate the various events found using the individual methods.
+Below are several examples of events detected by the three methods. For each method, we provide examples of Well-formed event summaries as well as those of poor quality. The full outputs for all detected events can be found on the DVD. These examples serve purely to illustrate the various events found using the individual methods.
 
 For each event, the first few keywords are shown to save space. Then, for each event burst, we list its date, headline of the most similar document, and the generated summary with a maximum length of 60 words.
 
 \section{Original method}
-\subsection*{Well formed events}
+\subsection*{Well-formed events}
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
 
-\bf 1. Charlie, Hebdo \\ \midrule
-\bf Jan 6 - Jan 16, 2015 \\ \midrule
-\bf V centru Paříže se střílelo ve jménu Mohameda, 10 mrtvých \\
-Nejméně deset mrtvých si dnes vyžádala střelba v pařížském sídle satirického týdeníku Charlie Hebdo, uvedla francouzská prokuratura. si dnes vyžádala střelba v pařížském sídle satirického týdeníku Charlie Hebdo. V redakci satirického listu Charlie Hebdo v Paříži se střílelo. Paříž - Francie se vzpamatovává z brutálního útoku na redakci satirického týdeníku Charlie Hebdo. \\ \bottomrule[1.25pt]
+\bf 1. let, mha \\ \midrule
+\bf Mar 11 - Apr 2, 2014 \\ \midrule
+\bf Pátrání po malajském boeingu pokračuje \\
+Což měl údajně být i případ jednoho z lidí v malajsijském letu MH 370. Jsou však značně vzdálené od plánované trasy letu MH 370. Neřekl jsem, že to byl let MH 370. Záhada letu MH 370 pokračuje. Záhada letu MH 370 tak pokračuje. Záhada letu MH 370 trvá. \\ \bottomrule[1.25pt]
+
+\bf Jul 18 - Jul 28, 2014 \\ \midrule
+\bf Na Ukrajině byl nejspíš sestřelen malajsijský boeing, více než 300 obětí \\
+Zpravodajství o tragickém letu MH 17 najdete v listě. Sestřelení letu MH 17 nadále sledujeme online. Redaktor CNN ukazuje dráhu letu MH 17. Byl MH 17 skutečně sestřelen? Na palubě letu MH 17 bylo podle malajsijského ministra dopravy 298 lidí. Sestřelení letu MH 17 by mu tedy takovou cestu mohlo otevřít. \\ \bottomrule[1.25pt]
+
+\bf Aug 14, 2014 - Jan 5, 2015 \\ \midrule
+\bf První zpráva o tragédii letu MH 17 na Ukrajině bude v září \\
+První zpráva o tragédii letu MH 17 bude v září. Boeing MH 370 také několikrát prudce změnil výšku. Bratr mi zmizel při letu MH 370, dcera zahynula v MH 17, pláče. Ukrajinská armáda prokazatelně BUKy měla a byly v dobu letu MH 17 aktivní. Separatistka se nalíčila řasenkou oběti letu MH 17. \\ \bottomrule[1.25pt]
+
 \end{tabularx}
 
-\hspace{\fill}
+\par
 
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
 \bf 2. KDU-ČSL, lidovec \\ \midrule
@@ -30,7 +39,7 @@ KDU-ČSL kandidují v hlavním městě v Trojkoalici. Zvítězila zde jediná vo
 
 \end{tabularx}
 
-\hspace{\fill}
+\par
 
 \subsection*{Poor quality events}
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
@@ -41,7 +50,7 @@ KDU-ČSL kandidují v hlavním městě v Trojkoalici. Zvítězila zde jediná vo
 Hemingway bar neboduje jen ve světě. Odpověď zní ``Ne děkuji. V anketě bodovalo divadlo všech žánrů. Pardubice naopak počtvrté za sebou nebodovaly. Východočeši nebodovali už počtvrté za sebou. Réway: Za výhru můžeme děkovat Rasťovi. Mají sílu a teď několikrát za sebou bodovali. JESENÍK BODOVAL V SOUTĚŽI ELEKTROOSKAR. \\ \bottomrule[1.25pt]
 \end{tabularx}
 
-\hspace{\fill}
+\par
 
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
 \bf 2. Čína, čínský \\ \midrule
@@ -55,13 +64,13 @@ Ta bude pod čínskou dominancí a řízená z Pekingu. Vháníme Rusko do náru
 
 \end{tabularx}
 
-\hspace{\fill}
+\par
 
 
 \section{Embedded-greedy method}
-\subsection*{Well formed events}
+\subsection*{Well-formed events}
 
-\hspace{\fill}
+\par
 
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
 \bf 1. sankce, konflikt, Putin, Moskva, západ, východ, armáda, vojenský... \\ \midrule
@@ -71,27 +80,15 @@ Demonstranti v Moskvě žádali Putina o vojenský zásah na Ukrajině. Merkelov
 
 \end{tabularx}
 
-\hspace{\fill}
+\par
 
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
-
-\bf 2. let, mha \\ \midrule
-\bf Mar 11 - Apr 2, 2014 \\ \midrule
-\bf Pátrání po malajském boeingu pokračuje \\
-Což měl údajně být i případ jednoho z lidí v malajsijském letu MH 370. Jsou však značně vzdálené od plánované trasy letu MH 370. Neřekl jsem, že to byl let MH 370. Záhada letu MH 370 pokračuje. Záhada letu MH 370 tak pokračuje. Záhada letu MH 370 trvá. \\ \bottomrule[1.25pt]
-
-\bf Jul 18 - Jul 28, 2014 \\ \midrule
-\bf Na Ukrajině byl nejspíš sestřelen malajsijský boeing, více než 300 obětí \\
-Zpravodajství o tragickém letu MH 17 najdete v listě. Sestřelení letu MH 17 nadále sledujeme online. Redaktor CNN ukazuje dráhu letu MH 17. Byl MH 17 skutečně sestřelen? Na palubě letu MH 17 bylo podle malajsijského ministra dopravy 298 lidí. Sestřelení letu MH 17 by mu tedy takovou cestu mohlo otevřít. \\ \bottomrule[1.25pt]
-
-\bf Aug 14 - Jan 5, 2015 \\ \midrule
-\bf První zpráva o tragédii letu MH 17 na Ukrajině bude v září \\
-První zpráva o tragédii letu MH 17 bude v září. Boeing MH 370 také několikrát prudce změnil výšku. Bratr mi zmizel při letu MH 370, dcera zahynula v MH 17, pláče. Ukrajinská armáda prokazatelně BUKy měla a byly v dobu letu MH 17 aktivní. Separatistka se nalíčila řasenkou oběti letu MH 17. \\ \bottomrule[1.25pt]
-
+\bf 2. předplatné, vložit, Václav, Havel, číslo, náměstí, pražský, výročí... \\ \midrule
+\bf Oct 26 - Dec 15, 2014 \\ \bf Knihovna Václava Havla slaví 25. výročí sametové revoluce \\
+Pro mě to nebyla až taková událost. Hodnotí nejsoučasnější události v Evropě. StB navrhovala zabít Václava Havla. Knihovna Václava Havla slaví 25. výročí sametové revoluce. Oslavy sametové revoluce pohlídají v Praze stovky policistů. Kroměříž si na náměstí připomene výročí revoluce i Karla Kryla. Psali jsme: Čas pracuje pro Václava Havla. \\ \bottomrule[1.25pt]
 \end{tabularx}
 
-\hspace{\fill}
-\newpage
+\par
 
 \subsection*{Poor quality events}
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
@@ -102,7 +99,8 @@ První zpráva o tragédii letu MH 17 bude v září. Boeing MH 370 také někol
 Co se stalo 20. února? Při loňské razii u Nagyové našla policie šperky za miliony. Tak máme pomalu konec února, jemuž je autor těchto řádků zvyklý říkat úmor. Vyšlo nové vydání Solidarity na únor/březen. Podle nejnovějších zpráv (z 1. března) město Brno povolilo výstavbu skladu Amozonu. \\ \bottomrule[1.25pt]
 \end{tabularx}
 
-\hspace{\fill}
+\par
+\newpage
 
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
 \bf 2. útok, oběť, zemřít, boj, těžký, dítě, skončit, Německo... \\ \midrule
@@ -115,11 +113,11 @@ Bakterie mají hodiny, které je probudí, když skončí útok antibiotiky. Bak
 Podle informací deníku Le Monde zemřelo 12 lidí. Zemřelo nejméně 12 lidí, z toho dva policisté. Obama se poklonil obětem pařížského útoku. Útočníci byli Francouzi, narození ve Francii. Část z nich v bojích padla, ale asi 180 radikálů se vrátilo do Německa. Boj proti terorismu: Francie se zbláznila. \\ \bottomrule[1.25pt]
 
 \end{tabularx}
-\hspace{\fill}
+\par
 
 
 \section{Cluster-based method}
-\subsection*{Well formed events}
+\subsection*{Well-formed events}
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
 \bf 1. Gaza, Hamas, Izrael, Izraelec, Palestinec, izraelský, palestinský \\ \midrule
 \bf Apr 28 - Sep 20, 2014 \\ \midrule
@@ -131,7 +129,8 @@ Palestinský Hamas oznámí příměří s Izraelem. Izraelci zaútočili na des
 Izrael v pátek odpoledne oznámil, že Palestinci odpálili z Gazy raketu Kásam. GAZA - Izraelská armáda provedla letecký úder v pásmu Gazy, jehož cílem bylo palestinské hnutí Hamas. Autor: ČTK. Gaza - Izraelská armáda provedla letecký úder v pásmu Gazy, jehož cílem bylo palestinské hnutí Hamas. Přesto s Hamásem nic neudělá. \\ \bottomrule[1.25pt]
 \end{tabularx}
 
-\hspace{\fill}
+\par
+\newpage
 
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
 \bf 2. Ebola, Guinea, Leone, Libérie, Sierra, ebola, epidemie \\ \midrule
@@ -139,15 +138,7 @@ Izrael v pátek odpoledne oznámil, že Palestinci odpálili z Gazy raketu Kása
 \bf Epidemie eboly \\
 Ebola nejdříve propukla v Guineji. Nejvíce postižené země jsou Sierra Leone, Guinea a Libérie. Libérie je spolu se Sierrou Leone a Guineou nejpostiženější ze západoafrických zemí. Zatím epidemie eboly hlavně postihovala východ Sierra Leone. Libérie patří k zemím nejvíce zasaženým epidemií eboly. WHO: Epidemie eboly v Libérii začala ustupovat. \\ \bottomrule[1.25pt]
 \end{tabularx}
-\hspace{\fill}
-
-\begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
-\bf 3. Skotsko, skotský \\ \midrule
-\bf Sep 13 - Sep 23, 2014 \\ \midrule
-\bf Skotsko \\
-Možné skotské sbohem děsí Británii. Skotsko není chudou částí Velké Británie. Udrží si nezávislé Skotsko britskou libru? Tomu věří i skotská opozice. Oddělí se Skotsko od Velké Británie? Odchod Skotska by byl fatální. Skotsko rozhoduje o své nezávislosti. Skotský premiér Alex Salmond prosazoval osamostatnění. Referendum ve Skotsku neproběhlo podle pravidel. \\ \bottomrule[1.25pt]
-\end{tabularx}
-\hspace{\fill}
+\par
 
 \subsection*{Poor quality events}
 
@@ -158,9 +149,7 @@ Možné skotské sbohem děsí Británii. Skotsko není chudou částí Velké B
 Jaké reklamy na vás působí nejvíce? Reklama na mě nemá téměř žádný vliv. Televize Barrandov v listopadu rozšíří zpravodajství. Některé reklamy jsou hodně odvážné. Jaké se ti líbí reklamy? 4. Jaké se ti líbí reklamy ? 9. Zajímavá jsou zjištění ohledně televizní reklamy. Tyto reklamy se mi líbí. 3. \\ \bottomrule[1.25pt]
 \end{tabularx}
 
-\hspace{\fill}
-
-\newpage
+\par
 
 \begin{tabularx}{\linewidth}{p{\linewidth}} \toprule[1.5pt]
 \bf 2. Rusko, ruský \\ \midrule
@@ -178,4 +167,4 @@ Ne že by na to Rusko nemělo. Reálně není Rusko nikým vojenský ohrožován
 \end{tabularx}
 
 
-\hspace{\fill}
+\par
