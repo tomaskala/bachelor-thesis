@@ -4,17 +4,17 @@ More precisely, given a stream of text documents published over a certain time p
 
 In this thesis, we chose to modify an approach introduced by \cite{event-detection}, which is a retrospective \footnote{Discussed in \autoref{sec:related-event-detection}} method relying on event representation through keywords. These keywords are semantically related words with a similar temporal characteristic. The assumption is that related words frequently co-occurring during the same time period are representative of the same events that happened at that time.
 
-We attempt to modify this method in various ways to obtain events of higher quality. We aim for a small number of events comprised of highly relevant keywords without any underlying noise. These events should have a clear interpretation, and not be redundant of each other. To do this, we introduce a word embedding-based measure of word similarity, which will be discussed in \autoref{chap:related-work} and \autoref{chap:data-preprocessing} in more detail.
+We attempt to modify this method in various ways to obtain events of higher quality. We aim for a small number of events comprised of highly relevant keywords without any underlying noise. These events should have a clear interpretation, and not be redundant of each other. To achieve this, we introduce a word embedding-based measure of word similarity, which will be discussed in \autoref{chap:related-work} and \autoref{chap:data-preprocessing} in more detail.
 
-Once we obtain the events represented in terms of keywords, we query the document collection to also obtain the documents related to the events. We then use these documents and keywords together to generate human-readable annotations that reveal more information about the events than mere keywords.
+Once we obtain the events represented in terms of keywords, we query the document collection to also obtain the documents related to the events. We then use these documents and keywords together to generate human-readable annotations that reveal more information about the events.
 
-The rest of the thesis is organized as follows. First, in \autoref{chap:related-work}, we are going to discuss related work. Then, in \autoref{chap:data-preprocessing}, we describe the document collection used for evaluation and the preprocessing steps taken.
+The rest of the thesis is organized as follows. First, in \autoref{chap:related-work}, we discuss related work. Then, in \autoref{chap:data-preprocessing}, we describe the document collection used for evaluation and the preprocessing steps taken.
 
 In \autoref{chap:word-analysis}, we describe the original paper's procedure used to extract temporal characteristics of the individual words. These characteristics are then examined to reveal a subset of words which may be related to certain events, as opposed to generally appearing noisy words, so called \textit{stopwords}.
 
 Then, in \autoref{chap:event-detection}, we proceed to the event detection itself. Here, we describe the original method, its modification relying on word embedding and also propose an alternative algorithm for event detection.
 
-Although a set of related keywords provides a concise event representation, it is not particularly readable to the user. In \autoref{chap:document-retrieval}, we follow by interpreting each keyword set as a query to the document collection. This allows us to employ information retrieval techniques to obtain documents relevant to each event.
+Although a set of related keywords provides a concise event representation, it is not particularly readable to the user. In \autoref{chap:document-retrieval}, we follow by interpreting each keyword set as a query to the document collection. This allows us to employ Information Retrieval techniques to obtain documents relevant to each event.
 
 Since the number of documents may be still too high, we also generate a short annotation for each event. The user can quickly skim through these annotations to get an idea what the events are about, and decide which of them are worth a closer examination. This will be addressed in \autoref{chap:event-annotation}.
 
