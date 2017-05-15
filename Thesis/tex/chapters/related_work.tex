@@ -1,3 +1,8 @@
+A system encompassing event detection, subsequent document retrieval and automatic event annotation needs to tackle several issues. In particular, we need to select a suitable word embedding model to be used during the detection. Furthermore, we must decide on the detection method itself and also specify the process of relevant documents retrieval. Finally, we need to find a suitable method of annotating the detected events in a human-readable fashion.
+
+All of these concerns have been addressed in literature. Below, we provide a basic overview of the related work which was helpful for our approach.
+
+
 \section{Word embedding}
 Recently, a number of neural network models for vector space word embedding have been proposed. Perhaps the best known model is Word2Vec \citep{word2vec} by Tomáš Mikolov. Additional methods include Stanford GloVe \citep{glove}, WordRank \citep{wordrank} and FastText \citep{fasttext}.
 
@@ -8,7 +13,7 @@ The Word2Vec model has additionally been modified to support embedding whole doc
 \section{Event detection} \label{sec:related-event-detection}
 Although our method is evaluated on a news collection, the documents do not necessarily have to come from a formal news source. A lot of work has also been published in event detection by analyzing tweets, an overview can be found in \cite{twitter-survey}, other examples being \cite{ifrim} and \cite{brigadir}. \cite{twitter-survey} also distinguish between \textit{retrospective} and \textit{online} event detection. The former analyzes a given collection of documents to discover past events, the latter (also known as \textit{First Story Detection}) tries to classify continuously incoming texts into ``old'' documents concerning events already known, and ``new'' documents concerning events not yet seen.
 
-Further distinction can be made based on event representation. Some methods directly compare documents by their content and temporal similarity \citep{document-bursty-representation}, outputting an event as a set of documents. Others, such as \cite{parameter-free, event-detection, health-events} and our method included, represent the events by clusters of keywords related semantically and temporarily to each other.
+Further distinction can be made based on event representation. Some methods directly compare documents by their content and temporal similarity \citep{document-bursty-representation}, outputting an event as a set of documents. Others, such as \cite{parameter-free, event-detection, health-events} and our method included, represent the events by clusters of semantically and temporarily related keywords.
 
 Additional work has also been done in event detection through topic modeling \citep{chaney, keane}. Topic modeling will be briefly addressed in the next section.
 
