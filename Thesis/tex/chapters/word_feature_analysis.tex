@@ -55,7 +55,7 @@ We compare the trajectories of a typical eventful word and a stopword in \autore
 We ignore the documents and focus entirely on word analysis up until \autoref{chap:document-retrieval}. There, we use the words assembled into events to query the document collection, obtaining the event-related documents. The core of the word analysis algorithm is taken from \cite{event-detection}.
 
 
-\section{Binary bag of words model}
+\section{Binary bag of words model} \label{sec:bowmat}
 To construct the word trajectories, we first need to know which words appear in which documents, as we are interested in the document frequency of each word. We create a binary bag of words model, which is represented by a binary matrix denoting the incidence of documents and words. This model completely ignores word order, which is neglected in this analysis.
 
 It might seem that using only a simple \textit{binary} model, as opposed to one denoting, say, the frequency of words within the documents, results in a loss of information. While true, this model is not the target word representation --- we only need to know the word-document incidence to construct the word trajectories, which are then the desired output.

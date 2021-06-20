@@ -12,6 +12,8 @@ from sklearn.cluster import DBSCAN
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import silhouette_score
 
+import gensim
+
 from event_detection import annotations, data_fetchers, plotting, postprocessing, preprocessing
 
 
@@ -242,14 +244,26 @@ def event_detection_cluster_based(global_indices, w2v_model, feature_trajectorie
             if i > j:
                 word1 = id2word[global_indices[i]]
                 word2 = id2word[global_indices[j]]
-                vec1 = w2v_model[word1]
-                vec2 = w2v_model[word2]
-                dist = np.linalg.norm(vec1 - vec2)
-                trajectory_divergence = jsd(feature_trajectories[i], feature_trajectories[j])
-                distance_matrix[i, j] = trajectory_divergence * dist
-                distance_matrix[j, i] = distance_matrix[i, j]
+
+                try:
+                    word1 = gensim.parsing.preprocessing.strip_punctuation(word1).split()[0]
+                    word2 = gensim.parsing.preprocessing.strip_punctuation(word2).split()[0]
+
+                    vec1 = w2v_model[word1]
+                    vec2 = w2v_model[word2]
+                    dist = np.linalg.norm(vec1 - vec2)
+
+                    trajectory_divergence = jsd(feature_trajectories[i], feature_trajectories[j])
+                    distance_matrix[i, j] = trajectory_divergence * dist
+                    distance_matrix[j, i] = distance_matrix[i, j]
+                except IndexError:
+                    distance_matrix[i, j] = 1e6
+                    distance_matrix[j, i] = 1e6
 
     logging.info('Precomputed word similarities in %fs.', time() - t)
+
+    distance_matrix[distance_matrix > 1e6] = 1e6
+    distance_matrix[np.isnan(distance_matrix)] = 1e6
 
     clusterer = DBSCAN(metric='precomputed', min_samples=2)
     labels = clusterer.fit_predict(distance_matrix)
@@ -447,7 +461,7 @@ def summarize_inner(events_docs_repr, events, id2word, w2v_model, file_path):
     print('Summarized the events in {:f}s.'.format(time() - t))
 
 
-DPS_BOUNDARY = 0.05  # Boundary between eventful and non-eventful words.
+DPS_BOUNDARY = 0.75  # Boundary between eventful and non-eventful words.
 DATASET = 'full'  # Dataset is shared across all document fetchers.
 # Embeddings generally need all POS tags, this removes only punctuation (Z) and unknowns (X).
 POS_EMBEDDINGS = ('A', 'C', 'D', 'I', 'J', 'N', 'P', 'V', 'R', 'T')

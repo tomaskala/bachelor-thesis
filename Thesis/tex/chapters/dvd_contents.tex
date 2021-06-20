@@ -1,0 +1,19 @@
+The attached DVD contains the Python scripts used for experimentation, logs and outputs of the event detection. Additionally, we provide the preprocessed data for running the event detection. Due to space limitations, we do not include the whole document collection in text format. Instead, we provide the serialized matrix $\bowmat$ defined in \autoref{sec:bowmat} and the relevant documents retrieved for all events. This will allow to run the detection with the settings as defined in the scripts. In addition, we provide the trained Word2Vec model.
+
+To run, the project requires Python 3.6, NumPy 1.11.3, SciPy 0.18.1, Scikit-Learn 0.18.1, Matplotlib 2.0.0, Wordcloud 1.2.1 and Gensim 1.0.1.
+
+The DVD structure is as follows:
+
+\begin{itemize}
+	\item /logs -- Log files produced during the experiments with information about running times.
+	\item /plots -- Trajectories of all detected events.
+	\item /scripts -- Python scripts used for experimentation.
+		\begin{itemize}
+			\item /scripts/event\_detection -- The main project files. Run the detection through the main.py file.
+			\item /scripts/notebooks -- Jupyter notebooks used for testing.
+			\item /utils -- Simple utility scripts used to collect word counts and train the Word2Vec mode
+		\end{itemize}
+	\item /summaries -- Summaries of all detected events.
+	\item /thesis -- Source codes for this thesis and its PDF version.
+	\item event\_detection\_data.zip -- Input data and trained Word2Vec model compressed into a ZIP format. Unzip to /scripts/event\_detection before running the project.
+\end{itemize}

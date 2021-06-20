@@ -1,0 +1,269 @@
+\documentclass[a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[margin=0.5in]{geometry}
+\usepackage{color}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+\title{Event Detection from the Reuters TRC2 Corpus}
+\author{Tomáš Kala}
+
+\begin{document}
+\maketitle
+
+\section{Dataset}
+The dataset used is the Reuters TRC2 corpus \footnote{http://trec.nist.gov/data/reuters/reuters.html}. It comprises 1,800,370 news stories covering the period from January 1, 2008 to February 28, 2009. Each document consists of a headline, publication date, and the news story itself. On average, the document contain 8 words per headline and 203 words per body.
+
+
+\section{Preprocessing}
+As the documents consist only of plain text, some form of preprocessing is necessary before proceeding to event detection.
+
+We first perform lemmatization and parts of speech tagging using the SpaCy package \cite{spacy}.
+
+Next, we train the popular Word2Vec model \cite{word2vec} on the lemmatized texts. The implementation used comes from the Gensim library \cite{gensim}.
+
+For the training, only punctuation symbols and words marked as unknown part of speech are discarded. The words were embedded into a 100-dimensional vector space using the skip-gram architecture, and allowing 5 passes over the collection with a 5-word window.
+
+Having done that, we proceeded to the event detection. Here, we used only words marked as Nouns, Verbs, Adjectives and Adverbs. We also filtered out any word containing special characters. This left us with a vocabulary of size 180,114 unique words.
+
+
+\section{Methods and parameters}
+
+\subsection{Common settings}
+The Dominant Power Spectrum boundary was set to 0.15, which left us with 1692 words considered for event detection. The window length for computing the moving average (Section 5.3.1 in the bachelor thesis) was set to 7.
+
+\subsection{Original method}
+No extra parameters.
+
+\subsection{Embedded-greedy method}
+No extra parameters.
+
+\subsection{Cluster-based method}
+Compared to the bachelor thesis where we used the DBSCAN algorithm \cite{dbscan}, its modification, HDBSCAN \cite{hdbscan}, proved to perform better on this dataset. After experimentation, parameters were set to $\epsilon = 1.0$, \textit{min\_samples} = 2, \textit{min\_cluster\_size} = 4.
+
+
+\section{Results}
+Results of the same evaluations as in the bachelor thesis are shown below. Compared to the Czech texts, more events with short period (7 days or lower) were detected. Such events are not usually as important as higher-periodic ones, as they usually concern sport matches, stock reports and so on. For this reason, all evaluations were done both on the detected events and on events with period higher than 7 days.
+
+Also, similarly to the bachelor thesis, the cluster-based method shows tendency to generate one or two clusters filled by words that simply did not fit anywhere else. It is possible that this behavior is due to ill-set parameters, but even after playing around with those, this tendency remained. However, these clusters are easy to detect and removed, as they contain over 100 words, compared to real events consisting of at most a few tens of words. For this reason, these clusters (numbers 21 and 30 in the plots) were removed before evaluation. Neither of these two events remains after removing those with period lower or equal to 7 days.
+
+\subsection{Detection statistics}
+The results are very similar to those from the bachelor thesis. The original method generates a large number of events consisting of very few keywords. The embedded-greedy method detects fewer events with more keywords. The cluster-based method detects the lowest number of events with two outliers mentioned above.
+
+\subsubsection{Number of events}
+\begin{center}
+\begin{tabular}{r c c c} \toprule[1.5pt]
+& \bf Original & \bf Embedded-greedy & \bf Cluster-based \\ \midrule
+\bf Events detected & 125 & 77 & 36 \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+
+\subsubsection{Keywords per event}
+\begin{center}
+\begin{tabular}{r c c c} \toprule[1.5pt]
+& \bf Original & \bf Embedded-greedy & \bf Cluster-based \\ \midrule
+\bf Mean & 2.064 & 12.442 & 15.056 \\
+\bf Std	& 0.304 & 9.541 & 23.762 \\
+\bf Min	& 2.000	& 3.000 & 4.000 \\
+\bf 25\% & 2.000 & 5.000 & 5.000 \\
+\bf 50\% & 2.000 & 9.000 & 7.500 \\
+\bf 75\% & 2.000 & 16.000 & 16.000 \\
+\bf Max	& 4.000 & 43.000 & 136.000 \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+
+\subsection{Detection statistics -- only events with period higher than 7 days}
+
+\subsubsection{Number of events}
+\begin{center}
+\begin{tabular}{r c c c} \toprule[1.5pt]
+& \bf Original & \bf Embedded-greedy & \bf Cluster-based \\ \midrule
+\bf Events detected & 113 & 18 & 14 \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+\subsubsection{Keywords per event}
+\begin{center}
+\begin{tabular}{r c c c} \toprule[1.5pt]
+& \bf Original & \bf Embedded-greedy & \bf Cluster-based \\ \midrule
+\bf Mean & 2.071 & 9.667 & 10.143 \\
+\bf Std	& 0.320 & 7.538 & 10.007 \\
+\bf Min	& 2.000	& 3.000 & 4.000 \\
+\bf 25\% & 2.000 & 6.000 & 4.250 \\
+\bf 50\% & 2.000 & 7.500 & 6.500 \\
+\bf 75\% & 2.000 & 10.750 & 8.000 \\
+\bf Max	& 4.000 & 36.000 & 40.000 \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+\subsection{Precision, recall, F-measure}
+
+\subsubsection{As detected}
+Overall, the cluster-based method reached the highest results. The high recall of the original method will be explained in Section \ref{redundancy}. The original method reached high redundancy, so that a correctly detected event would be counted multiple times.
+\begin{center}
+\begin{tabular}{r c c c} \toprule[1.5pt]
+\bf Method & \bf Precision & \bf Recall & \bf F-measure \\ \midrule
+\bf Original & 13.600\% & 26.316\% & 0.179 \\
+\bf Embedded-greedy & 7.792\% & 18.421\% & 0.110 \\
+\bf Cluster-based & 20.588\% & 26.316\% & 0.231 \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+\subsubsection{Only events with period higher than 7 days}
+Compared to the previous table, the precision of all three methods is higher, while the recall remains the same. This confirms the intuition that there simply are not that many events of interest with a period as small as 7 days.
+\begin{center}
+\begin{tabular}{r c c c} \toprule[1.5pt]
+\bf Method & \bf Precision & \bf Recall & \bf F-measure \\ \midrule
+\bf Original & 14.159\% & 26.316\% & 0.184 \\
+\bf Embedded-greedy & 11.111\% & 18.421\% & 0.139 \\
+\bf Cluster-based & 35.714\% & 26.316\% & 0.303 \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+
+\subsection{Noisiness}
+\subsubsection{As detected}
+The relatively high noisiness of the cluster-based method (where noisiness is expected to be low) is explained by the last 5 events detected. They all concern the same football matches, consist of words in different languages. They all have a low period though, and are filtered out in Subsection \ref{noisiness-high-period}.
+
+\begin{center}
+\begin{tabular}{r c} \toprule[1.5pt]
+\bf Method & \bf Noisiness \\ \midrule
+\bf Original & 80.800\% \\
+\bf Embedded-greedy & 84.416 \\
+\bf Cluster-based & 38.235 \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+\subsubsection{Only events with period higher than 7 days} \label{noisiness-high-period}
+\begin{center}
+\begin{tabular}{r c} \toprule[1.5pt]
+\bf Method & \bf Noisiness \\ \midrule
+\bf Original & 80.531\% \\
+\bf Embedded-greedy & 88.889 \\
+\bf Cluster-based & 21.429 \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+\subsection{Redundancy} \label{redundancy}
+Redundancy was evaluated both on all events, and on those marked as ``not noisy''.
+
+After removing noisy events, the embedded-greedy method seemingly performed very well. However, when we look back to the noisiness evaluation, we see that almost \textit{all} events were noisy. Therefore, not many events are left to evaluate redundancy after removing these.
+
+\subsubsection{As detected}
+\begin{center}
+\begin{tabular}{r c c} \toprule[1.5pt]
+\bf Method & \bf Redundancy (all events) & \bf Redundancy (no noise) \\ \midrule
+\bf Original & 65.600\% & 33.333\% \\
+\bf Embedded-greedy & 57.143\% & 8.333\% \\
+\bf Cluster-based & 14.706\% & 19.048\% \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+\subsubsection{Only events with period higher than 7 days}
+\begin{center}
+\begin{tabular}{r c c} \toprule[1.5pt]
+\bf Method & \bf Redundancy (all events) & \bf Redundancy (no noise) \\ \midrule
+\bf Original & 67.257\% & 36.364\% \\
+\bf Embedded-greedy & 22.222\% & 0.000\% \\
+\bf Cluster-based & 0.000\% & 0.000\% \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+\subsection{Purity}
+The cluster labels used for this evaluation can be found in Appendix \ref{cluster-labels}.
+
+In this case, only events with period higher than 7 days were evaluated. The reason is that such short periods essentially cover the entire document stream with short bursts, and for each of those, the documents would need to be retrieved. As the Word Mover's Distance \cite{wmd} is by itself a computationally expensive operation, this would take an unbearable amount of time.
+
+Furthermore, as we have seen when comparing results before and after removing these periods, such short-periodic events do not really contribute anything meaningful.
+
+\begin{center}
+\begin{tabular}{r c} \toprule[1.5pt]
+\bf Method & Purity \\ \midrule
+\bf Original & 33.62\% \\
+\bf Embedded-greedy & 27.51\% \\
+\bf Cluster-based & 60.59\% \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+
+\subsection{Computation time}
+The Word2Vec model can be pretrained and stored for future use. The tightest bottleneck of our two methods is therefore the Document retrieval phase.
+
+\begin{center}
+\begin{tabular}{r c c c} \toprule[1.5pt]
+\bf Unit & \bf Original & \bf Embedded-greedy & \bf Cluster-based \\ \midrule
+Word2Vec training & N/A & \multicolumn{2}{c}{2h 10min} \\
+Bag of words & $\longleftarrow$ & {15min} & $\longrightarrow$ \\
+Word trajectories & $\longleftarrow$ & 7s & $\longrightarrow$ \\
+Event detection & 5min 56s & 5min 49s & 2min35s \\
+Document retrieval & 1min 44s & 4h 41min & 4h 16min \\ \midrule
+\bf Total & 22min 47s & 7h 12min & 6h 44min \\ \bottomrule[1.25pt]
+\end{tabular}
+\end{center}
+
+
+\appendix
+
+\section{Cluster labels for Purity evaluation} \label{cluster-labels}
+We have selected 60 important words from 1000 most common words among all headlines. Again, only Nouns, Verbs, Adjectives and Adverbs were considered.
+
+The words are: \textit{price, u.s., us, stock, india, bank, target, stocks, oil, company, financial, forecast, europe, china, euro, energy, asia, dollar, soccer, economy, nasdaq, japan, research, industries, markets, politics, eu, finance, crisis, russia, canada, morgan, money, trading, olympics, france, banking, kill, mexico, brazil, mideast, obama, school, healthcare, housing, iraq, tennis, minister, iran, israel, attack, weather, president, gaza, police, protest, rebel, troop, death, afghanistan}.
+
+\section{Reference events}
+The following table contains confirmed events that happened between January 1, 2008 and February 28, 2009. The data was taken from \textit{https://www.onthisday.com/}.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}c @{}c X@{}}\toprule[1.5pt]
+\bf \# & \bf Date & \bf Headline \\ \midrule
+1 & Jan 1 & Malta and Cyprus officially adopt the Euro currency and become the fourteenth and fifteenth Eurozone countries. \\
+2 & Jan 14 & MESSENGER spacecraft performs a Mercury flyby \\
+3 & Jan 21 & Black Monday in worldwide stock markets. FTSE 100 had its biggest ever one-day points fall, European stocks closed with their worst result since 9/11, and Asian stocks drop as much as 15\%. \\
+4 & Feb 5 & A major tornado outbreak across the Southern United States leaves at least 58 dead, the most since the May 31, 1985 outbreak that killed 88. \\
+5 & Feb 14 & Northern Illinois University shooting: a gunman opened fire in a lecture hall of the DeKalb County, Illinois university resulting in 24 casualties; 6 fatalities (including gunman) and 18 injured. \\
+6 & Feb 17 & Kosovo declares independence from Serbia. \\
+7 & Feb 23 & B-2 Spirit of the USAF crashes at Guam. Crew survives but aircraft written off, the most expensive air crash in human history (aircraft alone cost \$1.2Bn). B-2 had a perfect safety record before the crash; not one B-2 ever crashed. \\
+8 & Feb 28 & Former Prime Minister of Thailand Thaksin Shinawatra is arrested on corruption charges upon returning to Thailand after months of exile. \\
+9 & Mar 2 & Riots in Yerevan, Armenia concerning the Armenian presidential election, 2008 come to a fatal end, with police forces clashing with civilians in their peaceful protest, resulting in 8 deaths. \\
+10 & Mar 24 & Bhutan officially becomes a democracy, with its first ever general election. \\
+11 & May 2 & Cyclone Nargis makes landfall in Myanmar killing over 130,000 people and leaving millions of people homeless \\
+12 & May 6 & Chaiten Volcano erupts in Chile, forcing the evacuation of more than 4,500 people. \\
+13 & May 7 & Dmitry Medvedev is sworn in as the 3rd President of the Russian Federation \\
+14 & May 12 & Wenchuan earthquake, measuring 7.8 in magnitude occurs in Sichuan, China, killing over 87,000, injuring 374,643 and leaving homeless between 4.8 million and 11 million people \\
+15 & Jun 8 & The Akihabara massacre took place on the Sunday-pedestrian-zoned Chuodori street. A man killed seven in an attack on a crowd using a truck and a dagger. \\
+16 & Jun 10 & The Gora Prai airstrike by the United States reportedly kills 11 Pakistani paramilitary troops. \\
+17 & Jun 25 & Atlantis Plastics shooting, An employee shot and killed five people after an argument, which ended in the gunman's suicide in Henderson, Kentucky. \\
+18 & Aug 8 & Georgian invasion into South Ossetia. Beginning of five-day war between Georgia and Russia. \\
+19 & Aug 8 & 29th Olympic Games opens at Beijing, China \\
+20 & Aug 10 & 90th PGA Championship: Pádraig Harrington shoots a 277 at Oakland Hills Country Club \\
+21 & Aug 20 & Spanair Flight 5022, from Madrid to Gran Canaria, skids off the runway and crashes at Barajas Airport. 146 people are killed in the crash, 8 more die afterwards. Only 18 people survive. \\
+22 & Sep 10 & The Large Hadron Collider at CERN, described as the biggest scientific experiment in the history of mankind is powered up in Geneva, Switzerland \\
+23 & Sep 13 & Hurricane Ike makes landfall on the Texas Gulf Coast of the United States, causing heavy damage to Galveston Island, Houston and surrounding areas. \\
+24 & Sep 21 & Goldman Sachs and Morgan Stanley, the two last remaining independent investment banks on Wall Street, become bank holding companies as a result of the subprime mortgage crisis. \\
+25 & Oct 6 & MESSENGER spacecraft performs a second Mercury flyby \\
+26 & Nov 4 & Barack Obama becomes the first African-American to be elected President of the United States \\
+27 & Nov 25 & A car bomb in St. Petersburg, Russia, kills three people and injures one \\
+28 & Nov 26 & Terrorist attacks in Mumbai, India: Ten coordinated attacks by Pakistan-based terrorists kill 164 and injure more than 250 people in Mumbai, India. \\
+29 & Dec 1 & The US economy has been in recession since December 2007, the National Bureau of Economic Research announces today \\
+30 & Jan 1 & Slovakia officially adopts the Euro currency and becomes the sixteenth Eurozone country. \\
+31 & Jan 1 & 61 die in nightclub fire in Bangkok, Thailand. \\
+32 & Jan 3 & Israeli ground forces invade Gaza. \\
+33 & Jan 8 & A 6.2 magnitude earthquake hit Costa Rica's region of Volcan Poás, with an epicenter near Cinchona. It was caused by Varablanca-Angel fault. \\
+34 & Jan 15 & Chesley Sullenberger lands US Airways Flight 1549 on the Hudson River shortly after takeoff from LaGuardia Airport in NYC. All passengers and crew members survive in what becomes known as the ``Miracle on the Hudson'' \\
+35 & Jan 20 & Barack Obama, inaugurated as the 44th President of the United States of America, becomes the United States' first African-American president \\
+36 & Jan 31 & In Kenya, at least 113 people are killed and over 200 injured following an oil spillage ignition in Molo, days after a massive fire at a Nakumatt supermarket in Nairobi killed at least 25 people. \\
+37 & Feb 7 & Bushfires in Victoria left 173 dead in the worst natural disaster in Australia's history. \\
+38 & Feb 25 & BDR massacre in Pilkhana, Dhaka, Bangladesh. 74 People are being killed, including more than 50 Army officials, by Bangladeshi Boarder Guards inside its headquarter. \\
+
+\bottomrule[1.25pt]
+\end{tabularx}
+\end{center}
+
+\bibliographystyle{unsrt}
+\bibliography{bibliography}
+
+\end{document}

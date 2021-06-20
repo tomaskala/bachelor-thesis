@@ -267,6 +267,24 @@ def detect_events(bow_matrix, feature_trajectories, dps, dp, aperiodic):
                                                            dp_slice)))
 
 
+def detect_all_events(bow_matrix, feature_trajectories, dps, dp):
+    _, n_days = feature_trajectories.shape
+    feature_indices = np.where(dps > DPS_BOUNDARY)[0]
+
+    if len(feature_indices) == 0:
+        logging.warning('No features to detect events from.')
+        return []
+
+    bow_slice = bow_matrix[:, feature_indices]
+    trajectories_slice = feature_trajectories[feature_indices, :]
+    dps_slice = dps[feature_indices]
+    dp_slice = dp[feature_indices]
+
+    return list(filter(lambda event: len(event) > 1,
+                       unsupervised_greedy_event_detection(feature_indices, bow_slice, trajectories_slice, dps_slice,
+                                                           dp_slice)))
+
+
 def summarize_events(events, events_docids_repr, id2word, w2v_model):
     """
     Perform multi-document summarization on documents retrieved for the events detected. The summaries will be
